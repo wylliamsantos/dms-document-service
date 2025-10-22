@@ -1,0 +1,77 @@
+spring:
+  cloud:
+    vault:
+      enabled: false
+  config:
+    activate:
+      on-profile: test
+    import: "optional:consul:"
+  redis:
+    host: localhost
+  http:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+dms:
+  s3:
+    region: us-east-1
+  uid: admin
+  authorization: Basic YWRtaW46YWRtaW4=
+  documentId: "{\"documentId\":%s}"
+  enablePermanentDelete: false
+  lockConfig: "{\"timeToExpire\":0,\"type\":\"ALLOW_OWNER_CHANGES\",\"lifetime\":\"PERSISTENT\"}"
+  hashAlgorithm: MD5
+  personalDocuments: "ac:identificacao"
+  identificacao.path: /pessoas/%s/cpf_%s/identificacao
+  groupDateMask: yyyy/MM/dd
+  contentTypes: image/jpeg#image/png#image/tiff#application/pdf
+  searchByCpfAndName: "{\"ac:cpf\":\"%s\", \"cmis:name\":\"%s\"}"
+  urlBase: http://localhost
+  url:
+    documentInformation: http://localhost
+    urlSearch: http://localhost
+  search: 
+    searchPathId: "select * from cmis:folder c where c.cmis:name = 'pessoas' and CONTAINS('PATH:\"//app:company_home/st:sites/cm:agiplan/cm:documentLibrary/cm:pessoas\"')"
+    searchCpfPath: "select * from cmis:folder c where c.cmis:name = 'cpf_%s' and IN_TREE(c, 'workspace://SpacesStore/%s')"
+  msg:
+    jsonMetadataError: Json metadata com formato incorreto
+    unknowError: Erro ao acessar o DMS
+    lockError: "Não foi possível realizar a operação de lock. Código HTTP retornado: %s"
+    invalidLockKey: Lock Key inválida para esse documento
+    alreadyLock: O documento já está em lock
+    notLocked: O documento não está em lock
+    mimeTypeInvalid: Mime type do arquivo não suportado
+    typeInvalid: Tipo de documento não suportado
+    checkDuplicateError: Não foi possível verificar se o documento já existe no DMS
+
+token:
+  access:
+    publicKey: test
+
+keystore:
+  path: test
+  password: test
+  certificate-alias: test
+
+timestamp-authority:
+  url: http://localhost
+  connectTimeout: 100000
+signature:
+  private-key: teste
+  certificate: test
+
+allowDigitalSignature: true
+
+alfresco:
+  dms:
+    siteId: 1234
+
+management:
+  security:
+    enabled: false
+
+
+aws:
+  s3:
+    expiration: 6000

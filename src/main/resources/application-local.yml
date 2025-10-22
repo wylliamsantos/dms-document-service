@@ -1,0 +1,68 @@
+spring:
+  config:
+    activate:
+      on-profile: local
+    import: "optional:configserver:"  # disable vault/import during local runs
+  cloud:
+    vault:
+      enabled: false
+  redis:
+    host: localhost
+    port: 6379
+  http:
+    multipart:
+      max-file-size: 11MB
+      max-request-size: 10MB
+  data:
+    mongodb:
+      uri: mongodb://dms:dms@localhost:27017/dms?authSource=dms
+logging:
+  level:
+    br.com.dms: DEBUG
+dms:
+  fallback:
+    enabled: true
+  s3:
+    region: us-east-1
+    bucket-name: dms-local
+    endpoint: http://localhost:9000
+    access-key: dms
+    secret-key: dmssecret
+  contentTypes: "image/jpeg#image/png#image/tiff#application/pdf#text/plain#image/bmp#application/octet-stream"
+  hashAlgorithm: MD5
+  msg:
+    base64Invalid: Não foi possível utilizar o base64 informado
+    payloadInvalid: Body não enviado
+    jsonMetadataError: Json metadata com formato incorreto
+    unknowError: Erro ao acessar o DMS
+    lockError: "Não foi possível realizar a operação de lock. Código HTTP retornado: %s"
+    invalidLockKey: Lock Key inválida para esse documento
+    alreadyLock: O documento já está em lock
+    notLocked: O documento não está em lock
+    mimeTypeInvalid: Mime type do arquivo não suportado
+    typeInvalid: Tipo de documento não suportado
+    checkDuplicateError: Não foi possível verificar se o documento já existe no DMS
+    typeDocumentInvalid: Tipo de documento não configurado ou configurado incorretamente
+    issuingDateIsMandatory: Data de emissão/referência obrigatória para o tipo de documento informado
+    authorIsMandatory: Author é obrigatório
+    unsuportedOperation: Operação não suportada ou não implementada
+aws:
+  s3:
+    expiration: 5000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: prometheus,health,info
+
+timestamp-authority:
+  url: http://localhost
+  #url: http://sha256timestamp.ws.symantec.com/sha256/timestamp
+  connectTimeout: 10000
+
+signature:
+  private-key: ""
+  certificate: ""
+
+allowDigitalSignature: false

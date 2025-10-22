@@ -1,0 +1,88 @@
+package br.com.dms.service;
+
+import br.com.dms.domain.mongodb.Category;
+import br.com.dms.exception.DmsBusinessException;
+import br.com.dms.exception.TypeException;
+import br.com.dms.repository.mongo.CategoryRepository;
+import br.com.dms.service.handler.PrefixHandler;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.networknt.schema.JsonSchema;
+import com.networknt.schema.JsonSchemaFactory;
+import com.networknt.schema.SpecVersion;
+import com.networknt.schema.ValidationMessage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import java.io.IOException;
+import java.time.LocalDate;
+import java.util.Map;
+import java.util.Set;
+
+import static br.com.dms.domain.Messages.*;
+
+@Service
+public class ValidatorCategoryService {
+    private static final Logger logger = LoggerFactory.getLogger(ValidatorCategoryService.class);
+    private final CategoryRepository categoryRepository;
+
+    protected final PrefixHandler prefixHandler;
+
+    public ValidatorCategoryService(CategoryRepository categoryRepository,
+                                    PrefixHandler prefixHandler) {
+        this.categoryRepository = categoryRepository;
+        this.prefixHandler = prefixHandler;
+    }
+
+    public Set<ValidationMessage> validateCategory(String categoryName, Map<String, Object> jsonMetadata, LocalDate issuingDate, String transactionId) throws IOException {
+        logger.info("DMS - Validar categoria: {}", categoryName);
+        var category = this.categoryRepository.findByName(categoryName)
+                .orElseThrow(() -> {
+                    logger.error("DMS - Categoria {} não encontrada", categoryName);
+                    throw new DmsBusinessException(CATEGORY_NOT_FOUND, TypeException.VALID, transactionId);
+                });
+
+
+        var schema = getJsonSchema(category.getSchema());
+        handleIssuingDate(issuingDate, category, jsonMetadata);
+        var jsonContent = getJsonNodeFromMapContent(jsonMetadata);
+        return validate(schema, jsonContent);
+    }
+
+    private Set<ValidationMessage> validate(JsonSchema jsonSchema, JsonNode json) {
+        return jsonSchema.validate(json);
+    }
+
+    private void handleIssuingDate(LocalDate issuingDate, Category documentCategory, Map<String, Object> jsonMetadata) {
+        if (documentCategory.getValidityInDays() != null) {
+            if (issuingDate == null) {
+                logger.error(ISSUING_DATE_IS_MANDATORY);
+                throw new DmsBusinessException(ISSUING_DATE_IS_MANDATORY, TypeException.VALID);
+            }
+            LocalDate expirationDate = issuingDate.plusDays(documentCategory.getValidityInDays());
+
+            if (LocalDate.now().isAfter(expirationDate)) {
+                logger.error(INVALID_DATE);
+                throw new DmsBusinessException(INVALID_DATE, TypeException.VALID);
+            }
+
+            jsonMetadata.put(prefixHandler.handle(documentCategory.getPrefix(), "dataExpiracao"), expirationDate.toString());
+            jsonMetadata.put(prefixHandler.handle(documentCategory.getPrefix(), "dataEmissao"), issuingDate.toString());
+        }
+    }
+
+    private JsonSchema getJsonSchema(Map<Object, Object> schemaMap) {
+        ObjectMapper mapper = new ObjectMapper();
+        JsonSchemaFactory factory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V4);
+        var jsonNode = mapper.convertValue(schemaMap, JsonNode.class);
+        return factory.getSchema(jsonNode);
+    }
+
+    private JsonNode getJsonNodeFromMapContent(Map<String, Object> schemaMap) {
+        ObjectMapper mapper = new ObjectMapper();
+        return mapper.convertValue(schemaMap, JsonNode.class);
+    }
+
+
+}

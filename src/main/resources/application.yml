@@ -1,0 +1,49 @@
+---
+spring:
+  main:
+    banner-mode: off
+  mvc:
+    pathmatch:
+      matching-strategy: "ant-path-matcher"
+  application:
+    group: dms
+    name: dms-document-service
+  cache:
+    ehcache:
+      config: classpath:ehcache.xml
+management:
+  endpoints.web.exposure.include: 'health,prometheus'
+  endpoint:
+    metrics.enabled: false
+    prometheus.enabled: true
+  health:
+    consul.enabled: false
+    vault.enabled: false
+---
+spring:
+  config:
+    activate:
+      on-profile: default
+    import: "vault://secretv2/${spring.application.group}/${spring.application.name},consul:/config/${spring.application.group}/${spring.application.name}"
+  cloud:
+    consul:
+      scheme: https
+      host: ${CONSUL_HOST:consul.dms-dev.in}
+      port: 443
+      config:
+        format: YAML
+        acl-token: ${CONSUL_TOKEN:2d7e28b1-7795-a670-c470-cc47f8387c7a}
+    vault:
+      uri: ${VAULT_URI:https://vault.dms-dev.in:443}
+      fail-fast: true
+      scheme: https
+      authentication: ${VAULT_AUTH:TOKEN}
+      token: hvs.CAESIF0D7YRDXGBdumOfEBz2H3Mn9ih4RAlz3H9it3pM0ic9Gh4KHGh2cy5mV1pBcXh6MFQ5WEZPU3dFRDh3YUp6VFo
+      kubernetes:
+        role: ${spring.application.group}-${spring.application.name}
+        kubernetes-path: ${CLUSTER_NAME}
+  sleuth:
+    sampler:
+      probability: 1.0
+  zipkin:
+    base-url: ${ZIPKIN_URL:http://jaeger-collector.observability.svc.cluster.local:9411}

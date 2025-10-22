@@ -1,0 +1,79 @@
+plugins {
+    id 'org.springframework.boot' version '3.2.6'
+    id 'io.spring.dependency-management' version '1.1.5'
+    id 'java'
+}
+
+bootJar {
+    archiveFileName = 'dms-document-service.jar'
+}
+
+repositories {
+    mavenCentral()
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
+    implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0'
+
+    implementation 'io.jsonwebtoken:jjwt:0.9.1'
+    implementation 'org.apache.commons:commons-lang3:3.14.0'
+    implementation 'org.apache.tika:tika-core:2.9.2'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+    implementation 'net.sf.ehcache:ehcache:2.10.6'
+    implementation 'commons-io:commons-io:2.15.1'
+    implementation 'com.drewnoakes:metadata-extractor:2.19.0'
+
+    implementation 'org.bouncycastle:bcmail-jdk15on:1.70'
+    implementation 'org.bouncycastle:bcprov-jdk15on:1.70'
+    implementation 'org.apache.pdfbox:pdfbox:2.0.30'
+
+    implementation 'com.amazonaws:aws-java-sdk-config:1.12.691'
+    implementation 'com.amazonaws:aws-java-sdk-s3:1.12.691'
+    implementation 'com.amazonaws:aws-java-sdk-sts:1.12.691'
+    implementation 'com.amazonaws:aws-java-sdk-core:1.12.691'
+    implementation 'com.networknt:json-schema-validator:1.0.76'
+    implementation 'org.modelmapper:modelmapper:3.2.0'
+
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.mockito:mockito-inline:5.2.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.register('generateOpenApiDocs', Test) {
+    include '**/OpenApiSpecTest.class'
+    useJUnitPlatform()
+}
+
+tasks.named('check') {
+    dependsOn 'generateOpenApiDocs'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+}
