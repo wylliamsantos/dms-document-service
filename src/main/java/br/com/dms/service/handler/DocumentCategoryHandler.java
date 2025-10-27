@@ -59,6 +59,7 @@ public class DocumentCategoryHandler {
         documentCategory.setId(null);
         documentCategory.setName(category.getName());
         documentCategory.setDescription(category.getDescription());
+        documentCategory.setPrefix(category.getPrefix());
         documentCategory.setMainType(category.getMainType());
         documentCategory.setTypeSearch(category.getTypeSearch());
         documentCategory.setUniqueAttributes(category.getUniqueAttributes());
@@ -107,6 +108,14 @@ public class DocumentCategoryHandler {
         Object rawType = metadata.get(documentTypeKey);
         if (rawType == null) {
             rawType = metadata.get(documentTypeKey.toLowerCase());
+        }
+
+        if (rawType == null && StringUtils.isNotBlank(documentCategory.getPrefix())) {
+            String prefixedKey = documentCategory.getPrefix() + StringUtils.capitalize(documentTypeKey);
+            rawType = metadata.get(prefixedKey);
+            if (rawType == null) {
+                rawType = metadata.get(prefixedKey.toLowerCase());
+            }
         }
         String documentTypeName = rawType instanceof String ? (String) rawType : null;
 
