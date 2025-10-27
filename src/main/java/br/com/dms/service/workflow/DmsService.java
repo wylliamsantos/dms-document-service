@@ -3,29 +3,26 @@ package br.com.dms.service.workflow;
 import br.com.dms.controller.request.PayloadApprove;
 import br.com.dms.controller.request.PayloadUrlPresigned;
 import br.com.dms.controller.response.UrlPresignedResponse;
-import br.com.dms.service.AmazonS3Service;
+import br.com.dms.domain.core.DocumentId;
 import br.com.dms.domain.mongodb.DmsDocument;
 import br.com.dms.domain.mongodb.DmsDocumentVersion;
 import br.com.dms.domain.mongodb.type.VersionType;
-import br.com.dms.domain.core.DocumentCategory;
-import br.com.dms.domain.core.DocumentId;
-import br.com.dms.service.handler.PrefixHandler;
-import br.com.dms.repository.mongo.DmsDocumentRepository;
-import br.com.dms.repository.mongo.DmsDocumentVersionRepository;
-import br.com.dms.repository.redis.DocumentInformationRepository;
-import br.com.dms.service.signature.SigningService;
 import br.com.dms.exception.DmsBusinessException;
 import br.com.dms.exception.DmsException;
 import br.com.dms.exception.TypeException;
+import br.com.dms.repository.mongo.DmsDocumentRepository;
+import br.com.dms.repository.mongo.DmsDocumentVersionRepository;
+import br.com.dms.repository.redis.DocumentInformationRepository;
+import br.com.dms.service.AmazonS3Service;
+import br.com.dms.service.signature.SigningService;
 import br.com.dms.util.DmsUtil;
 import com.amazonaws.HttpMethod;
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.tika.mime.MimeType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.core.env.Environment;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.dao.DuplicateKeyException;
@@ -41,12 +38,14 @@ import java.math.BigDecimal;
 import java.net.URL;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.Date;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 
 @Service
+@Slf4j
 public class DmsService {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(DmsService.class);
 
     private final AmazonS3Service amazonS3Service;
 
@@ -60,9 +59,6 @@ public class DmsService {
 
     private final Environment environment;
 
-
-    protected final PrefixHandler prefixHandler;
-
     protected final SigningService signingService;
 
     private final MetadataService metadataService;
@@ -73,7 +69,6 @@ public class DmsService {
                       DmsDocumentVersionRepository dmsDocumentVersionRepository,
                       DmsUtil dmsUtil,
                       Environment environment,
-                      PrefixHandler prefixHandler,
                       SigningService signingService,
                       MetadataService metadataService) {
         this.amazonS3Service = amazonS3Service;
@@ -82,39 +77,15 @@ public class DmsService {
         this.dmsDocumentVersionRepository = dmsDocumentVersionRepository;
         this.dmsUtil = dmsUtil;
         this.environment = environment;
-        this.prefixHandler = prefixHandler;
         this.signingService = signingService;
         this.metadataService = metadataService;
-    }
-
-    protected void handleIssuingDate(String transactionId, LocalDate issuingDate, DocumentCategory documentCategory, HashMap<String, Object> jsonMetadata) {
-        if (documentCategory.getConditionalValidityInDays() != null) {
-            if (issuingDate == null) {
-                LOGGER.info("DMS - TransactionId: {} - issuing date is mandatory for this document category {}  and document type {}", transactionId,
-                        documentCategory.getName(), documentCategory.getDocumentType().getName());
-                throw new DmsBusinessException(environment.getProperty("dms.msg.issuingDateIsMandatory"), TypeException.VALID, transactionId);
-            }
-            LocalDate expirationDate = issuingDate.plusDays(documentCategory.getConditionalValidityInDays());
-
-            if (LocalDate.now().isAfter(expirationDate)) {
-                LOGGER.info("DMS - TransactionId: {} - Invalid issuing date {}, expiration date {}", transactionId, issuingDate, expirationDate);
-                throw new DmsBusinessException(environment.getProperty("dms.msg.invalidIssuingDate"), TypeException.VALID, transactionId);
-            }
-
-            jsonMetadata.put(prefixHandler.handle(documentCategory.getPrefix(), "dataExpiracao"), expirationDate.toString());
-            jsonMetadata.put(prefixHandler.handle(documentCategory.getPrefix(), "dataEmissao"), issuingDate.toString());
-
-            LOGGER.info("DMS - TransactionId: {} - Adding expiration {{}} and issuing dates {{}} to alfresco metadata", transactionId, expirationDate,
-                    issuingDate);
-
-        }
     }
 
     public ResponseEntity<?> reprove(String transactionId, String documentId, String documentVersion) {
         var documentExists = dmsDocumentRepository.existsById(documentId);
 
         if (documentExists) {
-            LOGGER.info("DMS - TransactionId: {} - Documento {} e versão {} encontrado será reprovado", transactionId, documentId, documentVersion);
+            log.info("DMS - TransactionId: {} - Documento {} e versão {} encontrado será reprovado", transactionId, documentId, documentVersion);
             var optionalDmsDocumentVersion = dmsDocumentVersionRepository.findByDmsDocumentIdAndVersionNumber(documentId, documentVersion);
             var dmsDocumentversion = optionalDmsDocumentVersion.orElseThrow(() -> new DmsException(String.format("Versão %s não encontrada para document %s", documentId, documentVersion), TypeException.VALID));
             dmsDocumentVersionRepository.delete(dmsDocumentversion);
@@ -140,7 +111,7 @@ public class DmsService {
         Optional<DmsDocument> optEntity = dmsDocumentRepository.findByCpfAndFilename(cpf, fileName);
 
         if (optEntity.isPresent()) {
-            LOGGER.info("DMS - TransactionId: {} - Documento {} encontrado será atualizado", transactionId, documentId);
+            log.info("DMS - TransactionId: {} - Documento {} encontrado será atualizado", transactionId, documentId);
             var entity = optEntity.get();
             var dmsDocumentVersion = dmsDocumentVersionRepository.findLastVersionByDmsDocumentId(entity.getId()).orElseThrow();
             dmsDocumentVersion.setMetadata(jsonMetadata);
@@ -168,7 +139,7 @@ public class DmsService {
 
             return createOrUpdate(transactionId, isFinal, documentData, documentResource, issuingDate, author, metadata, documentCategoryName, documentTypeName, effectiveFilename, comment);
         } catch (IOException e) {
-            LOGGER.error("DMS - TransactionId: {} - Error processing multipart document", transactionId, e);
+            log.error("DMS - TransactionId: {} - Error processing multipart document", transactionId, e);
             throw new DmsException(environment.getProperty("dms.msg.unknowError"), TypeException.CONFIG, transactionId);
         }
     }
@@ -188,28 +159,8 @@ public class DmsService {
         return createOrUpdate(transactionId, isFinal, documentData, documentResource, issuingDate, author, metadata, documentCategoryName, documentTypeName, filenameDms, comment);
     }
 
-    public DocumentId createOrUpdate(String transactionId, boolean isFinal, String documentAsBase64, LocalDate issuingDate, String author, Map<String, Object> metadados, String documentCategoryName,
-                                     String documentTypeName, String filenameDms, String comment) throws IOException {
-
-        final ByteArrayInputStream documentData = new ByteArrayInputStream(Base64.decodeBase64(documentAsBase64));
-        final ByteArrayResource documentResource = new ByteArrayResource(Base64.decodeBase64(documentAsBase64)) {
-            @Override
-            public String getFilename() {
-                return filenameDms;
-            }
-        };
-
-        try {
-            String metadataJson = metadados != null ?
-                new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(metadados) : "{}";
-            return createOrUpdate(transactionId, isFinal, documentData, documentResource, issuingDate, author, metadataJson, documentCategoryName, documentTypeName, filenameDms, comment);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            throw new IOException("Erro ao converter metadados para JSON", e);
-        }
-    }
-
     @Transactional
-    public DocumentId createOrUpdate(String transactionId, boolean isFinal, ByteArrayInputStream documentData, ByteArrayResource documentResource, LocalDate issuingDate, String author, String metadata, String documentCategoryName,
+    private DocumentId createOrUpdate(String transactionId, boolean isFinal, ByteArrayInputStream documentData, ByteArrayResource documentResource, LocalDate issuingDate, String author, String metadata, String documentCategoryName,
                                      String documentTypeName, String filenameDms, String comment) throws IOException {
 
         Map<String, Object> jsonMetadata = metadataService.getValideMetadata(transactionId, metadata, documentCategoryName, issuingDate);
@@ -257,7 +208,7 @@ public class DmsService {
             entity.setMetadata(jsonMetadata);
             dmsDocumentRepository.save(entity);
         } catch(DuplicateKeyException e) {
-            LOGGER.error("Chave duplicada para criacao de documento filename={}, cpf={}, version={}. Limpando registros orfãos", filenameDms, cpf, version);
+            log.error("Chave duplicada para criacao de documento filename={}, cpf={}, version={}. Limpando registros orfãos", filenameDms, cpf, version);
             dmsDocumentVersionRepository.deleteById(idNewVersion);
             throw new DuplicateKeyException(String.format("Chave duplicada para criacao de documento filename=%s, cpf=%s, version=%s. Registro ja se encontra na base. Verificar concorrencia nas chamadas", filenameDms, cpf, version));
         }
@@ -268,7 +219,7 @@ public class DmsService {
 
 
     public ResponseEntity<DocumentId> approveWithSignatureText(String documentId, String documentVersion, String transactionId, PayloadApprove payloadApprove) throws IOException {
-        LOGGER.info("approveWithSignatureText documentId {} documentVersion {} transactionId {} signatureText {}", documentId, documentVersion, transactionId, payloadApprove);
+        log.info("approveWithSignatureText documentId {} documentVersion {} transactionId {} signatureText {}", documentId, documentVersion, transactionId, payloadApprove);
 
         Optional<DmsDocument> optEntity = dmsDocumentRepository.findById(documentId);
         Optional<DmsDocumentVersion> optEntityVersion = dmsDocumentVersionRepository.findByDmsDocumentIdAndVersionNumber(documentId, documentVersion);
@@ -348,7 +299,7 @@ public class DmsService {
             entity.setMetadata(metadata);
             dmsDocumentRepository.save(entity);
         } catch(DuplicateKeyException e) {
-            LOGGER.error("Chave duplicada para criacao de documento filename={}, cpf={}, version={}. Limpando registros orfãos", payloadUrlPresigned.getFileName(), cpf, version);
+            log.error("Chave duplicada para criacao de documento filename={}, cpf={}, version={}. Limpando registros orfãos", payloadUrlPresigned.getFileName(), cpf, version);
             dmsDocumentVersionRepository.deleteById(idNewVersion);
             throw new DuplicateKeyException(String.format("Chave duplicada para criacao de documento filename=%s, cpf=%s, version=%s. Registro ja se encontra na base. Verificar concorrencia nas chamadas", payloadUrlPresigned.getFileName(), cpf, version));
         }
@@ -370,9 +321,6 @@ public class DmsService {
                 .withExpiration(expiration);
 
         URL presignedUrl = amazonS3Service.generatePresignedUrl(generatePresignedUrlRequest);
-
-        LOGGER.info("Presigned URL to upload a file to: [{}]", presignedUrl);
-        LOGGER.info("HTTP method: [PUT]");
 
         return UrlPresignedResponse.builder()
                 .url(presignedUrl)

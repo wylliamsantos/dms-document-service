@@ -232,16 +232,4 @@ public class DocumentCreateService {
 
         return ResponseEntity.status(HttpStatus.CREATED).body(documentId);
     }
-
-    @With
-    static record TesteDto(String name, String address) {}
-
-    public static void main(String[] args) {
-        TesteDto teste = new TesteDto("Wyll", "Avenida");
-        System.out.println(teste.name() + teste.address());
-
-        teste = teste.withAddress("avenida mariland").withName("wylliam");
-        System.out.println(teste.name() + teste.address());
-
-    }
 }
