@@ -7,6 +7,7 @@ import br.com.dms.domain.core.DocumentType;
 import br.com.dms.repository.mongo.CategoryRepository;
 import br.com.dms.exception.DmsBusinessException;
 import br.com.dms.exception.TypeException;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,21 +20,16 @@ import java.util.Map;
 
 @Component
 @CacheConfig(cacheNames = {"documentCategory", "documentType"})
+@Slf4j
 public class DocumentCategoryHandler {
 
-    private static final Logger logger = LoggerFactory.getLogger(DocumentCategoryHandler.class);
-
     private final CategoryRepository categoryRepository;
-
-    private final PrefixHandler prefixHandler;
 
     private final Environment environment;
 
     public DocumentCategoryHandler(CategoryRepository categoryRepository,
-                                   PrefixHandler prefixHandler,
                                    Environment environment) {
         this.categoryRepository = categoryRepository;
-        this.prefixHandler = prefixHandler;
         this.environment = environment;
     }
 
@@ -55,7 +51,7 @@ public class DocumentCategoryHandler {
     protected DocumentCategory findCategory(String transactionId, String documentCategoryName) {
         Category category = categoryRepository.findByName(documentCategoryName)
                 .orElseThrow(() -> {
-                    logger.info("DMS - TransactionId: {} - Type invalid {}", transactionId, documentCategoryName);
+                    log.info("DMS - TransactionId: {} - Type invalid {}", transactionId, documentCategoryName);
                     return new DmsBusinessException(environment.getProperty("dms.msg.typeInvalid"), TypeException.VALID, transactionId);
                 });
 
@@ -63,16 +59,11 @@ public class DocumentCategoryHandler {
         documentCategory.setId(null);
         documentCategory.setName(category.getName());
         documentCategory.setDescription(category.getDescription());
-        documentCategory.setPrefix(category.getPrefix());
         documentCategory.setMainType(category.getMainType());
         documentCategory.setTypeSearch(category.getTypeSearch());
         documentCategory.setUniqueAttributes(category.getUniqueAttributes());
-        documentCategory.setSearchDuplicateCriteria(category.getSearchDuplicateCriteria());
-        documentCategory.setPath(category.getPath());
         documentCategory.setValidityInDays(category.getValidityInDays());
         documentCategory.setDocumentGroup(category.getDocumentGroup());
-        documentCategory.setSite(category.getSite());
-        documentCategory.setParentFolder(category.getParentFolder());
         return documentCategory;
     }
 
@@ -82,7 +73,7 @@ public class DocumentCategoryHandler {
                 .orElseThrow(() -> new DmsBusinessException(environment.getProperty("dms.msg.typeInvalid"), TypeException.VALID, transactionId));
 
         if (category.getTypes() == null) {
-            logger.info("DMS - TransactionId: {} - Document type {} not configured for category {}", transactionId, documentTypeName, documentCategoryName);
+            log.info("DMS - TransactionId: {} - Document type {} not configured for category {}", transactionId, documentTypeName, documentCategoryName);
             throw new DmsBusinessException(environment.getProperty("dms.msg.typeInvalid"), TypeException.VALID, transactionId);
         }
 
@@ -93,7 +84,7 @@ public class DocumentCategoryHandler {
                 .orElse(null);
 
         if (documentType == null) {
-            logger.info("DMS - TransactionId: {} - Document type {} not found for category {}", transactionId, documentTypeName, documentCategoryName);
+            log.info("DMS - TransactionId: {} - Document type {} not found for category {}", transactionId, documentTypeName, documentCategoryName);
             throw new DmsBusinessException(environment.getProperty("dms.msg.typeInvalid"), TypeException.VALID, transactionId);
         }
 
@@ -112,7 +103,7 @@ public class DocumentCategoryHandler {
 
     public DocumentCategory resolveCategory(String transactionId, String documentCategoryName, Map<String, Object> metadata) {
         DocumentCategory documentCategory = loadCategory(transactionId, documentCategoryName);
-        String documentTypeKey = resolveMetadataDocumentTypeKey(documentCategory);
+        String documentTypeKey = "tipoDocumento";
         Object rawType = metadata.get(documentTypeKey);
         if (rawType == null) {
             rawType = metadata.get(documentTypeKey.toLowerCase());
@@ -126,24 +117,11 @@ public class DocumentCategoryHandler {
         }
 
         if (StringUtils.isBlank(documentCategory.getMainType()) && documentCategory.getDocumentType() == null) {
-            logger.info("DMS - TransactionId: {} - Type invalid {}", transactionId, documentCategoryName);
+            log.info("DMS - TransactionId: {} - Type invalid {}", transactionId, documentCategoryName);
             throw new DmsBusinessException(environment.getProperty("dms.msg.typeInvalid"), TypeException.VALID, transactionId);
         }
 
         return documentCategory;
     }
 
-    public String resolveDocumentTypeName(DocumentCategory documentCategory, String documentTypeFromMetadata) {
-        if (StringUtils.isNotBlank(documentTypeFromMetadata)) {
-            return documentTypeFromMetadata;
-        }
-        if (StringUtils.isNotBlank(documentCategory.getMainType())) {
-            return documentCategory.getMainType();
-        }
-        return null;
-    }
-
-    public String resolveMetadataDocumentTypeKey(DocumentCategory documentCategory) {
-        return prefixHandler.handle(documentCategory.getPrefix(), "tipoDocumento");
-    }
 }

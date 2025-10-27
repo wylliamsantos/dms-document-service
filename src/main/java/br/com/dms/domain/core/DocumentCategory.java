@@ -9,13 +9,9 @@ public class DocumentCategory {
     private String mainType;
     private String typeSearch;
     private String uniqueAttributes;
-    private String searchDuplicateCriteria;
-    private String path;
     private Long validityInDays;
     private DocumentGroup documentGroup;
     private DocumentType documentType;
-    private String site;
-    private String parentFolder;
 
     public Long getId() {
         return id;
@@ -73,22 +69,6 @@ public class DocumentCategory {
         this.uniqueAttributes = uniqueAttributes;
     }
 
-    public String getSearchDuplicateCriteria() {
-        return searchDuplicateCriteria;
-    }
-
-    public void setSearchDuplicateCriteria(String searchDuplicateCriteria) {
-        this.searchDuplicateCriteria = searchDuplicateCriteria;
-    }
-
-    public String getPath() {
-        return path;
-    }
-
-    public void setPath(String path) {
-        this.path = path;
-    }
-
     public Long getValidityInDays() {
         return validityInDays;
     }
@@ -111,22 +91,6 @@ public class DocumentCategory {
 
     public void setDocumentType(DocumentType documentType) {
         this.documentType = documentType;
-    }
-
-    public String getSite() {
-        return site;
-    }
-
-    public void setSite(String site) {
-        this.site = site;
-    }
-
-    public String getParentFolder() {
-        return parentFolder;
-    }
-
-    public void setParentFolder(String parentFolder) {
-        this.parentFolder = parentFolder;
     }
 
     public Long getConditionalValidityInDays() {

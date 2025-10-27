@@ -25,10 +25,6 @@ public class CategoryResponse {
     private String mainType;
     private String typeSearch;
     private String uniqueAttributes;
-    private String searchDuplicateCriteria;
-    private String path;
-    private String site;
-    private String parentFolder;
     private Map<Object, Object> schema;
     private List<CategoryTypeResponse> types;
 }
