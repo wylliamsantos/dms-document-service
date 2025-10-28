@@ -123,7 +123,7 @@ public class DmsService {
     }
     @Transactional
     public DocumentId createOrUpdate(String transactionId, boolean isFinal, MultipartFile document, LocalDate issuingDate, String author, String metadata,
-                                     String documentCategoryName, String documentTypeName, String filename, String comment) {
+                                     String documentCategoryName, String filename, String comment) {
         try {
             String effectiveFilename = StringUtils.isNotBlank(filename) ? filename : document.getOriginalFilename();
             byte[] documentBytes = document.getBytes();
@@ -137,7 +137,7 @@ public class DmsService {
 
             ByteArrayInputStream documentData = new ByteArrayInputStream(documentBytes);
 
-            return createOrUpdate(transactionId, isFinal, documentData, documentResource, issuingDate, author, metadata, documentCategoryName, documentTypeName, effectiveFilename, comment);
+            return createOrUpdate(transactionId, isFinal, documentData, documentResource, issuingDate, author, metadata, documentCategoryName, effectiveFilename, comment);
         } catch (IOException e) {
             log.error("DMS - TransactionId: {} - Error processing multipart document", transactionId, e);
             throw new DmsException(environment.getProperty("dms.msg.unknowError"), TypeException.CONFIG, transactionId);
@@ -146,7 +146,7 @@ public class DmsService {
 
     @Transactional
     public DocumentId createOrUpdate(String transactionId, boolean isFinal, String documentAsBase64, LocalDate issuingDate, String author, String metadata, String documentCategoryName,
-                                     String documentTypeName, String filenameDms, String comment) throws IOException {
+                                     String filenameDms, String comment) throws IOException {
 
         final ByteArrayInputStream documentData = new ByteArrayInputStream(Base64.decodeBase64(documentAsBase64));
         final ByteArrayResource documentResource = new ByteArrayResource(Base64.decodeBase64(documentAsBase64)) {
@@ -156,12 +156,12 @@ public class DmsService {
             }
         };
 
-        return createOrUpdate(transactionId, isFinal, documentData, documentResource, issuingDate, author, metadata, documentCategoryName, documentTypeName, filenameDms, comment);
+        return createOrUpdate(transactionId, isFinal, documentData, documentResource, issuingDate, author, metadata, documentCategoryName, filenameDms, comment);
     }
 
     @Transactional
     private DocumentId createOrUpdate(String transactionId, boolean isFinal, ByteArrayInputStream documentData, ByteArrayResource documentResource, LocalDate issuingDate, String author, String metadata, String documentCategoryName,
-                                     String documentTypeName, String filenameDms, String comment) throws IOException {
+                                     String filenameDms, String comment) throws IOException {
 
         Map<String, Object> jsonMetadata = metadataService.getValideMetadata(transactionId, metadata, documentCategoryName, issuingDate);
 

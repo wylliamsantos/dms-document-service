@@ -73,8 +73,7 @@ public class DocumentUpdateService {
                                                  String author,
                                                  String filename,
                                                  String comment,
-                                                 MultipartFile document,
-                                                 String documentCategoryName) {
+                                                 MultipartFile document) {
 
         try {
             final String filenameDms = StringUtils.isNotBlank(filename) ? filename : document.getOriginalFilename();
@@ -82,7 +81,7 @@ public class DocumentUpdateService {
             ByteArrayInputStream documentData = new ByteArrayInputStream(documentBytes);
             ByteArrayResource documentResource = new ByteArrayResource(documentBytes);
 
-            return update(documentId, transactionId, isFinal, metadata, issuingDate, author, filenameDms, comment, documentData, documentResource, documentCategoryName);
+            return update(documentId, transactionId, isFinal, metadata, issuingDate, author, filenameDms, comment, documentData, documentResource);
         } catch (IOException e) {
             logger.error("DMS - TransactionId: {} - Error updating document from multipart payload", transactionId, e);
             throw new DmsException(environment.getProperty("dms.msg.unknowError"), TypeException.CONFIG, transactionId);
@@ -90,29 +89,27 @@ public class DocumentUpdateService {
     }
 
     public ResponseEntity<DocumentId> updateWithBase64(String documentId, String transactionId, boolean isFinal, String metadata, LocalDate issuingDate,
-                                              String author, String filenameDms, String comment, String documentBase64,
-                                              String documentCategoryName) {
+                                              String author, String filenameDms, String comment, String documentBase64) {
 
         byte[] documentBytes = dmsUtil.decodeBase64(transactionId, documentBase64);
         ByteArrayInputStream documentData = new ByteArrayInputStream(documentBytes);
         ByteArrayResource documentResource = new ByteArrayResource(documentBytes);
 
-        return update(documentId, transactionId, isFinal, metadata, issuingDate, author, filenameDms, comment, documentData, documentResource, documentCategoryName);
+        return update(documentId, transactionId, isFinal, metadata, issuingDate, author, filenameDms, comment, documentData, documentResource);
     }
 
     public ResponseEntity<DocumentId> updateWithBase64(String documentId, String transactionId, boolean isFinal, Map<String, Object> metadados, LocalDate issuingDate,
-                                              String author, String filenameDms, String comment, String documentBase64,
-                                              String documentCategoryName) {
+                                              String author, String filenameDms, String comment, String documentBase64) {
 
         byte[] documentBytes = dmsUtil.decodeBase64(transactionId, documentBase64);
         ByteArrayInputStream documentData = new ByteArrayInputStream(documentBytes);
         ByteArrayResource documentResource = new ByteArrayResource(documentBytes);
 
-        return update(documentId, transactionId, isFinal, metadados, issuingDate, author, filenameDms, comment, documentData, documentResource, documentCategoryName);
+        return update(documentId, transactionId, isFinal, metadados, issuingDate, author, filenameDms, comment, documentData, documentResource);
     }
 
     public ResponseEntity<DocumentId> update(String documentId, String transactionId, boolean isFinal, String metadata, LocalDate issuingDate,
-                                    String author, String filenameDms, String comment, ByteArrayInputStream documentData, ByteArrayResource documentResource, String documentCategoryName) {
+                                    String author, String filenameDms, String comment, ByteArrayInputStream documentData, ByteArrayResource documentResource) {
         documentInformationRepository.delete(documentId, null);
         var optEntity = dmsDocumentRepository.findById(documentId);
 
@@ -158,7 +155,7 @@ public class DocumentUpdateService {
     }
 
     public ResponseEntity<DocumentId> update(String documentId, String transactionId, boolean isFinal, Map<String, Object> metadados, LocalDate issuingDate,
-                                    String author, String filenameDms, String comment, ByteArrayInputStream documentData, ByteArrayResource documentResource, String documentCategoryName) {
+                                    String author, String filenameDms, String comment, ByteArrayInputStream documentData, ByteArrayResource documentResource) {
         documentInformationRepository.delete(documentId, null);
         var optEntity = dmsDocumentRepository.findById(documentId);
 
