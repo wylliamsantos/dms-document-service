@@ -5,7 +5,7 @@ import br.com.dms.domain.core.DocumentId;
 import br.com.dms.domain.mongodb.Category;
 import br.com.dms.domain.mongodb.DmsDocument;
 import br.com.dms.domain.mongodb.DmsDocumentVersion;
-import br.com.dms.domain.mongodb.type.VersionType;
+import br.com.dms.domain.core.VersionType;
 import br.com.dms.exception.DmsException;
 import br.com.dms.exception.TypeException;
 import br.com.dms.repository.mongo.DmsDocumentRepository;
@@ -168,11 +168,14 @@ public class DocumentCreateService {
 
         String pathToDocument = amazonS3Service.createDocumentS3(filenameDms, cpf, initialVersion, new ByteArrayInputStream(signedBytes), contentLength);
 
+        LocalDateTime now = LocalDateTime.now();
+
         var newVersion = DmsDocumentVersion.of()
                 .dmsDocumentId(newDocument.getId())
                 .versionNumber(initialVersion)
                 .versionType(initialVersionType)
-                .creationDate(LocalDateTime.now())
+                .creationDate(now)
+                .modifiedAt(now)
                 .fileSize(contentLength)
                 .author(author)
                 .pathToDocument(pathToDocument)
@@ -211,12 +214,14 @@ public class DocumentCreateService {
         String pathToDocument = amazonS3Service.createDocumentS3(filenameDms, existingDocument.getCpf(), nextVersion,
                 new ByteArrayInputStream(signedBytes), contentLength);
 
+        LocalDateTime nowVersion = LocalDateTime.now();
+
         var newDocumentVersion = DmsDocumentVersion.of()
                 .dmsDocumentId(existingDocument.getId())
                 .versionNumber(nextVersion)
                 .versionType(versionType)
-                .creationDate(LocalDateTime.now())
-                .modifiedAt(LocalDateTime.now())
+                .creationDate(nowVersion)
+                .modifiedAt(nowVersion)
                 .fileSize(contentLength)
                 .author(author)
                 .comment(comment)

@@ -1,7 +1,7 @@
 package br.com.dms.domain.mongodb;
 
 
-import br.com.dms.domain.mongodb.type.VersionType;
+import br.com.dms.domain.core.VersionType;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;

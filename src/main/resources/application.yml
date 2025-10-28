@@ -47,3 +47,10 @@ spring:
       probability: 1.0
   zipkin:
     base-url: ${ZIPKIN_URL:http://jaeger-collector.observability.svc.cluster.local:9411}
+
+dms:
+  cors:
+    allowed-origins: ${DMS_CORS_ALLOWED_ORIGINS:http://localhost:5173}
+    allowed-methods: ${DMS_CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,OPTIONS}
+    allowed-headers: ${DMS_CORS_ALLOWED_HEADERS:*}
+    allow-credentials: ${DMS_CORS_ALLOW_CREDENTIALS:true}

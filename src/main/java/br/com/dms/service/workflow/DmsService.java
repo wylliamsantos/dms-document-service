@@ -6,7 +6,7 @@ import br.com.dms.controller.response.UrlPresignedResponse;
 import br.com.dms.domain.core.DocumentId;
 import br.com.dms.domain.mongodb.DmsDocument;
 import br.com.dms.domain.mongodb.DmsDocumentVersion;
-import br.com.dms.domain.mongodb.type.VersionType;
+import br.com.dms.domain.core.VersionType;
 import br.com.dms.exception.DmsBusinessException;
 import br.com.dms.exception.DmsException;
 import br.com.dms.exception.TypeException;
@@ -188,11 +188,14 @@ public class DmsService {
         long contentLength = byteArrayResourceSignature.contentLength();
         String pathToNewDocument = amazonS3Service.createDocumentS3(filenameDms, cpf, version, inputStreamSignature, contentLength);
 
+        LocalDateTime versionTimestamp = LocalDateTime.now();
+
         var newVersion = DmsDocumentVersion.of()
                 .dmsDocumentId(entity.getId())
                 .versionNumber(version)
                 .versionType(isFinal ? VersionType.MAJOR : VersionType.MINOR)
-                .creationDate(LocalDateTime.now())
+                .creationDate(versionTimestamp)
+                .modifiedAt(versionTimestamp)
                 .pathToDocument(pathToNewDocument)
                 .fileSize(contentLength)
                 .metadata(jsonMetadata)
@@ -279,11 +282,14 @@ public class DmsService {
 
         String pathToNewDocument = amazonS3Service.getPathToDocument(payloadUrlPresigned.getFileName(), cpf, String.valueOf(version));
 
+        LocalDateTime presignedTimestamp = LocalDateTime.now();
+
         var newVersion = DmsDocumentVersion.of()
                 .dmsDocumentId(documentId)
                 .versionNumber(version)
                 .versionType(payloadUrlPresigned.isFinal() ? VersionType.MAJOR : VersionType.MINOR)
-                .creationDate(LocalDateTime.now())
+                .creationDate(presignedTimestamp)
+                .modifiedAt(presignedTimestamp)
                 .pathToDocument(pathToNewDocument)
                 .fileSize(payloadUrlPresigned.getFileSize()) //todo validar o que colocar pois o base64 não é passado
                 .metadata(metadata)
