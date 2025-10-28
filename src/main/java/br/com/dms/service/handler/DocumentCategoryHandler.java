@@ -154,8 +154,6 @@ public class DocumentCategoryHandler {
         return metadata.entrySet().stream()
                 .filter(entry -> entry.getKey() != null)
                 .filter(entry -> entry.getValue() instanceof String)
-                .filter(entry -> candidateKeys.stream().anyMatch(candidate -> StringUtils.equalsIgnoreCase(candidate, entry.getKey()))
-                        || StringUtils.endsWithIgnoreCase(entry.getKey(), DOCUMENT_TYPE_METADATA_KEY))
                 .map(entry -> (String) entry.getValue())
                 .filter(StringUtils::isNotBlank)
                 .findFirst()
