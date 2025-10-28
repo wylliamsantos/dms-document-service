@@ -37,8 +37,6 @@ class DocumentCategoryHandlerTest {
     @Mock
     private CategoryRepository categoryRepository;
 
-    @Mock
-    private PrefixHandler prefixHandler;
 
     @Mock
     private Environment environment;
@@ -49,14 +47,6 @@ class DocumentCategoryHandlerTest {
     @BeforeEach
     void setUp() {
         when(environment.getProperty("dms.msg.typeInvalid")).thenReturn("Tipo inválido");
-        when(prefixHandler.handle(anyString(), anyString())).thenAnswer(invocation -> {
-            String prefix = invocation.getArgument(0);
-            String suffix = invocation.getArgument(1);
-            if (StringUtils.isNotBlank(prefix) && !prefix.endsWith(":")) {
-                return prefix + StringUtils.capitalize(suffix);
-            }
-            return prefix + suffix;
-        });
     }
 
     @Test
@@ -68,11 +58,7 @@ class DocumentCategoryHandlerTest {
                 .mainType("default")
                 .typeSearch("SEARCH")
                 .uniqueAttributes("cpf")
-                .searchDuplicateCriteria("cpf,name")
-                .path("/doc/path")
                 .validityInDays(365L)
-                .site("site")
-                .parentFolder("folder")
                 .documentGroup(DocumentGroup.PERSONAL)
                 .build();
 
@@ -86,8 +72,6 @@ class DocumentCategoryHandlerTest {
         assertThat(documentCategory.getMainType()).isEqualTo("default");
         assertThat(documentCategory.getTypeSearch()).isEqualTo("SEARCH");
         assertThat(documentCategory.getUniqueAttributes()).isEqualTo("cpf");
-        assertThat(documentCategory.getSearchDuplicateCriteria()).isEqualTo("cpf,name");
-        assertThat(documentCategory.getPath()).isEqualTo("/doc/path");
         assertThat(documentCategory.getValidityInDays()).isEqualTo(365L);
     }
 

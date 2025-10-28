@@ -2,9 +2,6 @@ target/
 !.mvn/wrapper/maven-wrapper.jar
 
 .gradle/
-gradle/
-gradlew
-gradlew.bat
 .DS_Store
 
 ### STS ###

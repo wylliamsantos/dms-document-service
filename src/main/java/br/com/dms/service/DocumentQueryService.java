@@ -7,7 +7,7 @@ import br.com.dms.repository.mongo.DmsDocumentRepository;
 import br.com.dms.repository.mongo.DmsDocumentVersionRepository;
 import br.com.dms.repository.redis.DocumentInformationRepository;
 import br.com.dms.service.dto.DocumentContent;
-import br.com.dms.domain.mongodb.type.VersionType;
+import br.com.dms.domain.core.VersionType;
 import br.com.dms.service.workflow.pojo.DmsDocumentSearchResponse;
 import br.com.dms.service.workflow.pojo.DmsEntry;
 import br.com.dms.service.workflow.pojo.DmsVersions;

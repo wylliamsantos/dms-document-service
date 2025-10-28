@@ -34,12 +34,6 @@ public class Category {
     private String typeSearch;
     @Field("unique_attributes")
     private String uniqueAttributes;
-    @Field("search_duplicate_criteria")
-    private String searchDuplicateCriteria;
-    private String path;
-    private String site;
-    @Field("parent_folder")
-    private String parentFolder;
     private Map<Object, Object> schema;
     private List<CategoryType> types;
 }

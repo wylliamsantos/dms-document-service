@@ -16,9 +16,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.binary.Base64;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -34,9 +33,9 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/v1/documents")
+@Slf4j
 public class DocumentController {
 
-    private static final Logger logger = LoggerFactory.getLogger(DocumentController.class);
     private static final String API_VERSION = "v1";
 
     private final DocumentCreateService documentCreateService;
@@ -76,7 +75,7 @@ public class DocumentController {
                                                 @RequestParam(name = "author", required = false) String author,
                                                 @RequestParam(name = "document") MultipartFile document) {
 
-        logger.info("DMS version {} - TransactionId: {} - Create document - comment: {} - metadata: {} - filename: {}", API_VERSION, transactionId, comment, metadata, filename);
+        log.info("DMS version {} - TransactionId: {} - Create document - comment: {} - metadata: {} - filename: {}", API_VERSION, transactionId, comment, metadata, filename);
 
         return documentCreateService.createWithMultipart(transactionId, comment, category, issuingDate, metadata, filename, author, document);
     }
@@ -94,7 +93,7 @@ public class DocumentController {
                                               @RequestHeader(name = "Authorization") String authorization,
                                               @RequestBody @Valid PayloadDocument payloadDocument) {
 
-        logger.info("DMS version {} - TransactionId: {} - Create document - comment: {} - metadados: {} - filename: {}", API_VERSION, transactionId, payloadDocument.getComment(),
+        log.info("DMS version {} - TransactionId: {} - Create document - comment: {} - metadados: {} - filename: {}", API_VERSION, transactionId, payloadDocument.getComment(),
                 payloadDocument.getMetadados(), payloadDocument.getFilename());
 
         return documentCreateService.createWithBase64(transactionId, payloadDocument.isFinal(), payloadDocument.getIssuingDate(),
@@ -117,7 +116,7 @@ public class DocumentController {
                                                        @PathVariable(value = "documentId") String documentId,
                                                        @RequestBody @Valid PayloadDocument payloadDocument) {
 
-        logger.info("DMS version {} - TransactionId: {} - Update document - comment: {} - metadados: {} - issuingDate: {} - filename: {}", API_VERSION,
+        log.info("DMS version {} - TransactionId: {} - Update document - comment: {} - metadados: {} - issuingDate: {} - filename: {}", API_VERSION,
                 transactionId, payloadDocument.getComment(), payloadDocument.getMetadados(), payloadDocument.getIssuingDate(), payloadDocument.getFilename());
 
         return documentUpdateService.updateWithBase64(documentId, transactionId, payloadDocument.isFinal(), payloadDocument.getMetadados(), payloadDocument.getIssuingDate(),
@@ -137,7 +136,7 @@ public class DocumentController {
                                     @RequestHeader(name = "Authorization") String authorization,
                                     @PathVariable(value = "documentId") String documentId) {
 
-        logger.info("DMS version {} - TransactionId: {} - Delete document - documentId: {}", API_VERSION, transactionId, documentId);
+        log.info("DMS version {} - TransactionId: {} - Delete document - documentId: {}", API_VERSION, transactionId, documentId);
         return documentDeleteService.delete(transactionId, documentId);
     }
 
@@ -161,7 +160,7 @@ public class DocumentController {
                                                 @RequestParam(name = "author", required = false) String author,
                                                 @RequestParam(name = "document") MultipartFile document) {
 
-        logger.info("DMS version {} - TransactionId: {} - Update document - documentId: {}", API_VERSION, transactionId, documentId);
+        log.info("DMS version {} - TransactionId: {} - Update document - documentId: {}", API_VERSION, transactionId, documentId);
 
         return documentUpdateService.updateWithMultipart(documentId, transactionId, true, metadata, issuingDate, author, filename, comment, document, null);
     }
@@ -178,7 +177,7 @@ public class DocumentController {
                                        @PathVariable(value = "documentId") String documentId,
                                        @PathVariable(name = "version", required = false) Optional<String> version) {
 
-        logger.info("DMS version {} - TransactionId: {} - Get document base64 - documentId: {}", API_VERSION, transactionId, documentId);
+        log.info("DMS version {} - TransactionId: {} - Get document base64 - documentId: {}", API_VERSION, transactionId, documentId);
         DocumentContent documentContent = documentQueryService.getDocumentContent(transactionId, documentId, version);
         return ResponseEntity.ok(Base64.encodeBase64String(documentContent.content()));
     }
@@ -195,7 +194,7 @@ public class DocumentController {
                                  @RequestHeader(name = "Authorization") String authorization,
                                  @RequestBody List<DocumentInformationRequest> documentsInformation) throws IOException {
 
-        logger.info("DMS version {} - Download Zip Files - TransactionId: {}", API_VERSION, transactionId);
+        log.info("DMS version {} - Download Zip Files - TransactionId: {}", API_VERSION, transactionId);
         var zipContent = documentQueryService.zipDocuments(documentsInformation, transactionId);
         return ResponseEntity
                 .ok()
@@ -235,7 +234,7 @@ public class DocumentController {
                                          @RequestHeader(name = "Authorization") String authorization,
                                          @PathVariable(value = "documentId") String documentId) {
 
-        logger.info("DMS version {} - TransactionId: {} - Get document versions - documentId: {}", API_VERSION, transactionId, documentId);
+        log.info("DMS version {} - TransactionId: {} - Get document versions - documentId: {}", API_VERSION, transactionId, documentId);
         return documentQueryService.getDocumentVersions(documentId);
     }
 
@@ -249,7 +248,7 @@ public class DocumentController {
                                                     @RequestHeader(name = "Authorization") String authorization,
                                                     @PathVariable(value = "documentId") String documentId,
                                                     @PathVariable(name = "version", required = false) Optional<String> version) {
-        logger.info("DMS version {} - TransactionId: {} - document information - documentId: {}, version: {}", API_VERSION, transactionId, documentId, version);
+        log.info("DMS version {} - TransactionId: {} - document information - documentId: {}, version: {}", API_VERSION, transactionId, documentId, version);
         return documentQueryService.getDocumentInformation(documentId, version);
     }
 
@@ -274,7 +273,7 @@ public class DocumentController {
                                             @RequestParam(name = "document") MultipartFile document,
                                             @RequestParam(name = "isFinal", required = false, defaultValue = "false") boolean isFinal) {
 
-        logger.info("DMS version v1 - TransactionId: {} - Upsert document (multipart) - comment: {} - metadata: {} - filename: {}", transactionId, comment, metadata, filename);
+        log.info("DMS version v1 - TransactionId: {} - Upsert document (multipart) - comment: {} - metadata: {} - filename: {}", transactionId, comment, metadata, filename);
 
         DocumentId documentId = dmsService.createOrUpdate(transactionId, isFinal, document, issuingDate, author, metadata, category, type, filename, comment);
         return ResponseEntity.status(HttpStatus.CREATED).body(documentId);
@@ -292,12 +291,14 @@ public class DocumentController {
     public ResponseEntity<DocumentId> createOrUpdate(@RequestHeader(name = "transactionId") String transactionId,
                                                      @RequestHeader(name = "Authorization") String authorization,
                                                      @RequestBody @Valid PayloadDocument payloadDocument) throws IOException {
-        logger.info("DMS version v1 - TransactionId: {} - Upsert document via base64 - payload {}", transactionId, payloadDocument);
+        log.info("DMS version v1 - TransactionId: {} - Upsert document via base64 - payload {}", transactionId, payloadDocument);
+
         try {
             String metadataJson = payloadDocument.getMetadados() != null ?
                 new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(payloadDocument.getMetadados()) : "{}";
             var documentId = dmsService.createOrUpdate(transactionId, payloadDocument.isFinal(), payloadDocument.getDocumentBase64(), payloadDocument.getIssuingDate(),
                     payloadDocument.getAuthor(), metadataJson, payloadDocument.getCategory(), payloadDocument.getType(), payloadDocument.getFilename(), payloadDocument.getComment());
+
             return ResponseEntity.status(HttpStatus.CREATED).body(documentId);
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
             throw new RuntimeException("Erro ao converter metadados para JSON", e);
@@ -318,9 +319,9 @@ public class DocumentController {
                                      @PathVariable(value = "id") String documentId,
                                      @PathVariable(name = "version") String documentVersion,
                                      @RequestBody(required = false) @Valid PayloadApprove payloadApprove) throws IOException {
-        logger.info("DMS version v1 - TransactionId: {} - Approve document {} version {} payload {}", transactionId, documentId, documentVersion, payloadApprove);
+        log.info("DMS version v1 - TransactionId: {} - Approve document {} version {} payload {}", transactionId, documentId, documentVersion, payloadApprove);
         ResponseEntity<DocumentId> result = dmsService.approveWithSignatureText(documentId, documentVersion, transactionId, payloadApprove);
-        logger.info("DMS version v1 - TransactionId: {} - Approve result {} - New version: {}", transactionId, result.getStatusCode(), result.getBody());
+        log.info("DMS version v1 - TransactionId: {} - Approve result {} - New version: {}", transactionId, result.getStatusCode(), result.getBody());
         return result;
     }
 
@@ -337,9 +338,9 @@ public class DocumentController {
                                      @RequestHeader(name = "Authorization") String authorization,
                                      @PathVariable(value = "id") String documentId,
                                      @PathVariable(name = "version") String documentVersion) {
-        logger.info("DMS version v1 - TransactionId: {} - Reprove document {} version {}", transactionId, documentId, documentVersion);
+        log.info("DMS version v1 - TransactionId: {} - Reprove document {} version {}", transactionId, documentId, documentVersion);
         ResponseEntity<?> result = dmsService.reprove(transactionId, documentId, documentVersion);
-        logger.info("DMS version v1 - TransactionId: {} - Reprove result {}", transactionId, result.getStatusCode());
+        log.info("DMS version v1 - TransactionId: {} - Reprove result {}", transactionId, result.getStatusCode());
         return result;
     }
 
@@ -356,7 +357,7 @@ public class DocumentController {
                                             @PathVariable(value = "documentId") String documentId,
                                             @RequestBody @Valid PayloadMetadata payloadMetadata) {
 
-        logger.info("DMS version v1 - TransactionId: {} - Update metadata - documentId: {} - data: {}", transactionId, documentId, payloadMetadata);
+        log.info("DMS version v1 - TransactionId: {} - Update metadata - documentId: {} - data: {}", transactionId, documentId, payloadMetadata);
 
         return dmsService.updateMetadata(transactionId, documentId, payloadMetadata.getProperties(), payloadMetadata.getFileName());
     }
@@ -373,7 +374,7 @@ public class DocumentController {
                                                                      @RequestHeader(name = "Authorization") String authorization,
                                                                      @RequestBody @Valid PayloadUrlPresigned payloadUrlPresigned) throws IOException {
 
-        logger.info("DMS version v1 - TransactionId: {} - Generate presigned URL", transactionId);
+        log.info("DMS version {}} - TransactionId: {} - Generate presigned URL", API_VERSION, transactionId);
         var response = dmsService.generatePresignedUrl(transactionId, payloadUrlPresigned);
         return new ResponseEntity<>(response, HttpStatus.OK);
     }

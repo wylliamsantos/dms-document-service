@@ -4,15 +4,13 @@ import br.com.dms.domain.mongodb.Category;
 import br.com.dms.exception.DmsBusinessException;
 import br.com.dms.exception.TypeException;
 import br.com.dms.repository.mongo.CategoryRepository;
-import br.com.dms.service.handler.PrefixHandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -23,23 +21,19 @@ import java.util.Set;
 import static br.com.dms.domain.Messages.*;
 
 @Service
+@Slf4j
 public class ValidatorCategoryService {
-    private static final Logger logger = LoggerFactory.getLogger(ValidatorCategoryService.class);
     private final CategoryRepository categoryRepository;
 
-    protected final PrefixHandler prefixHandler;
-
-    public ValidatorCategoryService(CategoryRepository categoryRepository,
-                                    PrefixHandler prefixHandler) {
+    public ValidatorCategoryService(CategoryRepository categoryRepository) {
         this.categoryRepository = categoryRepository;
-        this.prefixHandler = prefixHandler;
     }
 
     public Set<ValidationMessage> validateCategory(String categoryName, Map<String, Object> jsonMetadata, LocalDate issuingDate, String transactionId) throws IOException {
-        logger.info("DMS - Validar categoria: {}", categoryName);
+        log.info("DMS - Validar categoria: {}", categoryName);
         var category = this.categoryRepository.findByName(categoryName)
                 .orElseThrow(() -> {
-                    logger.error("DMS - Categoria {} não encontrada", categoryName);
+                    log.error("DMS - Categoria {} não encontrada", categoryName);
                     throw new DmsBusinessException(CATEGORY_NOT_FOUND, TypeException.VALID, transactionId);
                 });
 
@@ -57,18 +51,18 @@ public class ValidatorCategoryService {
     private void handleIssuingDate(LocalDate issuingDate, Category documentCategory, Map<String, Object> jsonMetadata) {
         if (documentCategory.getValidityInDays() != null) {
             if (issuingDate == null) {
-                logger.error(ISSUING_DATE_IS_MANDATORY);
+                log.error(ISSUING_DATE_IS_MANDATORY);
                 throw new DmsBusinessException(ISSUING_DATE_IS_MANDATORY, TypeException.VALID);
             }
             LocalDate expirationDate = issuingDate.plusDays(documentCategory.getValidityInDays());
 
             if (LocalDate.now().isAfter(expirationDate)) {
-                logger.error(INVALID_DATE);
+                log.error(INVALID_DATE);
                 throw new DmsBusinessException(INVALID_DATE, TypeException.VALID);
             }
 
-            jsonMetadata.put(prefixHandler.handle(documentCategory.getPrefix(), "dataExpiracao"), expirationDate.toString());
-            jsonMetadata.put(prefixHandler.handle(documentCategory.getPrefix(), "dataEmissao"), issuingDate.toString());
+            jsonMetadata.put("dataExpiracao", expirationDate.toString());
+            jsonMetadata.put("dataEmissao", issuingDate.toString());
         }
     }
 

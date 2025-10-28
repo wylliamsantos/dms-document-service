@@ -2,7 +2,7 @@ package br.com.dms.service;
 
 import br.com.dms.domain.core.DocumentId;
 import br.com.dms.domain.mongodb.DmsDocumentVersion;
-import br.com.dms.domain.mongodb.type.VersionType;
+import br.com.dms.domain.core.VersionType;
 import br.com.dms.exception.DmsException;
 import br.com.dms.exception.TypeException;
 import br.com.dms.repository.mongo.DmsDocumentRepository;

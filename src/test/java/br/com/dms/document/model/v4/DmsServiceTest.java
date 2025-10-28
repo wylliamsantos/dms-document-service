@@ -3,15 +3,14 @@ package br.com.dms.service.workflow;
 import br.com.dms.config.MongoConfig;
 import br.com.dms.controller.request.PayloadApprove;
 import br.com.dms.controller.request.PayloadUrlPresigned;
-import br.com.dms.service.AmazonS3Service;
-import br.com.dms.service.ValidatorCategoryService;
 import br.com.dms.domain.mongodb.DmsDocument;
 import br.com.dms.domain.mongodb.DmsDocumentVersion;
-import br.com.dms.service.handler.DocumentCategoryHandler;
-import br.com.dms.service.handler.PrefixHandler;
 import br.com.dms.repository.mongo.DmsDocumentRepository;
 import br.com.dms.repository.mongo.DmsDocumentVersionRepository;
 import br.com.dms.repository.redis.DocumentInformationRepository;
+import br.com.dms.service.AmazonS3Service;
+import br.com.dms.service.ValidatorCategoryService;
+import br.com.dms.service.handler.DocumentCategoryHandler;
 import br.com.dms.service.signature.SigningService;
 import br.com.dms.util.DmsUtil;
 import org.apache.tika.mime.MimeTypeException;
@@ -72,9 +71,6 @@ class DmsServiceTest {
 
 	@MockBean
 	private DmsUtil dmsUtil;
-
-	@MockBean
-	protected PrefixHandler prefixHandler;
 
 	@MockBean
 	protected SigningService signingService;
