@@ -24,10 +24,8 @@ public class CategoryRequest {
     private String description;
     private DocumentGroup documentGroup;
     private Long validityInDays;
-    private String prefix;
-    private String mainType;
-    private String typeSearch;
     private String uniqueAttributes;
+    private Boolean active;
     @NotNull
     private Map<Object, Object> schema;
     private List<CategoryTypeRequest> types;

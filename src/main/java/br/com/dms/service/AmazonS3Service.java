@@ -92,4 +92,12 @@ public class AmazonS3Service {
     public URL generatePresignedUrl(GeneratePresignedUrlRequest generatePresignedUrlRequest) {
         return amazonS3.generatePresignedUrl(generatePresignedUrlRequest);
     }
+
+    public boolean objectExists(String key) {
+        return amazonS3.doesObjectExist(getBucketName(), key);
+    }
+
+    public ObjectMetadata getObjectMetadata(String key) {
+        return amazonS3.getObjectMetadata(getBucketName(), key);
+    }
 }

@@ -28,7 +28,7 @@ dms:
     endpoint: http://localhost:9000
     access-key: dms
     secret-key: dmssecret
-  contentTypes: "image/jpeg#image/png#image/tiff#application/pdf#text/plain#image/bmp#application/octet-stream"
+  contentTypes: "image/jpeg#image/png#image/tiff#application/pdf#text/plain#image/bmp#application/octet-stream#video/mp4#video/webm#video/ogg"
   hashAlgorithm: MD5
   msg:
     base64Invalid: Não foi possível utilizar o base64 informado
@@ -45,6 +45,8 @@ dms:
     typeDocumentInvalid: Tipo de documento não configurado ou configurado incorretamente
     issuingDateIsMandatory: Data de emissão/referência obrigatória para o tipo de documento informado
     authorIsMandatory: Author é obrigatório
+    filenameIsMandatory: Nome do arquivo é obrigatório
+    categoryIsMandatory: Categoria é obrigatória
     unsuportedOperation: Operação não suportada ou não implementada
 aws:
   s3:

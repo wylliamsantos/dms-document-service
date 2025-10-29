@@ -121,7 +121,7 @@ public class DocumentController {
 
         return documentUpdateService.updateWithBase64(documentId, transactionId, payloadDocument.isFinal(), payloadDocument.getMetadados(), payloadDocument.getIssuingDate(),
                 payloadDocument.getAuthor(), payloadDocument.getFilename(), payloadDocument.getComment(),
-                payloadDocument.getDocumentBase64(), payloadDocument.getType());
+                payloadDocument.getDocumentBase64());
     }
 
     @DeleteMapping(value = "/{documentId}", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -162,7 +162,7 @@ public class DocumentController {
 
         log.info("DMS version {} - TransactionId: {} - Update document - documentId: {}", API_VERSION, transactionId, documentId);
 
-        return documentUpdateService.updateWithMultipart(documentId, transactionId, true, metadata, issuingDate, author, filename, comment, document, null);
+        return documentUpdateService.updateWithMultipart(documentId, transactionId, true, metadata, issuingDate, author, filename, comment, document);
     }
 
     @GetMapping(path = {"/{documentId}/base64", "/{documentId}/{version}/base64"}, produces = MediaType.TEXT_PLAIN_VALUE)
@@ -265,7 +265,6 @@ public class DocumentController {
                                             @RequestHeader(name = "Authorization") String authorization,
                                             @RequestParam(name = "comment", required = false) String comment,
                                             @RequestParam(name = "category") String category,
-                                            @RequestParam(name = "type", required = false) String type,
                                             @RequestParam(name = "issuingDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate issuingDate,
                                             @RequestParam(name = "metadata") String metadata,
                                             @RequestParam(name = "filename", required = false) String filename,
@@ -275,7 +274,7 @@ public class DocumentController {
 
         log.info("DMS version v1 - TransactionId: {} - Upsert document (multipart) - comment: {} - metadata: {} - filename: {}", transactionId, comment, metadata, filename);
 
-        DocumentId documentId = dmsService.createOrUpdate(transactionId, isFinal, document, issuingDate, author, metadata, category, type, filename, comment);
+        DocumentId documentId = dmsService.createOrUpdate(transactionId, isFinal, document, issuingDate, author, metadata, category, filename, comment);
         return ResponseEntity.status(HttpStatus.CREATED).body(documentId);
     }
 
@@ -297,7 +296,7 @@ public class DocumentController {
             String metadataJson = payloadDocument.getMetadados() != null ?
                 new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(payloadDocument.getMetadados()) : "{}";
             var documentId = dmsService.createOrUpdate(transactionId, payloadDocument.isFinal(), payloadDocument.getDocumentBase64(), payloadDocument.getIssuingDate(),
-                    payloadDocument.getAuthor(), metadataJson, payloadDocument.getCategory(), payloadDocument.getType(), payloadDocument.getFilename(), payloadDocument.getComment());
+                    payloadDocument.getAuthor(), metadataJson, payloadDocument.getCategory(), payloadDocument.getFilename(), payloadDocument.getComment());
 
             return ResponseEntity.status(HttpStatus.CREATED).body(documentId);
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
@@ -377,5 +376,22 @@ public class DocumentController {
         log.info("DMS version {}} - TransactionId: {} - Generate presigned URL", API_VERSION, transactionId);
         var response = dmsService.generatePresignedUrl(transactionId, payloadUrlPresigned);
         return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    @PutMapping(value = "/{documentId}/finalize", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Ok"),
+            @ApiResponse(responseCode = "400", description = "Bad Request"),
+            @ApiResponse(responseCode = "404", description = "Not Found"),
+            @ApiResponse(responseCode = "417", description = "Business Error", content = {@Content(schema = @Schema(implementation = DefaultError.class))}),
+            @ApiResponse(responseCode = "500", description = "Server Error", content = {@Content(schema = @Schema(implementation = DefaultError.class))})
+    })
+    public ResponseEntity<DocumentId> finalizeUpload(@RequestHeader(name = "TransactionId") String transactionId,
+                                                     @RequestHeader(name = "Authorization") String authorization,
+                                                     @PathVariable("documentId") String documentId,
+                                                     @RequestBody @Valid FinalizeUploadRequest request) {
+        log.info("DMS version {} - TransactionId: {} - Finalize upload document {} version {}", API_VERSION, transactionId, documentId, request.getVersion());
+        var documentIdResponse = dmsService.finalizeUpload(transactionId, documentId, request);
+        return ResponseEntity.ok(documentIdResponse);
     }
 }

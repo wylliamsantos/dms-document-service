@@ -1,5 +1,6 @@
 package br.com.dms.service.workflow;
 
+import br.com.dms.controller.request.FinalizeUploadRequest;
 import br.com.dms.controller.request.PayloadApprove;
 import br.com.dms.controller.request.PayloadUrlPresigned;
 import br.com.dms.controller.response.UrlPresignedResponse;
@@ -7,6 +8,7 @@ import br.com.dms.domain.core.DocumentId;
 import br.com.dms.domain.mongodb.DmsDocument;
 import br.com.dms.domain.mongodb.DmsDocumentVersion;
 import br.com.dms.domain.core.VersionType;
+import br.com.dms.domain.core.UploadStatus;
 import br.com.dms.exception.DmsBusinessException;
 import br.com.dms.exception.DmsException;
 import br.com.dms.exception.TypeException;
@@ -15,6 +17,7 @@ import br.com.dms.repository.mongo.DmsDocumentVersionRepository;
 import br.com.dms.repository.redis.DocumentInformationRepository;
 import br.com.dms.service.AmazonS3Service;
 import br.com.dms.service.signature.SigningService;
+import br.com.dms.service.DocumentValidationService;
 import br.com.dms.util.DmsUtil;
 import com.amazonaws.HttpMethod;
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
@@ -43,6 +46,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import static br.com.dms.domain.Messages.*;
+
 @Service
 @Slf4j
 public class DmsService {
@@ -62,6 +67,7 @@ public class DmsService {
     protected final SigningService signingService;
 
     private final MetadataService metadataService;
+    private final DocumentValidationService validationService;
 
     public DmsService(AmazonS3Service amazonS3Service,
                       DocumentInformationRepository documentInformationRepository,
@@ -70,7 +76,8 @@ public class DmsService {
                       DmsUtil dmsUtil,
                       Environment environment,
                       SigningService signingService,
-                      MetadataService metadataService) {
+                      MetadataService metadataService,
+                      DocumentValidationService validationService) {
         this.amazonS3Service = amazonS3Service;
         this.documentInformationRepository = documentInformationRepository;
         this.dmsDocumentRepository = dmsDocumentRepository;
@@ -79,6 +86,7 @@ public class DmsService {
         this.environment = environment;
         this.signingService = signingService;
         this.metadataService = metadataService;
+        this.validationService = validationService;
     }
 
     public ResponseEntity<?> reprove(String transactionId, String documentId, String documentVersion) {
@@ -123,11 +131,13 @@ public class DmsService {
     }
     @Transactional
     public DocumentId createOrUpdate(String transactionId, boolean isFinal, MultipartFile document, LocalDate issuingDate, String author, String metadata,
-                                     String documentCategoryName, String documentTypeName, String filename, String comment) {
+                                     String documentCategoryName, String filename, String comment) {
         try {
             String effectiveFilename = StringUtils.isNotBlank(filename) ? filename : document.getOriginalFilename();
             byte[] documentBytes = document.getBytes();
 
+            validationService.validateCategory(transactionId, documentCategoryName);
+            validationService.validateFilename(transactionId, effectiveFilename);
             ByteArrayResource documentResource = new ByteArrayResource(documentBytes) {
                 @Override
                 public String getFilename() {
@@ -135,9 +145,10 @@ public class DmsService {
                 }
             };
 
+            validationService.validateAuthor(transactionId, author);
             ByteArrayInputStream documentData = new ByteArrayInputStream(documentBytes);
 
-            return createOrUpdate(transactionId, isFinal, documentData, documentResource, issuingDate, author, metadata, documentCategoryName, documentTypeName, effectiveFilename, comment);
+            return createOrUpdate(transactionId, isFinal, documentData, documentResource, issuingDate, author, metadata, documentCategoryName, effectiveFilename, comment);
         } catch (IOException e) {
             log.error("DMS - TransactionId: {} - Error processing multipart document", transactionId, e);
             throw new DmsException(environment.getProperty("dms.msg.unknowError"), TypeException.CONFIG, transactionId);
@@ -146,9 +157,11 @@ public class DmsService {
 
     @Transactional
     public DocumentId createOrUpdate(String transactionId, boolean isFinal, String documentAsBase64, LocalDate issuingDate, String author, String metadata, String documentCategoryName,
-                                     String documentTypeName, String filenameDms, String comment) throws IOException {
+                                     String filenameDms, String comment) throws IOException {
 
         final ByteArrayInputStream documentData = new ByteArrayInputStream(Base64.decodeBase64(documentAsBase64));
+        validationService.validateCategory(transactionId, documentCategoryName);
+        validationService.validateFilename(transactionId, filenameDms);
         final ByteArrayResource documentResource = new ByteArrayResource(Base64.decodeBase64(documentAsBase64)) {
             @Override
             public String getFilename() {
@@ -156,14 +169,19 @@ public class DmsService {
             }
         };
 
-        return createOrUpdate(transactionId, isFinal, documentData, documentResource, issuingDate, author, metadata, documentCategoryName, documentTypeName, filenameDms, comment);
+        validationService.validateAuthor(transactionId, author);
+        return createOrUpdate(transactionId, isFinal, documentData, documentResource, issuingDate, author, metadata, documentCategoryName, filenameDms, comment);
     }
 
     @Transactional
     private DocumentId createOrUpdate(String transactionId, boolean isFinal, ByteArrayInputStream documentData, ByteArrayResource documentResource, LocalDate issuingDate, String author, String metadata, String documentCategoryName,
-                                     String documentTypeName, String filenameDms, String comment) throws IOException {
+                                     String filenameDms, String comment) throws IOException {
 
+        validationService.validateCategory(transactionId, documentCategoryName);
+        validationService.validateFilename(transactionId, filenameDms);
         Map<String, Object> jsonMetadata = metadataService.getValideMetadata(transactionId, metadata, documentCategoryName, issuingDate);
+
+        validationService.validateAuthor(transactionId, author);
 
         var cpf = dmsUtil.getCpfFromMetadata(jsonMetadata);
         Optional<DmsDocument> optEntity = this.dmsDocumentRepository.findByCpfAndFilename(cpf, filenameDms);
@@ -261,6 +279,9 @@ public class DmsService {
     }
 
     public UrlPresignedResponse generatePresignedUrl(String transactionId, PayloadUrlPresigned payloadUrlPresigned) throws IOException {
+        validationService.validateAuthor(transactionId, payloadUrlPresigned.getAuthor());
+        validationService.validateCategory(transactionId, payloadUrlPresigned.getCategory());
+        validationService.validateFilename(transactionId, payloadUrlPresigned.getFileName());
         Map<String, Object> metadata = metadataService.getValideMetadata(transactionId, payloadUrlPresigned.getMetadata(), payloadUrlPresigned.getCategory(), payloadUrlPresigned.getIssuingDate());
 
         var cpf = dmsUtil.getCpfFromMetadata(metadata);
@@ -296,6 +317,7 @@ public class DmsService {
                 .author(payloadUrlPresigned.getAuthor())
                 .comment(payloadUrlPresigned.getComment())
                 .mimeType(payloadUrlPresigned.getMimeType())
+                .uploadStatus(UploadStatus.PENDING)
                 .build();
 
         String idNewVersion = StringUtils.EMPTY;
@@ -303,6 +325,8 @@ public class DmsService {
         try {
             idNewVersion = dmsDocumentVersionRepository.save(newVersion).getId();
             entity.setMetadata(metadata);
+            entity.setMimeType(payloadUrlPresigned.getMimeType());
+            entity.setFilename(payloadUrlPresigned.getFileName());
             dmsDocumentRepository.save(entity);
         } catch(DuplicateKeyException e) {
             log.error("Chave duplicada para criacao de documento filename={}, cpf={}, version={}. Limpando registros orfãos", payloadUrlPresigned.getFileName(), cpf, version);
@@ -333,6 +357,57 @@ public class DmsService {
                 .id(new DocumentId(documentId, String.valueOf(version)))
                 .build();
 
+    }
+
+    public DocumentId finalizeUpload(String transactionId, String documentId, FinalizeUploadRequest request) {
+        var versionOpt = dmsDocumentVersionRepository.findByDmsDocumentIdAndVersionNumber(documentId, request.getVersion());
+
+        if (versionOpt.isEmpty()) {
+            throw new DmsBusinessException(DOCUMENT_VERSION_NOT_FOUND, TypeException.VALID, transactionId);
+        }
+
+        var version = versionOpt.get();
+
+        if (UploadStatus.COMPLETED.equals(version.getUploadStatus())) {
+            return new DocumentId(documentId, version.getVersionNumber().toPlainString());
+        }
+
+        if (StringUtils.isBlank(version.getPathToDocument())) {
+            throw new DmsBusinessException(DOCUMENT_UPLOAD_PATH_MISSING, TypeException.VALID, transactionId);
+        }
+
+        if (!amazonS3Service.objectExists(version.getPathToDocument())) {
+            throw new DmsBusinessException(DOCUMENT_UPLOAD_NOT_FOUND, TypeException.VALID, transactionId);
+        }
+
+        var objectMetadata = amazonS3Service.getObjectMetadata(version.getPathToDocument());
+        long objectSize = objectMetadata.getContentLength();
+
+        if (request.getFileSize() != null && !request.getFileSize().equals(objectSize)) {
+            throw new DmsBusinessException(DOCUMENT_UPLOAD_SIZE_MISMATCH, TypeException.VALID, transactionId);
+        }
+
+        version.setFileSize(objectSize);
+        version.setUploadStatus(UploadStatus.COMPLETED);
+        version.setModifiedAt(LocalDateTime.now());
+
+        if (StringUtils.isNotBlank(request.getMimeType())) {
+            version.setMimeType(request.getMimeType());
+        }
+
+        dmsDocumentVersionRepository.save(version);
+
+        dmsDocumentRepository.findById(documentId).ifPresent(document -> {
+            if (StringUtils.isNotBlank(request.getMimeType())) {
+                document.setMimeType(request.getMimeType());
+            }
+            dmsDocumentRepository.save(document);
+        });
+
+        documentInformationRepository.delete(documentId, null);
+        documentInformationRepository.delete(documentId, version.getVersionNumber().toPlainString());
+
+        return new DocumentId(documentId, version.getVersionNumber().toPlainString());
     }
 
     private DmsDocumentVersion digitalSignatureAndSaveBucket(String transactionId, PayloadApprove payloadApprove, DmsDocumentVersion currentDmsDocumentVersion, DmsDocument entity, BigDecimal newVersion, String mimeType) throws IOException {
@@ -367,6 +442,7 @@ public class DmsService {
                 .author(currentDmsDocumentVersion.getAuthor())
                 .metadata(currentDmsDocumentVersion.getMetadata())
                 .mimeType(mimeType)
+                .uploadStatus(UploadStatus.COMPLETED)
                 .build();
     }
 

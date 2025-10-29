@@ -6,6 +6,7 @@ import br.com.dms.domain.mongodb.Category;
 import br.com.dms.domain.mongodb.DmsDocument;
 import br.com.dms.domain.mongodb.DmsDocumentVersion;
 import br.com.dms.domain.core.VersionType;
+import br.com.dms.domain.core.UploadStatus;
 import br.com.dms.exception.DmsException;
 import br.com.dms.exception.TypeException;
 import br.com.dms.repository.mongo.DmsDocumentRepository;
@@ -15,6 +16,7 @@ import br.com.dms.service.handler.DocumentCategoryHandler;
 import br.com.dms.service.handler.IssuingDateHandler;
 import br.com.dms.service.workflow.MetadataService;
 import br.com.dms.service.signature.SigningService;
+import br.com.dms.service.DocumentValidationService;
 import br.com.dms.util.DmsUtil;
 import lombok.ToString;
 import lombok.With;
@@ -53,6 +55,7 @@ public class DocumentCreateService {
     private final DocumentCategoryHandler documentCategoryHandler;
     private final IssuingDateHandler issuingDateHandler;
     private final MetadataService metadataService;
+    private final DocumentValidationService validationService;
 
     public DocumentCreateService(AmazonS3Service amazonS3Service,
                                  DocumentInformationRepository documentInformationRepository,
@@ -64,7 +67,8 @@ public class DocumentCreateService {
                                  CategoryService categoryService,
                                  DocumentCategoryHandler documentCategoryHandler,
                                  IssuingDateHandler issuingDateHandler,
-                                 MetadataService metadataService) {
+                                 MetadataService metadataService,
+                                 DocumentValidationService validationService) {
         this.amazonS3Service = amazonS3Service;
         this.documentInformationRepository = documentInformationRepository;
         this.dmsUtil = dmsUtil;
@@ -76,6 +80,7 @@ public class DocumentCreateService {
         this.documentCategoryHandler = documentCategoryHandler;
         this.issuingDateHandler = issuingDateHandler;
         this.metadataService = metadataService;
+        this.validationService = validationService;
     }
 
     public ResponseEntity<DocumentId> createWithMultipart(String transactionId,
@@ -91,6 +96,7 @@ public class DocumentCreateService {
             final String filenameDms = StringUtils.isNotBlank(filename) ? filename : document.getOriginalFilename();
             final byte[] documentBytes = document.getBytes();
 
+            validationService.validateCategory(transactionId, category);
             ByteArrayResource documentResource = new ByteArrayResource(documentBytes) {
                 @Override
                 public String getFilename() {
@@ -98,6 +104,8 @@ public class DocumentCreateService {
                 }
             };
 
+            validationService.validateFilename(transactionId, filenameDms);
+            validationService.validateAuthor(transactionId, author);
             ByteArrayInputStream documentData = new ByteArrayInputStream(documentBytes);
             Map<String, Object> metadata = metadataService.getValideMetadata(transactionId, jsonMetadata, category, issuingDate);
 
@@ -122,6 +130,10 @@ public class DocumentCreateService {
 
         ByteArrayInputStream documentData = new ByteArrayInputStream(documentBytes);
 
+        validationService.validateCategory(transactionId, categoryName);
+        validationService.validateFilename(transactionId, filenameDms);
+        validationService.validateAuthor(transactionId, author);
+
         Map<String, Object> metadata = metadataService.getValideMetadata(transactionId, metadados, categoryName, issuingDate);
 
         return validateAndCreate(transactionId, isFinal, issuingDate, author, metadata, categoryName, filenameDms, comment, documentData, documentResource);
@@ -129,6 +141,9 @@ public class DocumentCreateService {
 
     private ResponseEntity<DocumentId> validateAndCreate(String transactionId, boolean isFinal, LocalDate issuingDate, String author, Map<String, Object> metadata, String categoryName, String filenameDms,
                                                String comment, ByteArrayInputStream documentData, ByteArrayResource documentResource) {
+        validationService.validateCategory(transactionId, categoryName);
+        validationService.validateFilename(transactionId, filenameDms);
+        validationService.validateAuthor(transactionId, author);
         DocumentCategory documentCategory = documentCategoryHandler.resolveCategory(transactionId, categoryName, metadata);
         issuingDateHandler.handle(transactionId, issuingDate, documentCategory, metadata);
 
@@ -182,6 +197,7 @@ public class DocumentCreateService {
                 .metadata(metadata)
                 .comment(comment)
                 .mimeType(mimeType.getName())
+                .uploadStatus(UploadStatus.COMPLETED)
                 .build();
 
         dmsDocumentVersionRepository.save(newVersion);
@@ -228,6 +244,7 @@ public class DocumentCreateService {
                 .metadata(metadata)
                 .mimeType(mimeType.getName())
                 .pathToDocument(pathToDocument)
+                .uploadStatus(UploadStatus.COMPLETED)
                 .build();
 
         dmsDocumentVersionRepository.save(newDocumentVersion);
@@ -237,4 +254,5 @@ public class DocumentCreateService {
 
         return ResponseEntity.status(HttpStatus.CREATED).body(documentId);
     }
+
 }

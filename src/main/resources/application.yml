@@ -49,6 +49,7 @@ spring:
     base-url: ${ZIPKIN_URL:http://jaeger-collector.observability.svc.cluster.local:9411}
 
 dms:
+  contentTypes: "image/jpeg#image/png#image/tiff#application/pdf#text/plain#image/bmp#application/octet-stream#video/mp4#video/webm#video/ogg"
   cors:
     allowed-origins: ${DMS_CORS_ALLOWED_ORIGINS:http://localhost:5173}
     allowed-methods: ${DMS_CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,OPTIONS}
