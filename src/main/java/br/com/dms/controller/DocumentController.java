@@ -4,10 +4,8 @@ import br.com.dms.controller.request.*;
 import br.com.dms.controller.response.UrlPresignedResponse;
 import br.com.dms.domain.core.DocumentId;
 import br.com.dms.exception.DefaultError;
-import br.com.dms.service.DocumentCreateService;
 import br.com.dms.service.DocumentDeleteService;
 import br.com.dms.service.DocumentQueryService;
-import br.com.dms.service.DocumentUpdateService;
 import br.com.dms.service.dto.DocumentContent;
 import br.com.dms.service.workflow.DmsService;
 import io.swagger.v3.oas.annotations.Hidden;
@@ -38,90 +36,16 @@ public class DocumentController {
 
     private static final String API_VERSION = "v1";
 
-    private final DocumentCreateService documentCreateService;
-    private final DocumentUpdateService documentUpdateService;
     private final DocumentDeleteService documentDeleteService;
     private final DocumentQueryService documentQueryService;
     private final DmsService dmsService;
 
-    public DocumentController(DocumentCreateService documentCreateService,
-                              DocumentUpdateService documentUpdateService,
-                              DocumentDeleteService documentDeleteService,
+    public DocumentController(DocumentDeleteService documentDeleteService,
                               DocumentQueryService documentQueryService,
                               DmsService dmsService) {
-        this.documentCreateService = documentCreateService;
-        this.documentUpdateService = documentUpdateService;
         this.documentDeleteService = documentDeleteService;
         this.documentQueryService = documentQueryService;
         this.dmsService = dmsService;
-    }
-
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "201", description = "Created", content = {@Content(schema = @Schema(implementation = DocumentId.class))}),
-            @ApiResponse(responseCode = "400", description = "Bad Request"),
-            @ApiResponse(responseCode = "409", description = "Conflict"),
-            @ApiResponse(responseCode = "413", description = "Payload too large"),
-            @ApiResponse(responseCode = "417", description = "Business Error", content = {@Content(schema = @Schema(implementation = DefaultError.class))}),
-            @ApiResponse(responseCode = "500", description = "Server Error", content = {@Content(schema = @Schema(implementation = DefaultError.class))})
-    })
-    public ResponseEntity<DocumentId> createWithFormData(@RequestHeader(name = "TransactionId") String transactionId,
-                                                @RequestHeader(name = "Authorization") String authorization,
-                                                @RequestParam(name = "comment", required = false) String comment,
-                                                @RequestParam(name = "category") String category,
-                                                @RequestParam(name = "issuingDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate issuingDate,
-                                                @RequestParam(name = "metadata") String metadata,
-                                                @RequestParam(name = "filename", required = false) String filename,
-                                                @RequestParam(name = "author", required = false) String author,
-                                                @RequestParam(name = "document") MultipartFile document) {
-
-        log.info("DMS version {} - TransactionId: {} - Create document - comment: {} - metadata: {} - filename: {}", API_VERSION, transactionId, comment, metadata, filename);
-
-        return documentCreateService.createWithMultipart(transactionId, comment, category, issuingDate, metadata, filename, author, document);
-    }
-
-    @PostMapping(value = "/base64", produces = MediaType.APPLICATION_JSON_VALUE)
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "201", description = "Created", content = {@Content(schema = @Schema(implementation = DocumentId.class))}),
-            @ApiResponse(responseCode = "400", description = "Bad Request"),
-            @ApiResponse(responseCode = "409", description = "Conflict"),
-            @ApiResponse(responseCode = "413", description = "Payload too large"),
-            @ApiResponse(responseCode = "417", description = "Business Error", content = {@Content(schema = @Schema(implementation = DefaultError.class))}),
-            @ApiResponse(responseCode = "500", description = "Server Error", content = {@Content(schema = @Schema(implementation = DefaultError.class))})
-    })
-    public ResponseEntity<DocumentId> createWithBase64(@RequestHeader(name = "TransactionId") String transactionId,
-                                              @RequestHeader(name = "Authorization") String authorization,
-                                              @RequestBody @Valid PayloadDocument payloadDocument) {
-
-        log.info("DMS version {} - TransactionId: {} - Create document - comment: {} - metadados: {} - filename: {}", API_VERSION, transactionId, payloadDocument.getComment(),
-                payloadDocument.getMetadados(), payloadDocument.getFilename());
-
-        return documentCreateService.createWithBase64(transactionId, payloadDocument.isFinal(), payloadDocument.getIssuingDate(),
-                payloadDocument.getAuthor(), payloadDocument.getMetadados(), payloadDocument.getCategory(), payloadDocument.getFilename(),
-                payloadDocument.getComment(), payloadDocument.getDocumentBase64());
-    }
-
-    @PutMapping(value = "/base64/{documentId}", produces = MediaType.APPLICATION_JSON_VALUE)
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Ok"),
-            @ApiResponse(responseCode = "400", description = "Bad Request"),
-            @ApiResponse(responseCode = "404", description = "documentId not found"),
-            @ApiResponse(responseCode = "409", description = "Conflict"),
-            @ApiResponse(responseCode = "413", description = "Payload too large"),
-            @ApiResponse(responseCode = "417", description = "Business Error", content = {@Content(schema = @Schema(implementation = DefaultError.class))}),
-            @ApiResponse(responseCode = "500", description = "Server Error", content = {@Content(schema = @Schema(implementation = DefaultError.class))})
-    })
-    public ResponseEntity<DocumentId> updateWithBase64(@RequestHeader(name = "TransactionId") String transactionId,
-                                                       @RequestHeader(name = "Authorization") String authorization,
-                                                       @PathVariable(value = "documentId") String documentId,
-                                                       @RequestBody @Valid PayloadDocument payloadDocument) {
-
-        log.info("DMS version {} - TransactionId: {} - Update document - comment: {} - metadados: {} - issuingDate: {} - filename: {}", API_VERSION,
-                transactionId, payloadDocument.getComment(), payloadDocument.getMetadados(), payloadDocument.getIssuingDate(), payloadDocument.getFilename());
-
-        return documentUpdateService.updateWithBase64(documentId, transactionId, payloadDocument.isFinal(), payloadDocument.getMetadados(), payloadDocument.getIssuingDate(),
-                payloadDocument.getAuthor(), payloadDocument.getFilename(), payloadDocument.getComment(),
-                payloadDocument.getDocumentBase64());
     }
 
     @DeleteMapping(value = "/{documentId}", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -138,31 +62,6 @@ public class DocumentController {
 
         log.info("DMS version {} - TransactionId: {} - Delete document - documentId: {}", API_VERSION, transactionId, documentId);
         return documentDeleteService.delete(transactionId, documentId);
-    }
-
-    @PostMapping(value = "/{documentId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Ok"),
-            @ApiResponse(responseCode = "400", description = "Bad Request"),
-            @ApiResponse(responseCode = "404", description = "documentId not found"),
-            @ApiResponse(responseCode = "409", description = "Conflict"),
-            @ApiResponse(responseCode = "413", description = "Payload too large"),
-            @ApiResponse(responseCode = "417", description = "Business Error", content = {@Content(schema = @Schema(implementation = DefaultError.class))}),
-            @ApiResponse(responseCode = "500", description = "Server Error", content = {@Content(schema = @Schema(implementation = DefaultError.class))})
-    })
-    public ResponseEntity<DocumentId> updateWithFormData(@RequestHeader(name = "TransactionId") String transactionId,
-                                                @RequestHeader(name = "Authorization") String authorization,
-                                                @PathVariable(value = "documentId") String documentId,
-                                                @RequestParam(name = "comment", required = false) String comment,
-                                                @RequestParam(name = "metadata", required = false) String metadata,
-                                                @RequestParam(name = "filename", required = false) String filename,
-                                                @RequestParam(name = "issuingDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate issuingDate,
-                                                @RequestParam(name = "author", required = false) String author,
-                                                @RequestParam(name = "document") MultipartFile document) {
-
-        log.info("DMS version {} - TransactionId: {} - Update document - documentId: {}", API_VERSION, transactionId, documentId);
-
-        return documentUpdateService.updateWithMultipart(documentId, transactionId, true, metadata, issuingDate, author, filename, comment, document);
     }
 
     @GetMapping(path = {"/{documentId}/base64", "/{documentId}/{version}/base64"}, produces = MediaType.TEXT_PLAIN_VALUE)
@@ -252,7 +151,7 @@ public class DocumentController {
         return documentQueryService.getDocumentInformation(documentId, version);
     }
 
-    @PostMapping(path = "/upsert/multipart", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Created", content = {@Content(schema = @Schema(implementation = DocumentId.class))}),
             @ApiResponse(responseCode = "200", description = "Updated", content = {@Content(schema = @Schema(implementation = DocumentId.class))}),
@@ -278,7 +177,7 @@ public class DocumentController {
         return ResponseEntity.status(HttpStatus.CREATED).body(documentId);
     }
 
-    @PostMapping(path = "/upsert", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping(path = "/base64", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Created", content = @Content(schema = @Schema(implementation = DocumentId.class))),
             @ApiResponse(responseCode = "200", description = "Updated", content = @Content(schema = @Schema(implementation = DocumentId.class))),

@@ -24,11 +24,14 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.http.MediaType.APPLICATION_PDF_VALUE;
@@ -111,14 +114,23 @@ class DmsUtilTest {
 	}
 
 	@Test
-	void testValidateMimeType_wrong(@TempDir Path tempDir) throws IOException {
-		Path xml = tempDir.resolve("empty.txt");
-		List<String> lines = List.of("1", "2", "3");
-		Files.write(xml, lines);
-		Exception exception = assertThrows(DmsBusinessException.class, () -> dmsUtil.validateMimeType(UUID.randomUUID().toString(), new ByteArrayInputStream(FileUtils.readFileToByteArray(xml.toFile()))));
-		String message = exception.getMessage();
-		assertTrue(message.contains(environment.getProperty("dms.msg.mimeTypeInvalid")));
-	}
+    void testValidateMimeType_wrong() throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (ZipOutputStream zos = new ZipOutputStream(baos)) {
+            zos.putNextEntry(new ZipEntry("test.txt"));
+            zos.write("zip-content".getBytes());
+            zos.closeEntry();
+        }
+
+        Exception exception = assertThrows(DmsBusinessException.class, () ->
+                dmsUtil.validateMimeType(
+                        UUID.randomUUID().toString(),
+                        new ByteArrayInputStream(baos.toByteArray())
+                ));
+
+        String message = exception.getMessage();
+        assertTrue(message.contains(environment.getProperty("dms.msg.mimeTypeInvalid")));
+    }
 
 	@Test
 	void getCpfKeyRequiredDefault() {

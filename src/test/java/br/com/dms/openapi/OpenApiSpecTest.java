@@ -2,10 +2,9 @@ package br.com.dms.openapi;
 
 import br.com.dms.config.MongoConfig;
 import br.com.dms.service.AmazonS3Service;
-import br.com.dms.service.DocumentCreateService;
 import br.com.dms.service.DocumentDeleteService;
-import br.com.dms.service.DocumentUpdateService;
 import br.com.dms.service.CategoryService;
+import br.com.dms.service.workflow.DmsService;
 import br.com.dms.repository.mongo.DmsDocumentRepository;
 import br.com.dms.repository.mongo.DmsDocumentVersionRepository;
 import br.com.dms.repository.redis.DocumentInformationRepository;
@@ -34,10 +33,7 @@ class OpenApiSpecTest {
     @Autowired
     private TestRestTemplate restTemplate;
     @MockBean
-    private DocumentCreateService documentCreateService;
-
-    @MockBean
-    private DocumentUpdateService documentUpdateService;
+    private DmsService dmsService;
 
     @MockBean
     private DocumentDeleteService documentDeleteService;
