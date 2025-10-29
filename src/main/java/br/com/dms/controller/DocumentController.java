@@ -377,4 +377,21 @@ public class DocumentController {
         var response = dmsService.generatePresignedUrl(transactionId, payloadUrlPresigned);
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
+
+    @PutMapping(value = "/{documentId}/finalize", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Ok"),
+            @ApiResponse(responseCode = "400", description = "Bad Request"),
+            @ApiResponse(responseCode = "404", description = "Not Found"),
+            @ApiResponse(responseCode = "417", description = "Business Error", content = {@Content(schema = @Schema(implementation = DefaultError.class))}),
+            @ApiResponse(responseCode = "500", description = "Server Error", content = {@Content(schema = @Schema(implementation = DefaultError.class))})
+    })
+    public ResponseEntity<DocumentId> finalizeUpload(@RequestHeader(name = "TransactionId") String transactionId,
+                                                     @RequestHeader(name = "Authorization") String authorization,
+                                                     @PathVariable("documentId") String documentId,
+                                                     @RequestBody @Valid FinalizeUploadRequest request) {
+        log.info("DMS version {} - TransactionId: {} - Finalize upload document {} version {}", API_VERSION, transactionId, documentId, request.getVersion());
+        var documentIdResponse = dmsService.finalizeUpload(transactionId, documentId, request);
+        return ResponseEntity.ok(documentIdResponse);
+    }
 }

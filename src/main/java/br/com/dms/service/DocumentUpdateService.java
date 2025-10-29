@@ -3,12 +3,14 @@ package br.com.dms.service;
 import br.com.dms.domain.core.DocumentId;
 import br.com.dms.domain.mongodb.DmsDocumentVersion;
 import br.com.dms.domain.core.VersionType;
+import br.com.dms.domain.core.UploadStatus;
 import br.com.dms.exception.DmsException;
 import br.com.dms.exception.TypeException;
 import br.com.dms.repository.mongo.DmsDocumentRepository;
 import br.com.dms.repository.mongo.DmsDocumentVersionRepository;
 import br.com.dms.repository.redis.DocumentInformationRepository;
 import br.com.dms.service.signature.SigningService;
+import br.com.dms.service.DocumentValidationService;
 import br.com.dms.util.DmsUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.tika.mime.MimeType;
@@ -49,13 +51,16 @@ public class DocumentUpdateService {
 
     protected final SigningService signingService;
 
+    private final DocumentValidationService validationService;
+
     public DocumentUpdateService(AmazonS3Service amazonS3Service,
                                  Environment environment,
                                  DocumentInformationRepository documentInformationRepository,
                                  DmsDocumentRepository dmsDocumentRepository,
                                  DmsDocumentVersionRepository dmsDocumentVersionRepository,
                                  DmsUtil dmsUtil,
-                                 SigningService signingService) {
+                                 SigningService signingService,
+                                 DocumentValidationService validationService) {
         this.amazonS3Service = amazonS3Service;
         this.environment = environment;
         this.documentInformationRepository = documentInformationRepository;
@@ -63,6 +68,7 @@ public class DocumentUpdateService {
         this.dmsDocumentVersionRepository = dmsDocumentVersionRepository;
         this.dmsUtil = dmsUtil;
         this.signingService = signingService;
+        this.validationService = validationService;
     }
 
     public ResponseEntity<DocumentId> updateWithMultipart(String documentId,
@@ -124,8 +130,11 @@ public class DocumentUpdateService {
 
         var mapProperties = dmsUtil.handleObject(transactionId, metadata);
 
+        validationService.validateFilename(transactionId, filenameDms);
+
         String cpf = dmsUtil.getCpfFromMetadata(mapProperties);
 
+        validationService.validateAuthor(transactionId, author);
         final MimeType mimeType = this.dmsUtil.validateMimeType(transactionId, documentData);
         ByteArrayResource byteArrayResourceSignature = signingService.applyDigitalSignature(mimeType) ? signingService.signPdf(filenameDms, documentResource) : documentResource;
         ByteArrayInputStream inputStreamSignature = new ByteArrayInputStream(byteArrayResourceSignature.getByteArray());
@@ -144,6 +153,7 @@ public class DocumentUpdateService {
                 .fileSize(contentLength)
                 .pathToDocument(pathToDocument)
                 .metadata(mapProperties)
+                .uploadStatus(UploadStatus.COMPLETED)
                 .build();
 
         dmsDocumentVersionRepository.save(entityNewVersion);
@@ -170,8 +180,11 @@ public class DocumentUpdateService {
 
         var mapProperties = dmsUtil.handleObject(metadados);
 
+        validationService.validateFilename(transactionId, filenameDms);
+
         String cpf = dmsUtil.getCpfFromMetadata(mapProperties);
 
+        validationService.validateAuthor(transactionId, author);
         final MimeType mimeType = this.dmsUtil.validateMimeType(transactionId, documentData);
         ByteArrayResource byteArrayResourceSignature = signingService.applyDigitalSignature(mimeType) ? signingService.signPdf(filenameDms, documentResource) : documentResource;
         ByteArrayInputStream inputStreamSignature = new ByteArrayInputStream(byteArrayResourceSignature.getByteArray());
@@ -191,6 +204,7 @@ public class DocumentUpdateService {
                 .fileSize(contentLength)
                 .pathToDocument(pathToDocument)
                 .metadata(mapProperties)
+                .uploadStatus(UploadStatus.COMPLETED)
                 .build();
 
         dmsDocumentVersionRepository.save(entityNewVersion);

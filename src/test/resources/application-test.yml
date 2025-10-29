@@ -25,7 +25,7 @@ dms:
   personalDocuments: "ac:identificacao"
   identificacao.path: /pessoas/%s/cpf_%s/identificacao
   groupDateMask: yyyy/MM/dd
-  contentTypes: image/jpeg#image/png#image/tiff#application/pdf
+  contentTypes: image/jpeg#image/png#image/tiff#application/pdf#text/plain#image/bmp#application/octet-stream#video/mp4#video/webm#video/ogg
   searchByCpfAndName: "{\"ac:cpf\":\"%s\", \"cmis:name\":\"%s\"}"
   urlBase: http://localhost
   url:
@@ -44,6 +44,8 @@ dms:
     mimeTypeInvalid: Mime type do arquivo não suportado
     typeInvalid: Tipo de documento não suportado
     checkDuplicateError: Não foi possível verificar se o documento já existe no DMS
+    filenameIsMandatory: Nome do arquivo é obrigatório
+    categoryIsMandatory: Categoria é obrigatória
 
 token:
   access:

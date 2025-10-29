@@ -25,15 +25,11 @@ public class Category {
     private String description;
     @Field("document_group")
     private DocumentGroup documentGroup;
-    private String prefix;
     @Field("validity_in_days")
     private Long validityInDays;
-    @Field("main_type")
-    private String mainType;
-    @Field("type_search")
-    private String typeSearch;
     @Field("unique_attributes")
     private String uniqueAttributes;
     private Map<Object, Object> schema;
     private List<CategoryType> types;
+    private Boolean active;
 }

@@ -6,7 +6,6 @@ import br.com.dms.domain.core.DocumentCategory;
 import br.com.dms.domain.core.DocumentGroup;
 import br.com.dms.repository.mongo.CategoryRepository;
 import br.com.dms.exception.DmsBusinessException;
-import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,9 +53,6 @@ class DocumentCategoryHandlerTest {
         Category category = Category.builder()
                 .name("category::test")
                 .description("Test description")
-                .prefix("cat")
-                .mainType("default")
-                .typeSearch("SEARCH")
                 .uniqueAttributes("cpf")
                 .validityInDays(365L)
                 .documentGroup(DocumentGroup.PERSONAL)
@@ -68,9 +64,6 @@ class DocumentCategoryHandlerTest {
 
         assertThat(documentCategory.getName()).isEqualTo("category::test");
         assertThat(documentCategory.getDescription()).isEqualTo("Test description");
-        assertThat(documentCategory.getPrefix()).isEqualTo("cat");
-        assertThat(documentCategory.getMainType()).isEqualTo("default");
-        assertThat(documentCategory.getTypeSearch()).isEqualTo("SEARCH");
         assertThat(documentCategory.getUniqueAttributes()).isEqualTo("cpf");
         assertThat(documentCategory.getValidityInDays()).isEqualTo(365L);
     }
@@ -132,14 +125,13 @@ class DocumentCategoryHandlerTest {
 
         Category category = Category.builder()
                 .name("category::test")
-                .prefix("cat")
                 .types(List.of(drivingLicense))
                 .build();
 
         when(categoryRepository.findByName("category::test")).thenReturn(Optional.of(category));
 
         Map<String, Object> metadata = new HashMap<>();
-        metadata.put("catTipoDocumento", "CNH");
+        metadata.put("tipoDocumento", "CNH");
 
         DocumentCategory documentCategory = handler.resolveCategory(TRANSACTION_ID, "category::test", metadata);
 
@@ -148,40 +140,15 @@ class DocumentCategoryHandlerTest {
     }
 
     @Test
-    void resolveCategoryShouldFallbackToMainTypeWhenMetadataMissing() {
-        CategoryType defaultType = CategoryType.builder()
-                .name("default")
-                .description("Default type")
-                .validityInDays(90L)
-                .requiredAttributes("cpf")
-                .build();
-
+    void resolveCategoryShouldReturnWithoutTypeWhenMetadataMissing() {
         Category category = Category.builder()
                 .name("category::test")
-                .prefix("cat")
-                .mainType("default")
-                .types(List.of(defaultType))
                 .build();
 
         when(categoryRepository.findByName("category::test")).thenReturn(Optional.of(category));
 
         DocumentCategory documentCategory = handler.resolveCategory(TRANSACTION_ID, "category::test", Map.of());
 
-        assertThat(documentCategory.getDocumentType()).isNotNull();
-        assertThat(documentCategory.getDocumentType().getName()).isEqualTo("default");
-    }
-
-    @Test
-    void resolveCategoryShouldFailWhenNoTypeAvailable() {
-        Category category = Category.builder()
-                .name("category::test")
-                .prefix("cat")
-                .build();
-
-        when(categoryRepository.findByName("category::test")).thenReturn(Optional.of(category));
-
-        assertThatThrownBy(() -> handler.resolveCategory(TRANSACTION_ID, "category::test", Map.of()))
-                .isInstanceOf(DmsBusinessException.class)
-                .hasMessageContaining("Tipo inválido");
+        assertThat(documentCategory.getDocumentType()).isNull();
     }
 }

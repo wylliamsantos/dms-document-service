@@ -5,9 +5,6 @@ public class DocumentCategory {
     private Long id;
     private String name;
     private String description;
-    private String prefix;
-    private String mainType;
-    private String typeSearch;
     private String uniqueAttributes;
     private Long validityInDays;
     private DocumentGroup documentGroup;
@@ -35,30 +32,6 @@ public class DocumentCategory {
 
     public void setDescription(String description) {
         this.description = description;
-    }
-
-    public String getPrefix() {
-        return prefix;
-    }
-
-    public void setPrefix(String prefix) {
-        this.prefix = prefix;
-    }
-
-    public String getMainType() {
-        return mainType;
-    }
-
-    public void setMainType(String mainType) {
-        this.mainType = mainType;
-    }
-
-    public String getTypeSearch() {
-        return typeSearch;
-    }
-
-    public void setTypeSearch(String typeSearch) {
-        this.typeSearch = typeSearch;
     }
 
     public String getUniqueAttributes() {

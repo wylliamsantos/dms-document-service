@@ -62,9 +62,6 @@ public class DocumentCategoryHandler {
         documentCategory.setId(null);
         documentCategory.setName(category.getName());
         documentCategory.setDescription(category.getDescription());
-        documentCategory.setPrefix(category.getPrefix());
-        documentCategory.setMainType(category.getMainType());
-        documentCategory.setTypeSearch(category.getTypeSearch());
         documentCategory.setUniqueAttributes(category.getUniqueAttributes());
         documentCategory.setValidityInDays(category.getValidityInDays());
         documentCategory.setDocumentGroup(category.getDocumentGroup());
@@ -110,14 +107,7 @@ public class DocumentCategoryHandler {
         String documentTypeName = extractDocumentTypeFromMetadata(documentCategory, metadata);
 
         if (StringUtils.isNotBlank(documentTypeName)) {
-            documentCategory = loadCategoryWithType(transactionId, documentCategoryName, documentTypeName);
-        } else if (StringUtils.isNotBlank(documentCategory.getMainType())) {
-            documentCategory = loadCategoryWithType(transactionId, documentCategoryName, documentCategory.getMainType());
-        }
-
-        if (StringUtils.isBlank(documentCategory.getMainType()) && documentCategory.getDocumentType() == null) {
-            log.info("DMS - TransactionId: {} - Type invalid {}", transactionId, documentCategoryName);
-            throw new DmsBusinessException(environment.getProperty("dms.msg.typeInvalid"), TypeException.VALID, transactionId);
+            return loadCategoryWithType(transactionId, documentCategoryName, documentTypeName);
         }
 
         return documentCategory;
@@ -132,13 +122,6 @@ public class DocumentCategoryHandler {
         candidateKeys.add(DOCUMENT_TYPE_METADATA_KEY);
         candidateKeys.add(DOCUMENT_TYPE_METADATA_KEY.toLowerCase(Locale.ROOT));
         candidateKeys.add(capitalizeFirstLetter(DOCUMENT_TYPE_METADATA_KEY));
-
-        if (StringUtils.isNotBlank(documentCategory.getPrefix())) {
-            String prefix = documentCategory.getPrefix();
-            candidateKeys.add(prefix + DOCUMENT_TYPE_METADATA_KEY);
-            candidateKeys.add(prefix + DOCUMENT_TYPE_METADATA_KEY.toLowerCase(Locale.ROOT));
-            candidateKeys.add(prefix + capitalizeFirstLetter(DOCUMENT_TYPE_METADATA_KEY));
-        }
 
         for (String key : candidateKeys) {
             Object rawValue = metadata.get(key);

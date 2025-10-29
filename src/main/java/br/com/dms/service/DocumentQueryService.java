@@ -3,6 +3,7 @@ package br.com.dms.service;
 import br.com.dms.controller.request.DocumentInformationRequest;
 import br.com.dms.domain.mongodb.DmsDocument;
 import br.com.dms.domain.mongodb.DmsDocumentVersion;
+import br.com.dms.domain.core.UploadStatus;
 import br.com.dms.repository.mongo.DmsDocumentRepository;
 import br.com.dms.repository.mongo.DmsDocumentVersionRepository;
 import br.com.dms.repository.redis.DocumentInformationRepository;
@@ -113,7 +114,7 @@ public class DocumentQueryService {
             DmsDocument entity = optEntity.get();
             if (version.isPresent()) {
                 var optVersion = dmsDocumentVersionRepository.findByDmsDocumentIdAndVersionNumber(documentId, version.get());
-                if (optVersion.isPresent()) {
+                if (optVersion.isPresent() && isCompletedUpload(optVersion.get())) {
                     var dmsVersion = optVersion.get();
                     Map<String, Object> metadados = dmsVersion.getMetadata();
                     var mimeType = Objects.nonNull(dmsVersion.getMimeType()) ? dmsVersion.getMimeType() : entity.getMimeType();
@@ -121,7 +122,7 @@ public class DocumentQueryService {
                     response.setEntry(dmsEntry);
                 }
             } else {
-                var lastVersion = dmsDocumentVersionRepository.findLastVersionByDmsDocumentId(documentId).orElse(null);
+                var lastVersion = findLastCompletedVersion(documentId).orElse(null);
                 if (lastVersion != null) {
                     Map<String, Object> metadados = lastVersion.getMetadata();
                     var mimeType = Objects.nonNull(lastVersion.getMimeType()) ? lastVersion.getMimeType() : entity.getMimeType();
@@ -150,7 +151,12 @@ public class DocumentQueryService {
 
         if (optionalEntity.isPresent()) {
             var entity = optionalEntity.get();
-            var mongoVersions = this.dmsDocumentVersionRepository.findByDmsDocumentId(documentId).orElse(new ArrayList<>());
+            var mongoVersions = this.dmsDocumentVersionRepository.findByDmsDocumentId(documentId)
+                    .map(list -> list.stream()
+                            .filter(this::isCompletedUpload)
+                            .sorted(Comparator.comparing(DmsDocumentVersion::getVersionNumber).reversed())
+                            .toList())
+                    .orElse(new ArrayList<>());
 
             for (DmsDocumentVersion dmsDocumentVersion : mongoVersions) {
                 var mimeType = Objects.nonNull(dmsDocumentVersion.getMimeType()) ? dmsDocumentVersion.getMimeType() : entity.getMimeType();
@@ -191,11 +197,26 @@ public class DocumentQueryService {
     private DmsDocumentVersion resolveDocumentVersion(String transactionId, String documentId, Optional<String> version) {
         if (version.isPresent()) {
             logger.info("TransactionId: {} - Fetching version {} for document {}", transactionId, version.get(), documentId);
-            return dmsDocumentVersionRepository.findByDmsDocumentIdAndVersionNumber(documentId, version.get()).orElse(null);
+            return dmsDocumentVersionRepository.findByDmsDocumentIdAndVersionNumber(documentId, version.get())
+                    .filter(this::isCompletedUpload)
+                    .orElse(null);
         }
 
         logger.info("TransactionId: {} - Fetching latest version for document {}", transactionId, documentId);
-        return dmsDocumentVersionRepository.findLastVersionByDmsDocumentId(documentId).orElse(null);
+        return findLastCompletedVersion(documentId).orElse(null);
+    }
+
+    private Optional<DmsDocumentVersion> findLastCompletedVersion(String documentId) {
+        return dmsDocumentVersionRepository.findByDmsDocumentId(documentId)
+                .stream()
+                .flatMap(List::stream)
+                .filter(this::isCompletedUpload)
+                .max(Comparator.comparing(DmsDocumentVersion::getVersionNumber));
+    }
+
+    private boolean isCompletedUpload(DmsDocumentVersion version) {
+        UploadStatus status = version.getUploadStatus();
+        return status == null || UploadStatus.COMPLETED.equals(status);
     }
 
     private byte[] loadDocumentContent(DmsDocument document, DmsDocumentVersion version) throws IOException {
@@ -225,12 +246,12 @@ public class DocumentQueryService {
             if (version.isPresent()) {
                 logger.info("TransactionId: {} - Encontrada a versao {} do documento {} no novo DMS", transactionId,documentInformation.getVersion(), documentInformation.getDocumentId());
                 var versionOpt = this.dmsDocumentVersionRepository.findByDmsDocumentIdAndVersionNumber(entity.getId(), version.get());
-                if (versionOpt.isPresent()) {
+                if (versionOpt.isPresent() && isCompletedUpload(versionOpt.get())) {
                     dmsDocumentVersionEntity = versionOpt.get();
                 }
             } else {
                 logger.info("TransactionId: {} - Buscando a ultima versao do documento {} no novo DMS", transactionId,documentInformation.getDocumentId());
-                dmsDocumentVersionEntity = this.dmsDocumentVersionRepository.findLastVersionByDmsDocumentId(entity.getId()).orElse(null);
+                dmsDocumentVersionEntity = findLastCompletedVersion(entity.getId()).orElse(null);
             }
             try {
                 if (dmsDocumentVersionEntity != null) {

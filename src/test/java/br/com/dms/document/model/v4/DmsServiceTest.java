@@ -1,10 +1,12 @@
 package br.com.dms.service.workflow;
 
 import br.com.dms.config.MongoConfig;
+import br.com.dms.controller.request.FinalizeUploadRequest;
 import br.com.dms.controller.request.PayloadApprove;
 import br.com.dms.controller.request.PayloadUrlPresigned;
 import br.com.dms.domain.mongodb.DmsDocument;
 import br.com.dms.domain.mongodb.DmsDocumentVersion;
+import br.com.dms.domain.core.UploadStatus;
 import br.com.dms.repository.mongo.DmsDocumentRepository;
 import br.com.dms.repository.mongo.DmsDocumentVersionRepository;
 import br.com.dms.repository.redis.DocumentInformationRepository;
@@ -12,7 +14,10 @@ import br.com.dms.service.AmazonS3Service;
 import br.com.dms.service.ValidatorCategoryService;
 import br.com.dms.service.handler.DocumentCategoryHandler;
 import br.com.dms.service.signature.SigningService;
+import br.com.dms.service.DocumentValidationService;
 import br.com.dms.util.DmsUtil;
+import br.com.dms.exception.DmsBusinessException;
+import com.amazonaws.services.s3.model.ObjectMetadata;
 import org.apache.tika.mime.MimeTypeException;
 import org.apache.tika.mime.MimeTypes;
 import org.junit.jupiter.api.BeforeAll;
@@ -34,8 +39,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.eq;
 
 @ExtendWith(SpringExtension.class)
 @SpringBootTest
@@ -78,6 +86,9 @@ class DmsServiceTest {
 	@MockBean
 	private ValidatorCategoryService validatorCategoryService;
 
+	@MockBean
+	private DocumentValidationService documentValidationService;
+
 	@Autowired
 	private Environment environment;
 
@@ -92,9 +103,15 @@ class DmsServiceTest {
 	void setUp() {
 		uuid = UUID.randomUUID().toString();
 
+		doNothing().when(documentValidationService).validateAuthor(any(), any());
+		doNothing().when(documentValidationService).validateCategory(any(), any());
+		doNothing().when(documentValidationService).validateFilename(any(), any());
+
 		dmsDocumentVersion = new DmsDocumentVersion();
 		dmsDocumentVersion.setId("123");
 		dmsDocumentVersion.setFileSize(100L);
+		dmsDocumentVersion.setUploadStatus(UploadStatus.COMPLETED);
+		dmsDocumentVersion.setVersionNumber(BigDecimal.ONE);
 
 		dmsDocument = new DmsDocument();
 		dmsDocument.setId("123");
@@ -105,7 +122,7 @@ class DmsServiceTest {
 		when(dmsUtil.validateMimeType(any(), any())).thenReturn(MimeTypes.getDefaultMimeTypes().forName("text/plain"));
 		when(dmsDocumentVersionRepository.save(any())).thenReturn(dmsDocumentVersion);
 
-		dmsService.createOrUpdate(uuid, true, "f4btgf23fevrg", null, "DMS", "{}", "dr:contrato", null,  "teste.txt", "comment" );
+		dmsService.createOrUpdate(uuid, true, "f4btgf23fevrg", null, "DMS", "{}", "dr:contrato", "teste.txt", "comment" );
 		verify(validatorCategoryService, times(1)).validateCategory(any(), any(), any(), any());
 		verify(dmsUtil, times(1)).getCpfFromMetadata(any());
 		verify(dmsDocumentRepository, times(1)).findByCpfAndFilename(any(), any());
@@ -167,6 +184,63 @@ class DmsServiceTest {
 		verify(dmsDocumentVersionRepository, times(1)).findLastVersionByDmsDocumentId(any());
 		verify(dmsDocumentVersionRepository, times(1)).findByDmsDocumentIdAndVersionNumber(any(), any());
 		verify(dmsUtil, times(1)).generateNewMajorVersion(any());
+	}
+
+	@Test
+	void testFinalizeUploadSuccess() {
+		DmsDocumentVersion pendingVersion = new DmsDocumentVersion();
+		pendingVersion.setId("version-pending");
+		pendingVersion.setDmsDocumentId(DOCUMENT_ID);
+		pendingVersion.setVersionNumber(new BigDecimal("2.0"));
+		pendingVersion.setPathToDocument("cpf/file/2.0/video.mp4");
+		pendingVersion.setUploadStatus(UploadStatus.PENDING);
+
+		when(dmsDocumentVersionRepository.findByDmsDocumentIdAndVersionNumber(eq(DOCUMENT_ID), eq("2.0")))
+			.thenReturn(Optional.of(pendingVersion));
+		when(amazonS3Service.objectExists(pendingVersion.getPathToDocument())).thenReturn(true);
+		ObjectMetadata metadata = new ObjectMetadata();
+		metadata.setContentLength(2048L);
+		when(amazonS3Service.getObjectMetadata(pendingVersion.getPathToDocument())).thenReturn(metadata);
+		when(dmsDocumentRepository.findById(DOCUMENT_ID)).thenReturn(Optional.of(dmsDocument));
+		when(dmsDocumentRepository.save(any())).thenReturn(dmsDocument);
+
+		FinalizeUploadRequest request = new FinalizeUploadRequest();
+		request.setVersion("2.0");
+		request.setFileSize(2048L);
+		request.setMimeType("video/mp4");
+
+		var response = dmsService.finalizeUpload(uuid, DOCUMENT_ID, request);
+
+		assertEquals("2.0", response.getVersion());
+		assertEquals(UploadStatus.COMPLETED, pendingVersion.getUploadStatus());
+		assertEquals(2048L, pendingVersion.getFileSize());
+
+		verify(dmsDocumentVersionRepository).save(pendingVersion);
+		verify(documentInformationRepository).delete(DOCUMENT_ID, null);
+		verify(documentInformationRepository).delete(DOCUMENT_ID, "2.0");
+	}
+
+	@Test
+	void testFinalizeUploadSizeMismatch() {
+		DmsDocumentVersion pendingVersion = new DmsDocumentVersion();
+		pendingVersion.setId("version-pending");
+		pendingVersion.setDmsDocumentId(DOCUMENT_ID);
+		pendingVersion.setVersionNumber(new BigDecimal("3.0"));
+		pendingVersion.setPathToDocument("cpf/file/3.0/video.mp4");
+		pendingVersion.setUploadStatus(UploadStatus.PENDING);
+
+		when(dmsDocumentVersionRepository.findByDmsDocumentIdAndVersionNumber(eq(DOCUMENT_ID), eq("3.0")))
+			.thenReturn(Optional.of(pendingVersion));
+		when(amazonS3Service.objectExists(pendingVersion.getPathToDocument())).thenReturn(true);
+		ObjectMetadata metadata = new ObjectMetadata();
+		metadata.setContentLength(4096L);
+		when(amazonS3Service.getObjectMetadata(pendingVersion.getPathToDocument())).thenReturn(metadata);
+
+		FinalizeUploadRequest request = new FinalizeUploadRequest();
+		request.setVersion("3.0");
+		request.setFileSize(2048L);
+
+		assertThrows(DmsBusinessException.class, () -> dmsService.finalizeUpload(uuid, DOCUMENT_ID, request));
 	}
 
 }

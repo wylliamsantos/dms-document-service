@@ -21,10 +21,8 @@ public class CategoryResponse {
     private String description;
     private DocumentGroup documentGroup;
     private Long validityInDays;
-    private String prefix;
-    private String mainType;
-    private String typeSearch;
     private String uniqueAttributes;
     private Map<Object, Object> schema;
     private List<CategoryTypeResponse> types;
+    private Boolean active;
 }
