@@ -151,7 +151,7 @@ public class DocumentController {
         return documentQueryService.getDocumentInformation(documentId, version);
     }
 
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping(path = "/multipart", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Created", content = {@Content(schema = @Schema(implementation = DocumentId.class))}),
             @ApiResponse(responseCode = "200", description = "Updated", content = {@Content(schema = @Schema(implementation = DocumentId.class))}),
