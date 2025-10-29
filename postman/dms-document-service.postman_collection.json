@@ -34,30 +34,74 @@
   ],
   "item": [
     {
-      "name": "Create Document (multipart)",
+      "name": "Create/Upsert (multipart)",
       "request": {
         "method": "POST",
         "header": [
-          { "key": "TransactionId", "value": "{{transaction_id}}" },
-          { "key": "Authorization", "value": "{{authorization_header}}" }
+          {
+            "key": "TransactionId",
+            "value": "{{transaction_id}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "{{authorization_header}}"
+          }
         ],
         "body": {
           "mode": "formdata",
           "formdata": [
-            { "key": "comment", "value": "Initial upload", "type": "text" },
-            { "key": "category", "value": "personal-docs", "type": "text" },
-            { "key": "issuingDate", "value": "2024-01-01", "type": "text" },
-            { "key": "metadata", "value": "{\"cpf\":\"12345678900\"}", "type": "text" },
-            { "key": "filename", "value": "sample.pdf", "type": "text" },
-            { "key": "author", "value": "agent.api", "type": "text" },
-            { "key": "document", "type": "file", "src": "" },
-            { "key": "isFinal", "value": "true", "type": "text" }
+            {
+              "key": "comment",
+              "value": "Initial upload",
+              "type": "text"
+            },
+            {
+              "key": "category",
+              "value": "personal-docs",
+              "type": "text"
+            },
+            {
+              "key": "issuingDate",
+              "value": "2024-01-01",
+              "type": "text"
+            },
+            {
+              "key": "metadata",
+              "value": "{\"cpf\":\"12345678900\"}",
+              "type": "text"
+            },
+            {
+              "key": "filename",
+              "value": "sample.pdf",
+              "type": "text"
+            },
+            {
+              "key": "author",
+              "value": "agent.api",
+              "type": "text"
+            },
+            {
+              "key": "document",
+              "type": "file",
+              "src": ""
+            },
+            {
+              "key": "isFinal",
+              "value": "true",
+              "type": "text"
+            }
           ]
         },
         "url": {
-          "raw": "{{document_base_url}}/v1/documents",
-          "host": ["{{document_base_url}}"],
-          "path": ["v1", "documents"]
+          "raw": "{{document_base_url}}/v1/documents/multipart",
+          "host": [
+            "{{document_base_url}}"
+          ],
+          "path": [
+            "v1",
+            "documents",
+            "multipart"
+          ]
         }
       }
     },
@@ -66,19 +110,38 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "TransactionId", "value": "{{transaction_id}}" },
-          { "key": "Authorization", "value": "{{authorization_header}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "TransactionId",
+            "value": "{{transaction_id}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "{{authorization_header}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"category\": \"personal-docs\",\n  \"type\": \"ID\",\n  \"metadata\": \"{\\\"cpf\\\":\\\"12345678900\\\"}\",\n  \"filename\": \"sample.pdf\",\n  \"author\": \"agent.api\",\n  \"documentBase64\": \"U2FtcGxlIGJhc2U2NCBkYXRh\",\n  \"comment\": \"Initial upload via base64\",\n  \"issuingDate\": \"2024-01-01\",\n  \"isFinal\": true\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         },
         "url": {
           "raw": "{{document_base_url}}/v1/documents/base64",
-          "host": ["{{document_base_url}}"],
-          "path": ["v1", "documents", "base64"]
+          "host": [
+            "{{document_base_url}}"
+          ],
+          "path": [
+            "v1",
+            "documents",
+            "base64"
+          ]
         }
       }
     },
@@ -87,24 +150,60 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "TransactionId", "value": "{{transaction_id}}" },
-          { "key": "Authorization", "value": "{{authorization_header}}" }
+          {
+            "key": "TransactionId",
+            "value": "{{transaction_id}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "{{authorization_header}}"
+          }
         ],
         "body": {
           "mode": "formdata",
           "formdata": [
-            { "key": "comment", "value": "New version", "type": "text" },
-            { "key": "metadata", "value": "{\"cpf\":\"12345678900\",\"version\":\"2.0\"}", "type": "text" },
-            { "key": "filename", "value": "sample.pdf", "type": "text" },
-            { "key": "issuingDate", "value": "2024-06-01", "type": "text" },
-            { "key": "author", "value": "agent.api", "type": "text" },
-            { "key": "document", "type": "file", "src": "" }
+            {
+              "key": "comment",
+              "value": "New version",
+              "type": "text"
+            },
+            {
+              "key": "metadata",
+              "value": "{\"cpf\":\"12345678900\",\"version\":\"2.0\"}",
+              "type": "text"
+            },
+            {
+              "key": "filename",
+              "value": "sample.pdf",
+              "type": "text"
+            },
+            {
+              "key": "issuingDate",
+              "value": "2024-06-01",
+              "type": "text"
+            },
+            {
+              "key": "author",
+              "value": "agent.api",
+              "type": "text"
+            },
+            {
+              "key": "document",
+              "type": "file",
+              "src": ""
+            }
           ]
         },
         "url": {
           "raw": "{{document_base_url}}/v1/documents/{{documentId}}",
-          "host": ["{{document_base_url}}"],
-          "path": ["v1", "documents", "{{documentId}}"]
+          "host": [
+            "{{document_base_url}}"
+          ],
+          "path": [
+            "v1",
+            "documents",
+            "{{documentId}}"
+          ]
         }
       }
     },
@@ -113,19 +212,39 @@
       "request": {
         "method": "PUT",
         "header": [
-          { "key": "TransactionId", "value": "{{transaction_id}}" },
-          { "key": "Authorization", "value": "{{authorization_header}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "TransactionId",
+            "value": "{{transaction_id}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "{{authorization_header}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"category\": \"personal-docs\",\n  \"type\": \"ID\",\n  \"metadata\": \"{\\\"cpf\\\":\\\"12345678900\\\",\\\"version\\\":\\\"2.0\\\"}\",\n  \"filename\": \"sample.pdf\",\n  \"author\": \"agent.api\",\n  \"documentBase64\": \"VXBkYXRlZCBhcyBiYXNlNjQ=\",\n  \"comment\": \"Base64 update\",\n  \"issuingDate\": \"2024-06-01\",\n  \"isFinal\": true\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         },
         "url": {
           "raw": "{{document_base_url}}/v1/documents/base64/{{documentId}}",
-          "host": ["{{document_base_url}}"],
-          "path": ["v1", "documents", "base64", "{{documentId}}"]
+          "host": [
+            "{{document_base_url}}"
+          ],
+          "path": [
+            "v1",
+            "documents",
+            "base64",
+            "{{documentId}}"
+          ]
         }
       }
     },
@@ -134,20 +253,39 @@
       "request": {
         "method": "DELETE",
         "header": [
-          { "key": "TransactionId", "value": "{{transaction_id}}" },
-          { "key": "Authorization", "value": "{{authorization_header}}" },
-          { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+          {
+            "key": "TransactionId",
+            "value": "{{transaction_id}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "{{authorization_header}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
         ],
         "body": {
           "mode": "urlencoded",
           "urlencoded": [
-            { "key": "document", "type": "file", "src": "sample.pdf" }
+            {
+              "key": "document",
+              "type": "file",
+              "src": "sample.pdf"
+            }
           ]
         },
         "url": {
           "raw": "{{document_base_url}}/v1/documents/{{documentId}}",
-          "host": ["{{document_base_url}}"],
-          "path": ["v1", "documents", "{{documentId}}"]
+          "host": [
+            "{{document_base_url}}"
+          ],
+          "path": [
+            "v1",
+            "documents",
+            "{{documentId}}"
+          ]
         }
       }
     },
@@ -156,15 +294,31 @@
       "request": {
         "method": "GET",
         "header": [
-          { "key": "TransactionId", "value": "{{transaction_id}}" },
-          { "key": "Authorization", "value": "{{authorization_header}}" }
+          {
+            "key": "TransactionId",
+            "value": "{{transaction_id}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "{{authorization_header}}"
+          }
         ],
         "url": {
           "raw": "{{document_base_url}}/v1/documents/{{documentId}}/content?version={{version}}",
-          "host": ["{{document_base_url}}"],
-          "path": ["v1", "documents", "{{documentId}}", "content"],
+          "host": [
+            "{{document_base_url}}"
+          ],
+          "path": [
+            "v1",
+            "documents",
+            "{{documentId}}",
+            "content"
+          ],
           "query": [
-            { "key": "version", "value": "{{version}}" }
+            {
+              "key": "version",
+              "value": "{{version}}"
+            }
           ]
         }
       }
@@ -174,13 +328,26 @@
       "request": {
         "method": "GET",
         "header": [
-          { "key": "TransactionId", "value": "{{transaction_id}}" },
-          { "key": "Authorization", "value": "{{authorization_header}}" }
+          {
+            "key": "TransactionId",
+            "value": "{{transaction_id}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "{{authorization_header}}"
+          }
         ],
         "url": {
           "raw": "{{document_base_url}}/v1/documents/{{documentId}}/base64",
-          "host": ["{{document_base_url}}"],
-          "path": ["v1", "documents", "{{documentId}}", "base64"]
+          "host": [
+            "{{document_base_url}}"
+          ],
+          "path": [
+            "v1",
+            "documents",
+            "{{documentId}}",
+            "base64"
+          ]
         }
       }
     },
@@ -189,13 +356,26 @@
       "request": {
         "method": "GET",
         "header": [
-          { "key": "TransactionId", "value": "{{transaction_id}}" },
-          { "key": "Authorization", "value": "{{authorization_header}}" }
+          {
+            "key": "TransactionId",
+            "value": "{{transaction_id}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "{{authorization_header}}"
+          }
         ],
         "url": {
           "raw": "{{document_base_url}}/v1/documents/{{documentId}}/information",
-          "host": ["{{document_base_url}}"],
-          "path": ["v1", "documents", "{{documentId}}", "information"]
+          "host": [
+            "{{document_base_url}}"
+          ],
+          "path": [
+            "v1",
+            "documents",
+            "{{documentId}}",
+            "information"
+          ]
         }
       }
     },
@@ -204,13 +384,26 @@
       "request": {
         "method": "GET",
         "header": [
-          { "key": "TransactionId", "value": "{{transaction_id}}" },
-          { "key": "Authorization", "value": "{{authorization_header}}" }
+          {
+            "key": "TransactionId",
+            "value": "{{transaction_id}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "{{authorization_header}}"
+          }
         ],
         "url": {
           "raw": "{{document_base_url}}/v1/documents/{{documentId}}/versions",
-          "host": ["{{document_base_url}}"],
-          "path": ["v1", "documents", "{{documentId}}", "versions"]
+          "host": [
+            "{{document_base_url}}"
+          ],
+          "path": [
+            "v1",
+            "documents",
+            "{{documentId}}",
+            "versions"
+          ]
         }
       }
     },
@@ -219,19 +412,38 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "TransactionId", "value": "{{transaction_id}}" },
-          { "key": "Authorization", "value": "{{authorization_header}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "TransactionId",
+            "value": "{{transaction_id}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "{{authorization_header}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
           "raw": "[\n  { \"documentId\": \"{{documentId}}\", \"version\": \"1.0\" }\n]",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         },
         "url": {
           "raw": "{{document_base_url}}/v1/documents/zip",
-          "host": ["{{document_base_url}}"],
-          "path": ["v1", "documents", "zip"]
+          "host": [
+            "{{document_base_url}}"
+          ],
+          "path": [
+            "v1",
+            "documents",
+            "zip"
+          ]
         }
       }
     },
@@ -240,48 +452,39 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "TransactionId", "value": "{{transaction_id}}" },
-          { "key": "Authorization", "value": "{{authorization_header}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "TransactionId",
+            "value": "{{transaction_id}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "{{authorization_header}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"fileName\": \"upload.pdf\",\n  \"mimeType\": \"application/pdf\",\n  \"fileSize\": 524288,\n  \"category\": \"personal-docs\",\n  \"type\": \"ID\",\n  \"metadata\": \"{\\\"cpf\\\":\\\"12345678900\\\"}\",\n  \"author\": \"agent.api\",\n  \"issuingDate\": \"2024-07-01\",\n  \"isFinal\": false,\n  \"comment\": \"Request presigned URL\"\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         },
         "url": {
           "raw": "{{document_base_url}}/v1/documents/presigned/url",
-          "host": ["{{document_base_url}}"],
-          "path": ["v1", "documents", "presigned", "url"]
-        }
-      }
-    },
-    {
-      "name": "Workflow Upsert (multipart)",
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "TransactionId", "value": "{{transaction_id}}" },
-          { "key": "Authorization", "value": "{{authorization_header}}" }
-        ],
-        "body": {
-          "mode": "formdata",
-          "formdata": [
-            { "key": "comment", "value": "Workflow upsert", "type": "text" },
-            { "key": "category", "value": "personal-docs", "type": "text" },
-            { "key": "type", "value": "ID", "type": "text" },
-            { "key": "issuingDate", "value": "2024-01-01", "type": "text" },
-            { "key": "metadata", "value": "{\"cpf\":\"12345678900\"}", "type": "text" },
-            { "key": "filename", "value": "workflow.pdf", "type": "text" },
-            { "key": "author", "value": "workflow.user", "type": "text" },
-            { "key": "document", "type": "file", "src": "" },
-            { "key": "isFinal", "value": "false", "type": "text" }
+          "host": [
+            "{{document_base_url}}"
+          ],
+          "path": [
+            "v1",
+            "documents",
+            "presigned",
+            "url"
           ]
-        },
-        "url": {
-          "raw": "{{document_base_url}}/v1/documents/upsert/multipart",
-          "host": ["{{document_base_url}}"],
-          "path": ["v1", "documents", "upsert", "multipart"]
         }
       }
     },
@@ -290,19 +493,38 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "TransactionId", "value": "{{transaction_id}}" },
-          { "key": "Authorization", "value": "{{authorization_header}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "TransactionId",
+            "value": "{{transaction_id}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "{{authorization_header}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"category\": \"personal-docs\",\n  \"type\": \"ID\",\n  \"metadata\": \"{\\\"cpf\\\":\\\"12345678900\\\"}\",\n  \"filename\": \"workflow.pdf\",\n  \"author\": \"workflow.user\",\n  \"documentBase64\": \"V29ya2Zsb3cgdXBkYXRlIGJhc2U2NA==\",\n  \"comment\": \"Workflow upsert via base64\",\n  \"issuingDate\": \"2024-01-01\",\n  \"isFinal\": false\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         },
         "url": {
           "raw": "{{document_base_url}}/v1/documents/upsert",
-          "host": ["{{document_base_url}}"],
-          "path": ["v1", "documents", "upsert"]
+          "host": [
+            "{{document_base_url}}"
+          ],
+          "path": [
+            "v1",
+            "documents",
+            "upsert"
+          ]
         }
       }
     },
@@ -311,19 +533,40 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "transactionId", "value": "{{transaction_id}}" },
-          { "key": "Authorization", "value": "{{authorization_header}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "transactionId",
+            "value": "{{transaction_id}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "{{authorization_header}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"signatureText\": \"Approved by workflow\"\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         },
         "url": {
           "raw": "{{document_base_url}}/v1/documents/{{documentId}}/{{version}}/approve",
-          "host": ["{{document_base_url}}"],
-          "path": ["v1", "documents", "{{documentId}}", "{{version}}", "approve"]
+          "host": [
+            "{{document_base_url}}"
+          ],
+          "path": [
+            "v1",
+            "documents",
+            "{{documentId}}",
+            "{{version}}",
+            "approve"
+          ]
         }
       }
     },
@@ -332,13 +575,27 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "transactionId", "value": "{{transaction_id}}" },
-          { "key": "Authorization", "value": "{{authorization_header}}" }
+          {
+            "key": "transactionId",
+            "value": "{{transaction_id}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "{{authorization_header}}"
+          }
         ],
         "url": {
           "raw": "{{document_base_url}}/v1/documents/{{documentId}}/{{version}}/reprove",
-          "host": ["{{document_base_url}}"],
-          "path": ["v1", "documents", "{{documentId}}", "{{version}}", "reprove"]
+          "host": [
+            "{{document_base_url}}"
+          ],
+          "path": [
+            "v1",
+            "documents",
+            "{{documentId}}",
+            "{{version}}",
+            "reprove"
+          ]
         }
       }
     },
@@ -347,19 +604,39 @@
       "request": {
         "method": "PUT",
         "header": [
-          { "key": "TransactionId", "value": "{{transaction_id}}" },
-          { "key": "Authorization", "value": "{{authorization_header}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "TransactionId",
+            "value": "{{transaction_id}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "{{authorization_header}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"fileName\": \"sample.pdf\",\n  \"properties\": \"{\\\"cpf\\\":\\\"12345678900\\\",\\\"status\\\":\\\"APPROVED\\\"}\"\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         },
         "url": {
           "raw": "{{document_base_url}}/v1/documents/{{documentId}}/metadata",
-          "host": ["{{document_base_url}}"],
-          "path": ["v1", "documents", "{{documentId}}", "metadata"]
+          "host": [
+            "{{document_base_url}}"
+          ],
+          "path": [
+            "v1",
+            "documents",
+            "{{documentId}}",
+            "metadata"
+          ]
         }
       }
     }
