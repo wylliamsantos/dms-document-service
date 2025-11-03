@@ -4,19 +4,19 @@ import br.com.dms.controller.request.CategoryRequest;
 import br.com.dms.controller.response.CategoryResponse;
 import br.com.dms.service.CategoryService;
 import br.com.dms.service.DocumentTypeService;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.validation.Valid;
 import java.util.List;
 
 @RestController
 @RequestMapping("/v1/categories")
 @Slf4j
+@PreAuthorize("hasAuthority('ROLE_DOCUMENT_VIEWER')")
 public class CategoryController {
 
     private final CategoryService service;
@@ -28,6 +28,7 @@ public class CategoryController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<CategoryResponse> create(@RequestHeader(name = "TransactionId") String transactionId,
                                                    @RequestHeader(name = "Authorization") String authorization,
                                                    @RequestBody @Valid CategoryRequest categoryRequest) {
@@ -36,6 +37,7 @@ public class CategoryController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<CategoryResponse> update(@RequestHeader(name = "TransactionId") String transactionId,
                                                    @RequestHeader(name = "Authorization") String authorization,
                                                    @PathVariable("id") String id, @RequestBody @Valid CategoryRequest categoryRequest) {

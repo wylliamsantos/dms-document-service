@@ -16,6 +16,41 @@ Serviço responsável pela ingestão, atualização e consulta de documentos no 
 - `GET /{documentId}/content` e `/base64` — recupera conteúdo (binário ou Base64).
 - `POST /{documentId}` — cria nova versão via multipart (major/minor).
 - `DELETE /{documentId}` — remove documento e limpa caches.
+- `POST /presigned/url` e `PUT /{documentId}/finalize` — fluxo assíncrono para uploads grandes/vídeos (detalhado abaixo).
+
+#### Fluxo de upload assíncrono (presigned URL)
+
+1. **Solicitar URL pré-assinada** — `POST /v1/documents/presigned/url`
+
+   ```jsonc
+   {
+     "category": "ac:procuracao",          // obrigatório, validação de categoria
+     "metadata": "{\"cpf\":\"12345678900\"}",
+     "isFinal": true,                        // controla versão major/minor
+     "fileName": "contrato-assinado.pdf",   // nome lógico final
+     "fileSize": 10485760,                   // tamanho em bytes
+     "mimeType": "application/pdf",
+     "issuingDate": "2024-01-31",           // opcional
+     "author": "João Silva",                // obrigatório
+     "comment": "Reenvio com assinatura"
+   }
+   ```
+
+   Resposta: `{ "id": { "id": "<documentId>", "version": "<version>" }, "url": "https://s3..." }`
+
+2. **Upload direto para S3 compatível** — executar `PUT` na `url` retornada utilizando o `Content-Type` informado. O frontend acompanha o progresso e bloqueia a página até concluir.
+
+3. **Finalizar o upload** — `PUT /v1/documents/{documentId}/finalize`
+
+   ```json
+   {
+     "version": "1.0",               // versão retornada no passo 1
+     "fileSize": 10485760,
+     "mimeType": "application/pdf"
+   }
+   ```
+
+   A API valida integridade, atualiza metadados e devolve `{ "id": "…", "version": "…" }` para consumo pela interface.
 
 ### Detalhes de implementação relevantes
 
@@ -31,7 +66,28 @@ Serviço responsável pela ingestão, atualização e consulta de documentos no 
    export PATH="$JAVA_HOME/bin:$PATH"
    ```
 2. Garantir MongoDB, Redis e S3 (MinIO) disponíveis conforme `application-local.yml`.
-3. `./gradlew bootRun`.
+3. (Opcional) Subir o Keycloak local (ver seção abaixo) para testar autenticação.
+4. `./gradlew bootRun`.
+
+### Autenticação via Keycloak (ambiente local)
+
+O `docker-compose.yml` agora inclui um serviço `dms-keycloak` com um realm de exemplo (`dms`).
+
+1. Inicie a stack local:
+   ```bash
+   docker-compose up -d keycloak
+   ```
+   Usuários disponíveis:
+   - `admin / admin123` (roles `ROLE_ADMIN`, `ROLE_DOCUMENT_VIEWER`)
+   - `viewer / viewer123` (role `ROLE_DOCUMENT_VIEWER`)
+
+2. O serviço expõe o console e endpoints em `http://localhost:8180/`. As configurações principais estão no arquivo `docker/keycloak/realm-export.json` (clientes `dms-frontend` e `dms-api`).
+
+3. O `dms-document-service` foi configurado como resource-server OAuth2 (`spring.security.oauth2.resourceserver.jwt.issuer-uri`). Ao receber um token JWT do realm `dms`, ele valida a assinatura e usa os roles (`realm_access`/`resource_access`) como `GrantedAuthority`.
+
+4. Próximos passos sugeridos:
+   - Ajustar o frontend para autenticar via Keycloak (PKCE) em vez da tela de login simulada.
+   - Criar uma configuração equivalente no `dms-search-service` para padronizar a segurança entre os serviços.
 
 ### Observabilidade
 

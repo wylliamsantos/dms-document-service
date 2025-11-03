@@ -11,6 +11,11 @@ spring:
   cache:
     ehcache:
       config: classpath:ehcache.xml
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/dms}
 management:
   endpoints.web.exposure.include: 'health,prometheus'
   endpoint:
