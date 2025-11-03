@@ -1,4 +1,4 @@
-package br.com.dms.service.workflow;
+package br.com.dms.service;
 
 import br.com.dms.controller.request.FinalizeUploadRequest;
 import br.com.dms.controller.request.PayloadApprove;
@@ -15,9 +15,8 @@ import br.com.dms.exception.TypeException;
 import br.com.dms.repository.mongo.DmsDocumentRepository;
 import br.com.dms.repository.mongo.DmsDocumentVersionRepository;
 import br.com.dms.repository.redis.DocumentInformationRepository;
-import br.com.dms.service.AmazonS3Service;
 import br.com.dms.service.signature.SigningService;
-import br.com.dms.service.DocumentValidationService;
+import br.com.dms.service.workflow.MetadataService;
 import br.com.dms.util.DmsUtil;
 import com.amazonaws.HttpMethod;
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;

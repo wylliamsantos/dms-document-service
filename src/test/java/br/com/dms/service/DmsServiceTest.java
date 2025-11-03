@@ -1,4 +1,4 @@
-package br.com.dms.service.workflow;
+package br.com.dms.service;
 
 import br.com.dms.config.MongoConfig;
 import br.com.dms.controller.request.FinalizeUploadRequest;
