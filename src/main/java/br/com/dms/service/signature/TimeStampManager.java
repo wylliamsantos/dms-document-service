@@ -49,6 +49,10 @@ class TimeStampManager {
      * @throws IOException
      */
     CMSSignedData addSignedTimeStamp(CMSSignedData signedData) throws IOException, TSPException {
+        if (tsaClient == null) {
+            throw new IllegalStateException("TimeStampManager is not configured with a TSA URL");
+        }
+
         SignerInformationStore signerStore = signedData.getSignerInfos();
         List<SignerInformation> signersWithTimeStamp = new ArrayList<>();
 

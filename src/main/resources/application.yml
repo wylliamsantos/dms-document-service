@@ -37,13 +37,13 @@ spring:
       port: 443
       config:
         format: YAML
-        acl-token: ${CONSUL_TOKEN:2d7e28b1-7795-a670-c470-cc47f8387c7a}
+        acl-token: ${CONSUL_TOKEN:}
     vault:
       uri: ${VAULT_URI:https://vault.dms-dev.in:443}
       fail-fast: true
       scheme: https
       authentication: ${VAULT_AUTH:TOKEN}
-      token: hvs.CAESIF0D7YRDXGBdumOfEBz2H3Mn9ih4RAlz3H9it3pM0ic9Gh4KHGh2cy5mV1pBcXh6MFQ5WEZPU3dFRDh3YUp6VFo
+      token: ${VAULT_TOKEN:}
       kubernetes:
         role: ${spring.application.group}-${spring.application.name}
         kubernetes-path: ${CLUSTER_NAME}

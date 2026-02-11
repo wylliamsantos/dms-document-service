@@ -6,8 +6,10 @@ import java.io.OutputStream;
 import java.math.BigInteger;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.util.Base64;
 
 import org.apache.pdfbox.io.IOUtils;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
@@ -80,7 +82,9 @@ class TSAClient {
         connection.setRequestProperty("Content-Type", "application/timestamp-query");
 
         if (this.username != null && this.password != null) {
-            connection.setRequestProperty(this.username, this.password);
+            String rawCredentials = this.username + ":" + this.password;
+            String basicAuth = Base64.getEncoder().encodeToString(rawCredentials.getBytes(StandardCharsets.UTF_8));
+            connection.setRequestProperty("Authorization", "Basic " + basicAuth);
         }
 
         OutputStream output = null;
