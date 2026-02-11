@@ -1,5 +1,6 @@
 package br.com.dms.controller.request;
 
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDate;
@@ -10,6 +11,7 @@ public class CreateDocumentRequest {
     private String comment;
 
     @NotNull
+    @NotBlank
     private String category;
 
     private LocalDate issuingDate;
@@ -21,6 +23,7 @@ public class CreateDocumentRequest {
     private String author;
 
     @NotNull
+    @NotBlank
     private String documentBase64;
 
     public String getComment() {
