@@ -9,6 +9,7 @@ import br.com.dms.domain.mongodb.DmsDocumentVersion;
 import br.com.dms.domain.core.UploadStatus;
 import br.com.dms.repository.mongo.DmsDocumentRepository;
 import br.com.dms.repository.mongo.DmsDocumentVersionRepository;
+import br.com.dms.repository.mongo.DocumentWorkflowTransitionRepository;
 import br.com.dms.repository.redis.DocumentInformationRepository;
 import br.com.dms.service.AmazonS3Service;
 import br.com.dms.service.ValidatorCategoryService;
@@ -20,9 +21,8 @@ import br.com.dms.exception.DmsBusinessException;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import org.apache.tika.mime.MimeTypeException;
 import org.apache.tika.mime.MimeTypes;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.core.AutoConfigureCache;
@@ -35,8 +35,10 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -50,7 +52,6 @@ import static org.mockito.ArgumentMatchers.eq;
 @AutoConfigureMockMvc
 @AutoConfigureCache
 @ActiveProfiles("test")
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class DmsServiceTest {
 
 	private static final String DOCUMENT_ID = "12357491243";
@@ -81,6 +82,9 @@ class DmsServiceTest {
 	private DmsUtil dmsUtil;
 
 	@MockBean
+	private DocumentWorkflowTransitionRepository workflowTransitionRepository;
+
+	@MockBean
 	protected SigningService signingService;
 
 	@MockBean
@@ -99,13 +103,20 @@ class DmsServiceTest {
 	private DmsDocumentVersion dmsDocumentVersion;
 	private String uuid;
 
-	@BeforeAll
-	void setUp() {
+	@BeforeEach
+	void setUp() throws IOException {
 		uuid = UUID.randomUUID().toString();
 
 		doNothing().when(documentValidationService).validateAuthor(any(), any());
 		doNothing().when(documentValidationService).validateCategory(any(), any());
 		doNothing().when(documentValidationService).validateFilename(any(), any());
+
+		when(dmsUtil.getCpfFromMetadata(any())).thenReturn(CPF);
+		HashMap<String, Object> metadata = new HashMap<>();
+		metadata.put("cpf", CPF);
+		when(dmsUtil.handleObject(any(), any())).thenReturn(metadata);
+		when(validatorCategoryService.validateCategory(any(), any(), any(), any())).thenReturn(Set.of());
+		when(dmsDocumentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
 		dmsDocumentVersion = new DmsDocumentVersion();
 		dmsDocumentVersion.setId("123");
@@ -150,14 +161,14 @@ class DmsServiceTest {
 
 	@Test
 	void testReprove() {
-		when(dmsDocumentRepository.existsById(any())).thenReturn(true);
+		when(dmsDocumentRepository.findById(any())).thenReturn(Optional.of(dmsDocument));
 		when(dmsDocumentVersionRepository.findByDmsDocumentIdAndVersionNumber(any(), any())).thenReturn(Optional.of(dmsDocumentVersion));
 
 		dmsService.reprove(uuid, DOCUMENT_ID, DOCUMENT_VERSION);
-		verify(dmsDocumentRepository, times(1)).existsById(any());
+		verify(dmsDocumentRepository, times(1)).findById(any());
 		verify(dmsDocumentVersionRepository, times(1)).findByDmsDocumentIdAndVersionNumber(any(), any());
-		verify(dmsDocumentVersionRepository, times(1)).delete(any());
-		verify(amazonS3Service, times(1)).deleteDocumentS3(any(), any());
+		verify(dmsDocumentRepository, atLeastOnce()).save(any());
+		verify(workflowTransitionRepository, times(1)).save(any());
 	}
 
 	@Test
