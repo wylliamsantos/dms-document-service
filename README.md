@@ -7,6 +7,7 @@ Serviço responsável pela ingestão, atualização e consulta de documentos no 
 - `./gradlew compileJava` — valida o projeto com Java 21.
 - `./gradlew test` — executa a suíte de testes.
 - `./gradlew bootRun` — sobe a aplicação localmente (Mongo/Redis/S3 devem estar acessíveis).
+- `./scripts/package-a-smoke.sh` — smoke test do Pacote A (token/401/403/400/CORS) com Keycloak local.
 
 ### Endpoints principais (todos sob `/v1/documents`)
 
@@ -68,6 +69,24 @@ Serviço responsável pela ingestão, atualização e consulta de documentos no 
 2. Garantir MongoDB, Redis e S3 (MinIO) disponíveis conforme `application-local.yml`.
 3. (Opcional) Subir o Keycloak local (ver seção abaixo) para testar autenticação.
 4. `./gradlew bootRun`.
+
+### Smoke do Pacote A (auth + validação + CORS)
+
+Com `dms-document-service` e Keycloak locais em execução, rode:
+
+```bash
+./scripts/package-a-smoke.sh
+```
+
+Checks executados:
+- health do serviço e discovery do realm;
+- emissão de token para usuário viewer e admin;
+- `401` sem token;
+- `403` para viewer em endpoint restrito de admin;
+- `400` para payload inválido com token admin;
+- preflight CORS (`OPTIONS`) em endpoint `/v1/**`.
+
+Variáveis úteis (opcionais): `DOC_API_URL`, `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID`, `KEYCLOAK_VIEWER_USER`, `KEYCLOAK_VIEWER_PASS`, `KEYCLOAK_ADMIN_USER`, `KEYCLOAK_ADMIN_PASS`, `CORS_ORIGIN`.
 
 ### Autenticação via Keycloak (ambiente local)
 
