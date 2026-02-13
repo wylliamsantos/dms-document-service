@@ -5,8 +5,10 @@ import br.com.dms.controller.request.PayloadApprove;
 import br.com.dms.controller.request.PayloadUrlPresigned;
 import br.com.dms.controller.response.UrlPresignedResponse;
 import br.com.dms.domain.core.DocumentId;
+import br.com.dms.domain.core.DocumentWorkflowStatus;
 import br.com.dms.domain.mongodb.DmsDocument;
 import br.com.dms.domain.mongodb.DmsDocumentVersion;
+import br.com.dms.domain.mongodb.DocumentWorkflowTransition;
 import br.com.dms.domain.core.VersionType;
 import br.com.dms.domain.core.UploadStatus;
 import br.com.dms.exception.DmsBusinessException;
@@ -14,6 +16,7 @@ import br.com.dms.exception.DmsException;
 import br.com.dms.exception.TypeException;
 import br.com.dms.repository.mongo.DmsDocumentRepository;
 import br.com.dms.repository.mongo.DmsDocumentVersionRepository;
+import br.com.dms.repository.mongo.DocumentWorkflowTransitionRepository;
 import br.com.dms.repository.redis.DocumentInformationRepository;
 import br.com.dms.service.signature.SigningService;
 import br.com.dms.service.workflow.MetadataService;
@@ -59,6 +62,8 @@ public class DmsService {
 
     private final DmsDocumentVersionRepository dmsDocumentVersionRepository;
 
+    private final DocumentWorkflowTransitionRepository workflowTransitionRepository;
+
     private final DmsUtil dmsUtil;
 
     private final Environment environment;
@@ -72,6 +77,7 @@ public class DmsService {
                       DocumentInformationRepository documentInformationRepository,
                       DmsDocumentRepository dmsDocumentRepository,
                       DmsDocumentVersionRepository dmsDocumentVersionRepository,
+                      DocumentWorkflowTransitionRepository workflowTransitionRepository,
                       DmsUtil dmsUtil,
                       Environment environment,
                       SigningService signingService,
@@ -81,6 +87,7 @@ public class DmsService {
         this.documentInformationRepository = documentInformationRepository;
         this.dmsDocumentRepository = dmsDocumentRepository;
         this.dmsDocumentVersionRepository = dmsDocumentVersionRepository;
+        this.workflowTransitionRepository = workflowTransitionRepository;
         this.dmsUtil = dmsUtil;
         this.environment = environment;
         this.signingService = signingService;
@@ -89,16 +96,13 @@ public class DmsService {
     }
 
     public ResponseEntity<?> reprove(String transactionId, String documentId, String documentVersion) {
-        var documentExists = dmsDocumentRepository.existsById(documentId);
+        DmsDocument document = dmsDocumentRepository.findById(documentId)
+            .orElseThrow(() -> new DmsBusinessException(String.format("Documento não encontrado para reprovação. Doc=%s", documentId), TypeException.VALID, transactionId));
 
-        if (documentExists) {
-            log.info("DMS - TransactionId: {} - Documento {} e versão {} encontrado será reprovado", transactionId, documentId, documentVersion);
-            var optionalDmsDocumentVersion = dmsDocumentVersionRepository.findByDmsDocumentIdAndVersionNumber(documentId, documentVersion);
-            var dmsDocumentversion = optionalDmsDocumentVersion.orElseThrow(() -> new DmsException(String.format("Versão %s não encontrada para document %s", documentId, documentVersion), TypeException.VALID));
-            dmsDocumentVersionRepository.delete(dmsDocumentversion);
-            amazonS3Service.deleteDocumentS3(amazonS3Service.getBucketName(), dmsDocumentversion.getPathToDocument());
-        }
+        dmsDocumentVersionRepository.findByDmsDocumentIdAndVersionNumber(documentId, documentVersion)
+            .orElseThrow(() -> new DmsBusinessException(String.format("Versão %s não encontrada para documento %s", documentVersion, documentId), TypeException.VALID, transactionId));
 
+        transitionWorkflow(document, DocumentWorkflowStatus.REJECTED, "system", "Rejected by workflow action", transactionId);
         return ResponseEntity.noContent().build();
     }
 
@@ -194,6 +198,7 @@ public class DmsService {
                 .category(documentCategoryName)
                 .mimeType(mimeType.getName())
                 .filename(filenameDms)
+                .workflowStatus(DocumentWorkflowStatus.DRAFT)
                 .build());
 
         var maxDmsDocumentVersion = dmsDocumentVersionRepository.findLastVersionByDmsDocumentId(entity.getId());
@@ -226,7 +231,8 @@ public class DmsService {
         try {
             idNewVersion = dmsDocumentVersionRepository.save(newVersion).getId();
             entity.setMetadata(jsonMetadata);
-            dmsDocumentRepository.save(entity);
+            entity = dmsDocumentRepository.save(entity);
+            transitionWorkflow(entity, DocumentWorkflowStatus.PENDING_REVIEW, author, "Document submitted for review", transactionId);
         } catch(DuplicateKeyException e) {
             log.error("Chave duplicada para criacao de documento filename={}, cpf={}, version={}. Limpando registros orfãos", filenameDms, cpf, version);
             dmsDocumentVersionRepository.deleteById(idNewVersion);
@@ -271,7 +277,8 @@ public class DmsService {
 
         dmsDocumentVersionRepository.save(newVersionMongo);
         entity.setMetadata(currentDmsDocumentVersion.getMetadata());
-        dmsDocumentRepository.save(entity);
+        entity = dmsDocumentRepository.save(entity);
+        transitionWorkflow(entity, DocumentWorkflowStatus.APPROVED, "system", "Document approved", transactionId);
 
         DocumentId documentIdResponse = new DocumentId(documentId, newVersion.toPlainString());
         return new ResponseEntity<>(documentIdResponse, HttpStatus.OK);
@@ -292,6 +299,7 @@ public class DmsService {
                 .category(payloadUrlPresigned.getCategory())
                 .mimeType(payloadUrlPresigned.getMimeType())// todo validar o que colocar pois o base64 não é passado
                 .filename(payloadUrlPresigned.getFileName())
+                .workflowStatus(DocumentWorkflowStatus.DRAFT)
                 .build());
 
         var maxDmsDocumentVersion = dmsDocumentVersionRepository.findLastVersionByDmsDocumentId(entity.getId());
@@ -326,7 +334,8 @@ public class DmsService {
             entity.setMetadata(metadata);
             entity.setMimeType(payloadUrlPresigned.getMimeType());
             entity.setFilename(payloadUrlPresigned.getFileName());
-            dmsDocumentRepository.save(entity);
+            entity = dmsDocumentRepository.save(entity);
+            transitionWorkflow(entity, DocumentWorkflowStatus.PENDING_REVIEW, payloadUrlPresigned.getAuthor(), "Presigned upload requested", transactionId);
         } catch(DuplicateKeyException e) {
             log.error("Chave duplicada para criacao de documento filename={}, cpf={}, version={}. Limpando registros orfãos", payloadUrlPresigned.getFileName(), cpf, version);
             dmsDocumentVersionRepository.deleteById(idNewVersion);
@@ -407,6 +416,79 @@ public class DmsService {
         documentInformationRepository.delete(documentId, version.getVersionNumber().toPlainString());
 
         return new DocumentId(documentId, version.getVersionNumber().toPlainString());
+    }
+
+    private void transitionWorkflow(DmsDocument document,
+                                    DocumentWorkflowStatus targetStatus,
+                                    String actor,
+                                    String reason,
+                                    String transactionId) {
+        DocumentWorkflowStatus currentStatus = document.getWorkflowStatus() == null
+            ? DocumentWorkflowStatus.DRAFT
+            : document.getWorkflowStatus();
+
+        if (currentStatus == targetStatus) {
+            return;
+        }
+
+        boolean valid = isValidTransition(currentStatus, targetStatus);
+        if (!valid) {
+            throw new DmsBusinessException(
+                String.format("Transição de workflow inválida para doc=%s: %s -> %s", document.getId(), currentStatus, targetStatus),
+                TypeException.VALID,
+                transactionId
+            );
+        }
+
+        document.setWorkflowStatus(targetStatus);
+        dmsDocumentRepository.save(document);
+
+        workflowTransitionRepository.save(
+            DocumentWorkflowTransition.of()
+                .documentId(document.getId())
+                .fromStatus(currentStatus)
+                .toStatus(targetStatus)
+                .actor(StringUtils.defaultIfBlank(actor, "system"))
+                .reason(StringUtils.defaultIfBlank(reason, "workflow transition"))
+                .changedAt(LocalDateTime.now())
+                .build()
+        );
+    }
+
+    private boolean isValidTransition(DocumentWorkflowStatus currentStatus, DocumentWorkflowStatus targetStatus) {
+        return switch (currentStatus) {
+            case DRAFT -> targetStatus == DocumentWorkflowStatus.PENDING_REVIEW
+                || targetStatus == DocumentWorkflowStatus.APPROVED
+                || targetStatus == DocumentWorkflowStatus.REJECTED;
+            case PENDING_REVIEW -> targetStatus == DocumentWorkflowStatus.APPROVED || targetStatus == DocumentWorkflowStatus.REJECTED;
+            case APPROVED -> targetStatus == DocumentWorkflowStatus.PENDING_REVIEW;
+            case REJECTED -> targetStatus == DocumentWorkflowStatus.PENDING_REVIEW;
+        };
+    }
+
+    public DocumentWorkflowStatus reviewDocumentWorkflow(String transactionId,
+                                                         String documentId,
+                                                         String action,
+                                                         String reason,
+                                                         String actor) {
+        DmsDocument document = dmsDocumentRepository.findById(documentId)
+            .orElseThrow(() -> new DmsBusinessException(String.format("Documento não encontrado para revisão. Doc=%s", documentId), TypeException.VALID, transactionId));
+
+        String normalizedAction = StringUtils.trimToEmpty(action).toUpperCase();
+        switch (normalizedAction) {
+            case "APPROVE" -> transitionWorkflow(document, DocumentWorkflowStatus.APPROVED, actor, "Approved by workflow review", transactionId);
+            case "REPROVE" -> {
+                if (StringUtils.isBlank(reason)) {
+                    throw new DmsBusinessException("Motivo é obrigatório para reprovação", TypeException.VALID, transactionId);
+                }
+                transitionWorkflow(document, DocumentWorkflowStatus.REJECTED, actor, reason, transactionId);
+            }
+            default -> throw new DmsBusinessException("Ação de revisão inválida. Use APPROVE ou REPROVE", TypeException.VALID, transactionId);
+        }
+
+        return dmsDocumentRepository.findById(documentId)
+            .map(DmsDocument::getWorkflowStatus)
+            .orElse(DocumentWorkflowStatus.DRAFT);
     }
 
     private DmsDocumentVersion digitalSignatureAndSaveBucket(String transactionId, PayloadApprove payloadApprove, DmsDocumentVersion currentDmsDocumentVersion, DmsDocument entity, BigDecimal newVersion, String mimeType) throws IOException {

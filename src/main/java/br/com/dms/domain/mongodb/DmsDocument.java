@@ -1,5 +1,6 @@
 package br.com.dms.domain.mongodb;
 
+import br.com.dms.domain.core.DocumentWorkflowStatus;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
@@ -24,6 +25,8 @@ public class DmsDocument {
     private String mimeType;
 
     private Map<String, Object> metadata;
+
+    private DocumentWorkflowStatus workflowStatus;
 
     public DmsDocument() {
     }
@@ -85,6 +88,14 @@ public class DmsDocument {
         this.metadata = metadata;
     }
 
+    public DocumentWorkflowStatus getWorkflowStatus() {
+        return workflowStatus;
+    }
+
+    public void setWorkflowStatus(DocumentWorkflowStatus workflowStatus) {
+        this.workflowStatus = workflowStatus;
+    }
+
     public static DmsDocument.Builder of() {
         return new DmsDocument.Builder();
     }
@@ -124,6 +135,11 @@ public class DmsDocument {
 
         public Builder metadata(Map<String, Object> metadata) {
             dmsDocument.setMetadata(metadata);
+            return this;
+        }
+
+        public Builder workflowStatus(DocumentWorkflowStatus workflowStatus) {
+            dmsDocument.setWorkflowStatus(workflowStatus);
             return this;
         }
 
