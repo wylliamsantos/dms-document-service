@@ -90,6 +90,8 @@ public class WorkflowQueryService {
             response.setWorkflowStatus(document.getWorkflowStatus());
             response.setCurrentVersion(version.getVersionNumber() != null ? version.getVersionNumber().toPlainString() : null);
             response.setAuthor(version.getAuthor());
+            response.setBusinessKeyType(document.getBusinessKeyType());
+            response.setBusinessKeyValue(document.getBusinessKeyValue());
             response.setUpdatedAt(updatedAt);
             items.add(response);
         }
