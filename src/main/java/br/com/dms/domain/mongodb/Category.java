@@ -29,6 +29,8 @@ public class Category {
     private Long validityInDays;
     @Field("unique_attributes")
     private String uniqueAttributes;
+    @Field("business_key_field")
+    private String businessKeyField;
     private Map<Object, Object> schema;
     private List<CategoryType> types;
     private Boolean active;

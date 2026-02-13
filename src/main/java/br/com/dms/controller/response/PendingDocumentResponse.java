@@ -12,6 +12,8 @@ public class PendingDocumentResponse {
     private DocumentWorkflowStatus workflowStatus;
     private String currentVersion;
     private String author;
+    private String businessKeyType;
+    private String businessKeyValue;
     private LocalDateTime updatedAt;
 
     public String getDocumentId() {
@@ -60,6 +62,22 @@ public class PendingDocumentResponse {
 
     public void setAuthor(String author) {
         this.author = author;
+    }
+
+    public String getBusinessKeyType() {
+        return businessKeyType;
+    }
+
+    public void setBusinessKeyType(String businessKeyType) {
+        this.businessKeyType = businessKeyType;
+    }
+
+    public String getBusinessKeyValue() {
+        return businessKeyValue;
+    }
+
+    public void setBusinessKeyValue(String businessKeyValue) {
+        this.businessKeyValue = businessKeyValue;
     }
 
     public LocalDateTime getUpdatedAt() {

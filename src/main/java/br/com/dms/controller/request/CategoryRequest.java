@@ -25,6 +25,9 @@ public class CategoryRequest {
     private DocumentGroup documentGroup;
     private Long validityInDays;
     private String uniqueAttributes;
+    @NotNull
+    @NotBlank
+    private String businessKeyField;
     private Boolean active;
     @NotNull
     private Map<Object, Object> schema;

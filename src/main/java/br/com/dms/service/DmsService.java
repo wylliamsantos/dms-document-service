@@ -14,6 +14,7 @@ import br.com.dms.domain.core.UploadStatus;
 import br.com.dms.exception.DmsBusinessException;
 import br.com.dms.exception.DmsException;
 import br.com.dms.exception.TypeException;
+import br.com.dms.repository.mongo.CategoryRepository;
 import br.com.dms.repository.mongo.DmsDocumentRepository;
 import br.com.dms.repository.mongo.DmsDocumentVersionRepository;
 import br.com.dms.repository.mongo.DocumentWorkflowTransitionRepository;
@@ -64,6 +65,8 @@ public class DmsService {
 
     private final DocumentWorkflowTransitionRepository workflowTransitionRepository;
 
+    private final CategoryRepository categoryRepository;
+
     private final DmsUtil dmsUtil;
 
     private final Environment environment;
@@ -78,6 +81,7 @@ public class DmsService {
                       DmsDocumentRepository dmsDocumentRepository,
                       DmsDocumentVersionRepository dmsDocumentVersionRepository,
                       DocumentWorkflowTransitionRepository workflowTransitionRepository,
+                      CategoryRepository categoryRepository,
                       DmsUtil dmsUtil,
                       Environment environment,
                       SigningService signingService,
@@ -88,6 +92,7 @@ public class DmsService {
         this.dmsDocumentRepository = dmsDocumentRepository;
         this.dmsDocumentVersionRepository = dmsDocumentVersionRepository;
         this.workflowTransitionRepository = workflowTransitionRepository;
+        this.categoryRepository = categoryRepository;
         this.dmsUtil = dmsUtil;
         this.environment = environment;
         this.signingService = signingService;
@@ -117,9 +122,14 @@ public class DmsService {
     }
 
     public void updateMetadata(String transactionId, String documentId, Map<String, Object> jsonMetadata, String fileName) {
-        var cpf = dmsUtil.getCpfFromMetadata(jsonMetadata);
+        String businessKeyType = dmsDocumentRepository.findById(documentId)
+            .map(DmsDocument::getBusinessKeyType)
+            .filter(StringUtils::isNotBlank)
+            .orElseThrow(() -> new DmsBusinessException("businessKeyType não encontrado para o documento", TypeException.VALID, transactionId));
 
-        Optional<DmsDocument> optEntity = dmsDocumentRepository.findByCpfAndFilename(cpf, fileName);
+        String businessKeyValue = dmsUtil.getBusinessKeyFromMetadata(jsonMetadata, businessKeyType);
+
+        Optional<DmsDocument> optEntity = dmsDocumentRepository.findByBusinessKeyValueAndFilename(businessKeyValue, fileName);
 
         if (optEntity.isPresent()) {
             log.info("DMS - TransactionId: {} - Documento {} encontrado será atualizado", transactionId, documentId);
@@ -186,15 +196,18 @@ public class DmsService {
 
         validationService.validateAuthor(transactionId, author);
 
-        var cpf = dmsUtil.getCpfFromMetadata(jsonMetadata);
-        Optional<DmsDocument> optEntity = this.dmsDocumentRepository.findByCpfAndFilename(cpf, filenameDms);
+        String businessKeyType = resolveBusinessKeyType(documentCategoryName);
+        String businessKeyValue = dmsUtil.getBusinessKeyFromMetadata(jsonMetadata, businessKeyType);
+        Optional<DmsDocument> optEntity = this.dmsDocumentRepository
+                .findByBusinessKeyTypeAndBusinessKeyValueAndFilenameAndCategory(businessKeyType, businessKeyValue, filenameDms, documentCategoryName);
 
         final MimeType mimeType = this.dmsUtil.validateMimeType(transactionId, documentData);
         ByteArrayResource byteArrayResourceSignature = signingService.applyDigitalSignature(mimeType) ? signingService.signPdf(filenameDms, documentResource) : documentResource;
         ByteArrayInputStream inputStreamSignature = new ByteArrayInputStream(byteArrayResourceSignature.getByteArray());
         var entity = optEntity.orElseGet(() -> DmsDocument.of()
                 .id(UUID.randomUUID().toString())
-                .cpf(cpf)
+                .businessKeyType(businessKeyType)
+                .businessKeyValue(businessKeyValue)
                 .category(documentCategoryName)
                 .mimeType(mimeType.getName())
                 .filename(filenameDms)
@@ -208,7 +221,7 @@ public class DmsService {
         var documentId = entity.getId();
 
         long contentLength = byteArrayResourceSignature.contentLength();
-        String pathToNewDocument = amazonS3Service.createDocumentS3(filenameDms, cpf, version, inputStreamSignature, contentLength);
+        String pathToNewDocument = amazonS3Service.createDocumentS3(filenameDms, businessKeyValue, version, inputStreamSignature, contentLength);
 
         LocalDateTime versionTimestamp = LocalDateTime.now();
 
@@ -234,9 +247,9 @@ public class DmsService {
             entity = dmsDocumentRepository.save(entity);
             transitionWorkflow(entity, DocumentWorkflowStatus.PENDING_REVIEW, author, "Document submitted for review", transactionId);
         } catch(DuplicateKeyException e) {
-            log.error("Chave duplicada para criacao de documento filename={}, cpf={}, version={}. Limpando registros orfãos", filenameDms, cpf, version);
+            log.error("Chave duplicada para criacao de documento filename={}, businessKey={}, version={}. Limpando registros orfãos", filenameDms, businessKeyValue, version);
             dmsDocumentVersionRepository.deleteById(idNewVersion);
-            throw new DuplicateKeyException(String.format("Chave duplicada para criacao de documento filename=%s, cpf=%s, version=%s. Registro ja se encontra na base. Verificar concorrencia nas chamadas", filenameDms, cpf, version));
+            throw new DuplicateKeyException(String.format("Chave duplicada para criacao de documento filename=%s, businessKey=%s, version=%s. Registro ja se encontra na base. Verificar concorrencia nas chamadas", filenameDms, businessKeyValue, version));
         }
 
         documentInformationRepository.delete(documentId, null);
@@ -290,12 +303,15 @@ public class DmsService {
         validationService.validateFilename(transactionId, payloadUrlPresigned.getFileName());
         Map<String, Object> metadata = metadataService.getValideMetadata(transactionId, payloadUrlPresigned.getMetadata(), payloadUrlPresigned.getCategory(), payloadUrlPresigned.getIssuingDate());
 
-        var cpf = dmsUtil.getCpfFromMetadata(metadata);
-        Optional<DmsDocument> optEntity = this.dmsDocumentRepository.findByCpfAndFilename(cpf, payloadUrlPresigned.getFileName());
+        String businessKeyType = resolveBusinessKeyType(payloadUrlPresigned.getCategory());
+        String businessKeyValue = dmsUtil.getBusinessKeyFromMetadata(metadata, businessKeyType);
+        Optional<DmsDocument> optEntity = this.dmsDocumentRepository
+                .findByBusinessKeyTypeAndBusinessKeyValueAndFilenameAndCategory(businessKeyType, businessKeyValue, payloadUrlPresigned.getFileName(), payloadUrlPresigned.getCategory());
 
         var entity = optEntity.orElseGet(() -> DmsDocument.of()
                 .id(UUID.randomUUID().toString())
-                .cpf(cpf)
+                .businessKeyType(businessKeyType)
+                .businessKeyValue(businessKeyValue)
                 .category(payloadUrlPresigned.getCategory())
                 .mimeType(payloadUrlPresigned.getMimeType())// todo validar o que colocar pois o base64 não é passado
                 .filename(payloadUrlPresigned.getFileName())
@@ -308,7 +324,7 @@ public class DmsService {
         var version = dmsUtil.generateVersion(payloadUrlPresigned.isFinal(), lastVersion);
         var documentId = entity.getId();
 
-        String pathToNewDocument = amazonS3Service.getPathToDocument(payloadUrlPresigned.getFileName(), cpf, String.valueOf(version));
+        String pathToNewDocument = amazonS3Service.getPathToDocument(payloadUrlPresigned.getFileName(), businessKeyValue, String.valueOf(version));
 
         LocalDateTime presignedTimestamp = LocalDateTime.now();
 
@@ -337,9 +353,9 @@ public class DmsService {
             entity = dmsDocumentRepository.save(entity);
             transitionWorkflow(entity, DocumentWorkflowStatus.PENDING_REVIEW, payloadUrlPresigned.getAuthor(), "Presigned upload requested", transactionId);
         } catch(DuplicateKeyException e) {
-            log.error("Chave duplicada para criacao de documento filename={}, cpf={}, version={}. Limpando registros orfãos", payloadUrlPresigned.getFileName(), cpf, version);
+            log.error("Chave duplicada para criacao de documento filename={}, businessKey={}, version={}. Limpando registros orfãos", payloadUrlPresigned.getFileName(), businessKeyValue, version);
             dmsDocumentVersionRepository.deleteById(idNewVersion);
-            throw new DuplicateKeyException(String.format("Chave duplicada para criacao de documento filename=%s, cpf=%s, version=%s. Registro ja se encontra na base. Verificar concorrencia nas chamadas", payloadUrlPresigned.getFileName(), cpf, version));
+            throw new DuplicateKeyException(String.format("Chave duplicada para criacao de documento filename=%s, businessKey=%s, version=%s. Registro ja se encontra na base. Verificar concorrencia nas chamadas", payloadUrlPresigned.getFileName(), businessKeyValue, version));
         }
 
         //Retira do cache esse id
@@ -491,6 +507,27 @@ public class DmsService {
             .orElse(DocumentWorkflowStatus.DRAFT);
     }
 
+    private String resolveBusinessKeyType(String categoryName) {
+        if (StringUtils.isBlank(categoryName)) {
+            throw new DmsBusinessException("Categoria é obrigatória para resolver chave de negócio", TypeException.VALID);
+        }
+
+        return categoryRepository.findByName(categoryName)
+            .map(category -> StringUtils.trimToNull(category.getBusinessKeyField()))
+            .filter(StringUtils::isNotBlank)
+            .orElseThrow(() -> new DmsBusinessException(
+                String.format("Categoria %s não possui businessKeyField configurado", categoryName),
+                TypeException.VALID
+            ));
+    }
+
+    private String getStorageKeySegment(DmsDocument document) {
+        if (StringUtils.isBlank(document.getBusinessKeyValue())) {
+            throw new DmsBusinessException("businessKeyValue não informado para o documento", TypeException.VALID);
+        }
+        return document.getBusinessKeyValue();
+    }
+
     private DmsDocumentVersion digitalSignatureAndSaveBucket(String transactionId, PayloadApprove payloadApprove, DmsDocumentVersion currentDmsDocumentVersion, DmsDocument entity, BigDecimal newVersion, String mimeType) throws IOException {
         String pathToDocument;
         Long fileSize;
@@ -498,7 +535,7 @@ public class DmsService {
         if (shouldAddSignatureText(payloadApprove)) {
             byte[] documentContent;
             if (StringUtils.isEmpty(currentDmsDocumentVersion.getPathToDocument())) {
-                documentContent = amazonS3Service.getDocumentContentFromS3(entity.getFilename(), entity.getCpf(), String.valueOf(currentDmsDocumentVersion.getVersionNumber()));
+                documentContent = amazonS3Service.getDocumentContentFromS3(entity.getFilename(), getStorageKeySegment(entity), String.valueOf(currentDmsDocumentVersion.getVersionNumber()));
             } else {
                 documentContent = amazonS3Service.getDocumentContentFromS3(currentDmsDocumentVersion.getPathToDocument());
             }
@@ -506,9 +543,9 @@ public class DmsService {
             ByteArrayResource documentWithDigitalSignature = signDocument(documentContent, transactionId, payloadApprove.getSignatureText(), entity.getFilename());
             ByteArrayInputStream documentData = new ByteArrayInputStream(documentWithDigitalSignature.getInputStream().readAllBytes());
             fileSize = documentWithDigitalSignature.contentLength();
-            pathToDocument = amazonS3Service.createDocumentS3(entity.getFilename(), entity.getCpf(), newVersion, documentData, fileSize);
+            pathToDocument = amazonS3Service.createDocumentS3(entity.getFilename(), getStorageKeySegment(entity), newVersion, documentData, fileSize);
         } else {
-            pathToDocument = amazonS3Service.copyDocumentS3(entity.getFilename(), entity.getCpf(), newVersion, currentDmsDocumentVersion.getVersionNumber());
+            pathToDocument = amazonS3Service.copyDocumentS3(entity.getFilename(), getStorageKeySegment(entity), newVersion, currentDmsDocumentVersion.getVersionNumber());
             fileSize = currentDmsDocumentVersion.getFileSize();
         }
 

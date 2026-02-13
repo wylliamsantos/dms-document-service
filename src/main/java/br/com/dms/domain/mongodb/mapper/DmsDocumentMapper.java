@@ -17,6 +17,8 @@ public class DmsDocumentMapper {
         return DmsDocument.of()
                 .id(entry.getId())
                 .cpf(cpf)
+                .businessKeyType("cpf")
+                .businessKeyValue(cpf)
                 .category(entry.getCategory())
                 .filename(entry.getName())
                 .mimeType(entry.getContent().getMimeType())

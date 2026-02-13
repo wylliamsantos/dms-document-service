@@ -6,11 +6,14 @@ import br.com.dms.domain.mongodb.Category;
 import br.com.dms.repository.mongo.CategoryRepository;
 import br.com.dms.exception.DmsBusinessException;
 import br.com.dms.exception.TypeException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.util.Strings;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import static br.com.dms.domain.Messages.*;
@@ -32,6 +35,8 @@ public class CategoryService {
             throw new DmsBusinessException(CATEGORY_EXISTS, TypeException.VALID);
         }
 
+        validateBusinessKeyConfig(request);
+
         Category category = modelMapper.map(request, Category.class);
         if(category.getActive() == null){
             category.setActive(Boolean.TRUE);
@@ -50,6 +55,8 @@ public class CategoryService {
         if(!request.getName().equalsIgnoreCase(categoryFromDB.getName()) && repository.existsByNameIgnoreCase(request.getName())){
             throw new DmsBusinessException(CATEGORY_EXISTS, TypeException.VALID);
         }
+
+        validateBusinessKeyConfig(request);
 
         Boolean requestedActive = request.getActive();
         modelMapper.map(request, categoryFromDB);
@@ -96,6 +103,29 @@ public class CategoryService {
             response.setActive(Boolean.TRUE);
         }
         return response;
+    }
+
+    private void validateBusinessKeyConfig(CategoryRequest request) {
+        String businessKeyField = StringUtils.trimToEmpty(request.getBusinessKeyField());
+        if (businessKeyField.isEmpty()) {
+            throw new DmsBusinessException("businessKeyField é obrigatório", TypeException.VALID);
+        }
+
+        List<String> uniqueAttributes = Arrays.stream(StringUtils.defaultString(request.getUniqueAttributes()).split(","))
+            .map(String::trim)
+            .filter(StringUtils::isNotBlank)
+            .map(String::toLowerCase)
+            .toList();
+
+        if (uniqueAttributes.isEmpty() || uniqueAttributes.stream().noneMatch(attr -> attr.equalsIgnoreCase(businessKeyField))) {
+            throw new DmsBusinessException("businessKeyField deve estar presente em uniqueAttributes", TypeException.VALID);
+        }
+
+        Map<Object, Object> schema = request.getSchema();
+        Object requiredObj = schema != null ? schema.get("required") : null;
+        if (!(requiredObj instanceof List<?> requiredFields) || requiredFields.stream().noneMatch(field -> businessKeyField.equalsIgnoreCase(String.valueOf(field)))) {
+            throw new DmsBusinessException("businessKeyField deve estar na lista required do schema", TypeException.VALID);
+        }
     }
 
 }

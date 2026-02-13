@@ -75,24 +75,32 @@ public class DmsUtil {
 		return generateVersion(true, lastVersion);
 	}
 
-	public String getCpfFromMetadata(Map<String, Object> jsonMetadata) {
-		var cpfKey = jsonMetadata.keySet()
+	public String getBusinessKeyFromMetadata(Map<String, Object> jsonMetadata, String preferredKey) {
+		String effectivePreferred = StringUtils.trimToNull(preferredKey);
+		if (effectivePreferred == null) {
+			throw new DmsBusinessException("Tipo da chave de negócio não configurado para a categoria", TypeException.VALID);
+		}
+		String key = jsonMetadata.keySet()
 				.stream()
-				.filter(key -> StringUtils.containsIgnoreCase(key, "cpf"))
+				.filter(candidate -> StringUtils.equalsIgnoreCase(candidate, effectivePreferred)
+						|| StringUtils.containsIgnoreCase(candidate, effectivePreferred))
 				.findFirst()
-				.orElseThrow(() -> new DmsBusinessException("CPF não informado nos metadados", TypeException.VALID));
+				.orElseThrow(() -> new DmsBusinessException(String.format("Chave de negócio não informada nos metadados (%s)", effectivePreferred), TypeException.VALID));
 
-		return jsonMetadata.get(cpfKey).toString();
+		Object value = jsonMetadata.get(key);
+		if (value == null || StringUtils.isBlank(value.toString())) {
+			throw new DmsBusinessException(String.format("Valor da chave de negócio inválido (%s)", effectivePreferred), TypeException.VALID);
+		}
+
+		return value.toString().trim();
+	}
+
+	public String getCpfFromMetadata(Map<String, Object> jsonMetadata) {
+		return getBusinessKeyFromMetadata(jsonMetadata, "cpf");
 	}
 
 	public String getCpfFromMetadata(Map<String, Object> jsonMetadata, String keyCpf) {
-		var cpfKey = jsonMetadata.keySet()
-				.stream()
-				.filter(key -> StringUtils.containsIgnoreCase(key, keyCpf))
-				.findFirst()
-				.orElseThrow(() -> new DmsBusinessException("CPF não informado nos metadados", TypeException.VALID));
-
-		return jsonMetadata.get(cpfKey).toString();
+		return getBusinessKeyFromMetadata(jsonMetadata, keyCpf);
 	}
 
 	public String getCpfKeyRequired(Category category){
