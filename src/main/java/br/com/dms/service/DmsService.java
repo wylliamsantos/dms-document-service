@@ -466,6 +466,31 @@ public class DmsService {
         };
     }
 
+    public DocumentWorkflowStatus reviewDocumentWorkflow(String transactionId,
+                                                         String documentId,
+                                                         String action,
+                                                         String reason,
+                                                         String actor) {
+        DmsDocument document = dmsDocumentRepository.findById(documentId)
+            .orElseThrow(() -> new DmsBusinessException(String.format("Documento não encontrado para revisão. Doc=%s", documentId), TypeException.VALID, transactionId));
+
+        String normalizedAction = StringUtils.trimToEmpty(action).toUpperCase();
+        switch (normalizedAction) {
+            case "APPROVE" -> transitionWorkflow(document, DocumentWorkflowStatus.APPROVED, actor, "Approved by workflow review", transactionId);
+            case "REPROVE" -> {
+                if (StringUtils.isBlank(reason)) {
+                    throw new DmsBusinessException("Motivo é obrigatório para reprovação", TypeException.VALID, transactionId);
+                }
+                transitionWorkflow(document, DocumentWorkflowStatus.REJECTED, actor, reason, transactionId);
+            }
+            default -> throw new DmsBusinessException("Ação de revisão inválida. Use APPROVE ou REPROVE", TypeException.VALID, transactionId);
+        }
+
+        return dmsDocumentRepository.findById(documentId)
+            .map(DmsDocument::getWorkflowStatus)
+            .orElse(DocumentWorkflowStatus.DRAFT);
+    }
+
     private DmsDocumentVersion digitalSignatureAndSaveBucket(String transactionId, PayloadApprove payloadApprove, DmsDocumentVersion currentDmsDocumentVersion, DmsDocument entity, BigDecimal newVersion, String mimeType) throws IOException {
         String pathToDocument;
         Long fileSize;

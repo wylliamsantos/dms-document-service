@@ -4,6 +4,7 @@ import br.com.dms.config.MongoConfig;
 import br.com.dms.controller.request.FinalizeUploadRequest;
 import br.com.dms.controller.request.PayloadApprove;
 import br.com.dms.controller.request.PayloadUrlPresigned;
+import br.com.dms.domain.core.DocumentWorkflowStatus;
 import br.com.dms.domain.mongodb.DmsDocument;
 import br.com.dms.domain.mongodb.DmsDocumentVersion;
 import br.com.dms.domain.core.UploadStatus;
@@ -195,6 +196,25 @@ class DmsServiceTest {
 		verify(dmsDocumentVersionRepository, times(1)).findLastVersionByDmsDocumentId(any());
 		verify(dmsDocumentVersionRepository, times(1)).findByDmsDocumentIdAndVersionNumber(any(), any());
 		verify(dmsUtil, times(1)).generateNewMajorVersion(any());
+	}
+
+	@Test
+	void testReviewDocumentWorkflowApprove() {
+		when(dmsDocumentRepository.findById(eq(DOCUMENT_ID))).thenReturn(Optional.of(dmsDocument));
+
+		var status = dmsService.reviewDocumentWorkflow(uuid, DOCUMENT_ID, "APPROVE", null, "admin");
+
+		assertEquals(DocumentWorkflowStatus.APPROVED, status);
+		verify(workflowTransitionRepository, times(1)).save(any());
+	}
+
+	@Test
+	void testReviewDocumentWorkflowReproveWithoutReason() {
+		when(dmsDocumentRepository.findById(eq(DOCUMENT_ID))).thenReturn(Optional.of(dmsDocument));
+
+		assertThrows(DmsBusinessException.class, () ->
+			dmsService.reviewDocumentWorkflow(uuid, DOCUMENT_ID, "REPROVE", null, "admin")
+		);
 	}
 
 	@Test
