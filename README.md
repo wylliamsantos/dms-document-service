@@ -69,7 +69,7 @@ O serviço não fica mais acoplado apenas a CPF para upsert de documentos.
   - `businessKeyValue` (valor efetivo da chave)
 - A resolução da chave considera `uniqueAttributes` da categoria (primeiro atributo da lista). Se não houver configuração, fallback para `cpf`.
 - Upsert (multipart/base64/presigned) usa `businessKeyType + businessKeyValue + filename + category` para localizar o documento.
-- Compatibilidade: quando a chave efetiva for `cpf`, o campo legado `cpf` continua sendo preenchido.
+- Não há fallback para CPF: a categoria **deve** definir `uniqueAttributes` para resolver a chave de negócio.
 
 Com isso, o DMS fica pronto para casos de uso além de pessoa física (ex.: DETRAN com chave por placa).
 

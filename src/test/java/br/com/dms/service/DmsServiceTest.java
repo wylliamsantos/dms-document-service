@@ -134,6 +134,8 @@ class DmsServiceTest {
 
 		dmsDocument = new DmsDocument();
 		dmsDocument.setId("123");
+		dmsDocument.setBusinessKeyType("cpf");
+		dmsDocument.setBusinessKeyValue(CPF);
 	}
 
 	@Test
@@ -182,10 +184,11 @@ class DmsServiceTest {
 	@Test
 	void testUpdateMetadata() {
 		when(dmsUtil.getBusinessKeyFromMetadata(any(), any())).thenReturn(CPF);
+		when(dmsDocumentRepository.findById(any())).thenReturn(Optional.of(dmsDocument));
 		when(dmsDocumentRepository.findByBusinessKeyValueAndFilename(any(), any())).thenReturn(Optional.of(dmsDocument));
 		when(dmsDocumentVersionRepository.findLastVersionByDmsDocumentId(any())).thenReturn(Optional.of(dmsDocumentVersion));
 
-		dmsService.updateMetadata(uuid, DOCUMENT_ID, Map.of(), FILENAME);
+		dmsService.updateMetadata(uuid, DOCUMENT_ID, Map.of("cpf", CPF), FILENAME);
 		verify(dmsUtil, times(1)).getBusinessKeyFromMetadata(any(), any());
 		verify(dmsDocumentRepository, times(1)).findByBusinessKeyValueAndFilename(any(), any());
 	}

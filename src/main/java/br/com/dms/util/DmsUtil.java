@@ -76,7 +76,10 @@ public class DmsUtil {
 	}
 
 	public String getBusinessKeyFromMetadata(Map<String, Object> jsonMetadata, String preferredKey) {
-		String effectivePreferred = StringUtils.defaultIfBlank(preferredKey, "cpf");
+		String effectivePreferred = StringUtils.trimToNull(preferredKey);
+		if (effectivePreferred == null) {
+			throw new DmsBusinessException("Tipo da chave de negócio não configurado para a categoria", TypeException.VALID);
+		}
 		String key = jsonMetadata.keySet()
 				.stream()
 				.filter(candidate -> StringUtils.equalsIgnoreCase(candidate, effectivePreferred)

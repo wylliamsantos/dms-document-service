@@ -122,7 +122,11 @@ public class DmsService {
     }
 
     public void updateMetadata(String transactionId, String documentId, Map<String, Object> jsonMetadata, String fileName) {
-        String businessKeyType = resolveBusinessKeyType(null);
+        String businessKeyType = dmsDocumentRepository.findById(documentId)
+            .map(DmsDocument::getBusinessKeyType)
+            .filter(StringUtils::isNotBlank)
+            .orElseThrow(() -> new DmsBusinessException("businessKeyType não encontrado para o documento", TypeException.VALID, transactionId));
+
         String businessKeyValue = dmsUtil.getBusinessKeyFromMetadata(jsonMetadata, businessKeyType);
 
         Optional<DmsDocument> optEntity = dmsDocumentRepository.findByBusinessKeyValueAndFilename(businessKeyValue, fileName);
@@ -202,7 +206,6 @@ public class DmsService {
         ByteArrayInputStream inputStreamSignature = new ByteArrayInputStream(byteArrayResourceSignature.getByteArray());
         var entity = optEntity.orElseGet(() -> DmsDocument.of()
                 .id(UUID.randomUUID().toString())
-                .cpf(StringUtils.equalsIgnoreCase(businessKeyType, "cpf") ? businessKeyValue : null)
                 .businessKeyType(businessKeyType)
                 .businessKeyValue(businessKeyValue)
                 .category(documentCategoryName)
@@ -307,7 +310,6 @@ public class DmsService {
 
         var entity = optEntity.orElseGet(() -> DmsDocument.of()
                 .id(UUID.randomUUID().toString())
-                .cpf(StringUtils.equalsIgnoreCase(businessKeyType, "cpf") ? businessKeyValue : null)
                 .businessKeyType(businessKeyType)
                 .businessKeyValue(businessKeyValue)
                 .category(payloadUrlPresigned.getCategory())
@@ -507,21 +509,24 @@ public class DmsService {
 
     private String resolveBusinessKeyType(String categoryName) {
         if (StringUtils.isBlank(categoryName)) {
-            return "cpf";
+            throw new DmsBusinessException("Categoria é obrigatória para resolver chave de negócio", TypeException.VALID);
         }
 
         return categoryRepository.findByName(categoryName)
-            .map(category -> StringUtils.defaultIfBlank(category.getUniqueAttributes(), "cpf"))
+            .map(category -> StringUtils.trimToNull(category.getUniqueAttributes()))
             .map(attributes -> attributes.split(",")[0].trim())
             .filter(StringUtils::isNotBlank)
-            .orElse("cpf");
+            .orElseThrow(() -> new DmsBusinessException(
+                String.format("Categoria %s não possui uniqueAttributes configurado para chave de negócio", categoryName),
+                TypeException.VALID
+            ));
     }
 
     private String getStorageKeySegment(DmsDocument document) {
-        if (StringUtils.isNotBlank(document.getBusinessKeyValue())) {
-            return document.getBusinessKeyValue();
+        if (StringUtils.isBlank(document.getBusinessKeyValue())) {
+            throw new DmsBusinessException("businessKeyValue não informado para o documento", TypeException.VALID);
         }
-        return document.getCpf();
+        return document.getBusinessKeyValue();
     }
 
     private DmsDocumentVersion digitalSignatureAndSaveBucket(String transactionId, PayloadApprove payloadApprove, DmsDocumentVersion currentDmsDocumentVersion, DmsDocument entity, BigDecimal newVersion, String mimeType) throws IOException {
