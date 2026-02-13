@@ -22,6 +22,7 @@ public class CategoryResponse {
     private DocumentGroup documentGroup;
     private Long validityInDays;
     private String uniqueAttributes;
+    private String businessKeyField;
     private Map<Object, Object> schema;
     private List<CategoryTypeResponse> types;
     private Boolean active;

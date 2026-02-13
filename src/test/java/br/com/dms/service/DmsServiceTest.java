@@ -119,7 +119,7 @@ class DmsServiceTest {
 
 		when(dmsUtil.getCpfFromMetadata(any())).thenReturn(CPF);
 		when(dmsUtil.getBusinessKeyFromMetadata(any(), any())).thenReturn(CPF);
-		when(categoryRepository.findByName(any())).thenReturn(Optional.of(Category.builder().name("dr:contrato").uniqueAttributes("cpf").build()));
+		when(categoryRepository.findByName(any())).thenReturn(Optional.of(Category.builder().name("dr:contrato").uniqueAttributes("cpf").businessKeyField("cpf").build()));
 		HashMap<String, Object> metadata = new HashMap<>();
 		metadata.put("cpf", CPF);
 		when(dmsUtil.handleObject(any(), any())).thenReturn(metadata);

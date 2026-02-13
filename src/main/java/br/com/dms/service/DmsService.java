@@ -513,11 +513,10 @@ public class DmsService {
         }
 
         return categoryRepository.findByName(categoryName)
-            .map(category -> StringUtils.trimToNull(category.getUniqueAttributes()))
-            .map(attributes -> attributes.split(",")[0].trim())
+            .map(category -> StringUtils.trimToNull(category.getBusinessKeyField()))
             .filter(StringUtils::isNotBlank)
             .orElseThrow(() -> new DmsBusinessException(
-                String.format("Categoria %s não possui uniqueAttributes configurado para chave de negócio", categoryName),
+                String.format("Categoria %s não possui businessKeyField configurado", categoryName),
                 TypeException.VALID
             ));
     }
