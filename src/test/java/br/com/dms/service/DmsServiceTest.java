@@ -5,9 +5,11 @@ import br.com.dms.controller.request.FinalizeUploadRequest;
 import br.com.dms.controller.request.PayloadApprove;
 import br.com.dms.controller.request.PayloadUrlPresigned;
 import br.com.dms.domain.core.DocumentWorkflowStatus;
+import br.com.dms.domain.mongodb.Category;
 import br.com.dms.domain.mongodb.DmsDocument;
 import br.com.dms.domain.mongodb.DmsDocumentVersion;
 import br.com.dms.domain.core.UploadStatus;
+import br.com.dms.repository.mongo.CategoryRepository;
 import br.com.dms.repository.mongo.DmsDocumentRepository;
 import br.com.dms.repository.mongo.DmsDocumentVersionRepository;
 import br.com.dms.repository.mongo.DocumentWorkflowTransitionRepository;
@@ -77,6 +79,9 @@ class DmsServiceTest {
 	private DmsDocumentRepository dmsDocumentRepository;
 
 	@MockBean
+	private CategoryRepository categoryRepository;
+
+	@MockBean
 	private DmsDocumentVersionRepository dmsDocumentVersionRepository;
 
 	@MockBean
@@ -113,6 +118,8 @@ class DmsServiceTest {
 		doNothing().when(documentValidationService).validateFilename(any(), any());
 
 		when(dmsUtil.getCpfFromMetadata(any())).thenReturn(CPF);
+		when(dmsUtil.getBusinessKeyFromMetadata(any(), any())).thenReturn(CPF);
+		when(categoryRepository.findByName(any())).thenReturn(Optional.of(Category.builder().name("dr:contrato").uniqueAttributes("cpf").build()));
 		HashMap<String, Object> metadata = new HashMap<>();
 		metadata.put("cpf", CPF);
 		when(dmsUtil.handleObject(any(), any())).thenReturn(metadata);
@@ -136,8 +143,8 @@ class DmsServiceTest {
 
 		dmsService.createOrUpdate(uuid, true, "f4btgf23fevrg", null, "DMS", "{}", "dr:contrato", "teste.txt", "comment" );
 		verify(validatorCategoryService, times(1)).validateCategory(any(), any(), any(), any());
-		verify(dmsUtil, times(1)).getCpfFromMetadata(any());
-		verify(dmsDocumentRepository, times(1)).findByCpfAndFilename(any(), any());
+		verify(dmsUtil, times(1)).getBusinessKeyFromMetadata(any(), any());
+		verify(dmsDocumentRepository, times(1)).findByBusinessKeyTypeAndBusinessKeyValueAndFilenameAndCategory(any(), any(), any(), any());
 	}
 
 	@Test
@@ -156,8 +163,8 @@ class DmsServiceTest {
 
 		dmsService.generatePresignedUrl(uuid, presigned);
 		verify(validatorCategoryService, times(1)).validateCategory(any(), any(), any(), any());
-		verify(dmsUtil, times(1)).getCpfFromMetadata(any());
-		verify(dmsDocumentRepository, times(1)).findByCpfAndFilename(any(), any());
+		verify(dmsUtil, times(1)).getBusinessKeyFromMetadata(any(), any());
+		verify(dmsDocumentRepository, times(1)).findByBusinessKeyTypeAndBusinessKeyValueAndFilenameAndCategory(any(), any(), any(), any());
 	}
 
 	@Test
@@ -174,13 +181,13 @@ class DmsServiceTest {
 
 	@Test
 	void testUpdateMetadata() {
-		when(dmsUtil.getCpfFromMetadata(any())).thenReturn(CPF);
-		when(dmsDocumentRepository.findByCpfAndFilename(any(), any())).thenReturn(Optional.of(dmsDocument));
+		when(dmsUtil.getBusinessKeyFromMetadata(any(), any())).thenReturn(CPF);
+		when(dmsDocumentRepository.findByBusinessKeyValueAndFilename(any(), any())).thenReturn(Optional.of(dmsDocument));
 		when(dmsDocumentVersionRepository.findLastVersionByDmsDocumentId(any())).thenReturn(Optional.of(dmsDocumentVersion));
 
 		dmsService.updateMetadata(uuid, DOCUMENT_ID, Map.of(), FILENAME);
-		verify(dmsUtil, times(1)).getCpfFromMetadata(any());
-		verify(dmsDocumentRepository, times(1)).findByCpfAndFilename(any(), any());
+		verify(dmsUtil, times(1)).getBusinessKeyFromMetadata(any(), any());
+		verify(dmsDocumentRepository, times(1)).findByBusinessKeyValueAndFilename(any(), any());
 	}
 
 	@Test

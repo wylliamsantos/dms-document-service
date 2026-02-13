@@ -58,6 +58,20 @@ Serviço responsável pela ingestão, atualização e consulta de documentos no 
 - Versões (`DmsDocumentVersion`) passam a salvar `modifiedAt` na criação inicial, alinhando histórico para o frontend.
 - CORS configurável via `dms.cors.*` em `application.yml` / variáveis `DMS_CORS_ALLOWED_ORIGINS` etc.
 - Enum `VersionType` agora compartilhado em `br.com.dms.domain.core`, reutilizado por ambos os serviços.
+- Workflow de revisão exposto via `/v1/workflow/**` (histórico, fila de pendências e review action).
+
+### Chave de negócio dinâmica (Business Key)
+
+O serviço não fica mais acoplado apenas a CPF para upsert de documentos.
+
+- `DmsDocument` agora mantém:
+  - `businessKeyType` (ex.: `cpf`, `placa`, `renavam`)
+  - `businessKeyValue` (valor efetivo da chave)
+- A resolução da chave considera `uniqueAttributes` da categoria (primeiro atributo da lista). Se não houver configuração, fallback para `cpf`.
+- Upsert (multipart/base64/presigned) usa `businessKeyType + businessKeyValue + filename + category` para localizar o documento.
+- Compatibilidade: quando a chave efetiva for `cpf`, o campo legado `cpf` continua sendo preenchido.
+
+Com isso, o DMS fica pronto para casos de uso além de pessoa física (ex.: DETRAN com chave por placa).
 
 ### Execução local
 

@@ -13,6 +13,10 @@ public interface DmsDocumentRepository extends MongoRepository<DmsDocument, Stri
 
     Optional<DmsDocument> findByCpfAndFilename(String cpf, String filename);
 
+    Optional<DmsDocument> findByBusinessKeyValueAndFilename(String businessKeyValue, String filename);
+
+    Optional<DmsDocument> findByBusinessKeyTypeAndBusinessKeyValueAndFilenameAndCategory(String businessKeyType, String businessKeyValue, String filename, String category);
+
     Optional<DmsDocument> findByCpfAndFilenameAndCategory(String cpf, String filename, String category);
 
     boolean existsByCpfAndFilename(String cpf, String filename);

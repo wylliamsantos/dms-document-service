@@ -9,7 +9,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.util.Map;
 
 @Document
-@CompoundIndex(def = "{'category': 1, 'cpf': 1}", name = "cpf_category_index")
+@CompoundIndex(def = "{'category': 1, 'businessKeyValue': 1}", name = "business_key_category_index")
 public class DmsDocument {
 
     @Id
@@ -21,6 +21,11 @@ public class DmsDocument {
 
     @Indexed(name = "cpf_index")
     private String cpf;
+
+    @Indexed(name = "business_key_value_index")
+    private String businessKeyValue;
+
+    private String businessKeyType;
 
     private String mimeType;
 
@@ -88,6 +93,22 @@ public class DmsDocument {
         this.metadata = metadata;
     }
 
+    public String getBusinessKeyValue() {
+        return businessKeyValue;
+    }
+
+    public void setBusinessKeyValue(String businessKeyValue) {
+        this.businessKeyValue = businessKeyValue;
+    }
+
+    public String getBusinessKeyType() {
+        return businessKeyType;
+    }
+
+    public void setBusinessKeyType(String businessKeyType) {
+        this.businessKeyType = businessKeyType;
+    }
+
     public DocumentWorkflowStatus getWorkflowStatus() {
         return workflowStatus;
     }
@@ -135,6 +156,16 @@ public class DmsDocument {
 
         public Builder metadata(Map<String, Object> metadata) {
             dmsDocument.setMetadata(metadata);
+            return this;
+        }
+
+        public Builder businessKeyValue(String businessKeyValue) {
+            dmsDocument.setBusinessKeyValue(businessKeyValue);
+            return this;
+        }
+
+        public Builder businessKeyType(String businessKeyType) {
+            dmsDocument.setBusinessKeyType(businessKeyType);
             return this;
         }
 
