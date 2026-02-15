@@ -24,20 +24,24 @@ public class CategoryService {
     private final ModelMapper modelMapper;
 
     private final CategoryRepository repository;
+    private final TenantContextService tenantContextService;
 
-    public CategoryService(ModelMapper modelMapper, CategoryRepository repository) {
+    public CategoryService(ModelMapper modelMapper, CategoryRepository repository, TenantContextService tenantContextService) {
         this.modelMapper = modelMapper;
         this.repository = repository;
+        this.tenantContextService = tenantContextService;
     }
 
     public CategoryResponse save(CategoryRequest request){
-        if(repository.existsByNameIgnoreCase(request.getName())){
+        String tenantId = tenantContextService.requireTenantId();
+        if(repository.existsByTenantIdAndNameIgnoreCase(tenantId, request.getName())){
             throw new DmsBusinessException(CATEGORY_EXISTS, TypeException.VALID);
         }
 
         validateBusinessKeyConfig(request);
 
         Category category = modelMapper.map(request, Category.class);
+        category.setTenantId(tenantId);
         if(category.getActive() == null){
             category.setActive(Boolean.TRUE);
         }
@@ -46,13 +50,14 @@ public class CategoryService {
     }
 
     public CategoryResponse update(String id, CategoryRequest request){
+        String tenantId = tenantContextService.requireTenantId();
         if(Strings.isBlank(id)){
             throw new DmsBusinessException(BAD_REQUEST, TypeException.VALID);
         }
-        Category categoryFromDB = repository.findById(id)
+        Category categoryFromDB = repository.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(()-> new DmsBusinessException(CATEGORY_NOT_FOUND, TypeException.VALID));
 
-        if(!request.getName().equalsIgnoreCase(categoryFromDB.getName()) && repository.existsByNameIgnoreCase(request.getName())){
+        if(!request.getName().equalsIgnoreCase(categoryFromDB.getName()) && repository.existsByTenantIdAndNameIgnoreCase(tenantId, request.getName())){
             throw new DmsBusinessException(CATEGORY_EXISTS, TypeException.VALID);
         }
 
@@ -70,7 +75,8 @@ public class CategoryService {
     }
 
     public List<CategoryResponse> findAll() {
-        var categories = repository.findAll();
+        String tenantId = tenantContextService.requireTenantId();
+        var categories = repository.findAllByTenantId(tenantId);
         return categories.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -78,12 +84,14 @@ public class CategoryService {
     }
 
     public CategoryResponse findById(String id) {
-        var category = repository.findById(id).orElseThrow(()-> new DmsBusinessException(CATEGORY_NOT_FOUND, TypeException.VALID));
+        String tenantId = tenantContextService.requireTenantId();
+        var category = repository.findByIdAndTenantId(id, tenantId).orElseThrow(()-> new DmsBusinessException(CATEGORY_NOT_FOUND, TypeException.VALID));
         return mapToResponse(category);
     }
 
     public Category getCategoryByName(String name){
-        Category category = this.repository.findByName(name)
+        String tenantId = tenantContextService.requireTenantId();
+        Category category = this.repository.findByTenantIdAndName(tenantId, name)
                 .orElseThrow(() -> new DmsBusinessException(CATEGORY_NOT_FOUND, TypeException.VALID));
 
         if (category.getActive() != null && Boolean.FALSE.equals(category.getActive())) {

@@ -28,17 +28,21 @@ public class WorkflowQueryService {
     private final DmsDocumentRepository dmsDocumentRepository;
     private final DmsDocumentVersionRepository dmsDocumentVersionRepository;
     private final DocumentWorkflowTransitionRepository workflowTransitionRepository;
+    private final TenantContextService tenantContextService;
 
     public WorkflowQueryService(DmsDocumentRepository dmsDocumentRepository,
                                 DmsDocumentVersionRepository dmsDocumentVersionRepository,
-                                DocumentWorkflowTransitionRepository workflowTransitionRepository) {
+                                DocumentWorkflowTransitionRepository workflowTransitionRepository,
+                                TenantContextService tenantContextService) {
         this.dmsDocumentRepository = dmsDocumentRepository;
         this.dmsDocumentVersionRepository = dmsDocumentVersionRepository;
         this.workflowTransitionRepository = workflowTransitionRepository;
+        this.tenantContextService = tenantContextService;
     }
 
     public List<WorkflowTransitionResponse> listDocumentHistory(String documentId) {
-        return workflowTransitionRepository.findByDocumentIdOrderByChangedAtDesc(documentId)
+        String tenantId = tenantContextService.requireTenantId();
+        return workflowTransitionRepository.findByTenantIdAndDocumentIdOrderByChangedAtDesc(tenantId, documentId)
             .stream()
             .map(transition -> {
                 WorkflowTransitionResponse response = new WorkflowTransitionResponse();
@@ -58,13 +62,14 @@ public class WorkflowQueryService {
                                                            LocalDateTime to,
                                                            int page,
                                                            int size) {
+        String tenantId = tenantContextService.requireTenantId();
         List<DmsDocument> documents = StringUtils.isBlank(category)
-            ? dmsDocumentRepository.findByWorkflowStatus(DocumentWorkflowStatus.PENDING_REVIEW)
-            : dmsDocumentRepository.findByWorkflowStatusAndCategory(DocumentWorkflowStatus.PENDING_REVIEW, category);
+            ? dmsDocumentRepository.findByTenantIdAndWorkflowStatus(tenantId, DocumentWorkflowStatus.PENDING_REVIEW)
+            : dmsDocumentRepository.findByTenantIdAndWorkflowStatusAndCategory(tenantId, DocumentWorkflowStatus.PENDING_REVIEW, category);
 
         List<PendingDocumentResponse> items = new ArrayList<>();
         for (DmsDocument document : documents) {
-            Optional<DmsDocumentVersion> versionOpt = dmsDocumentVersionRepository.findLastVersionByDmsDocumentId(document.getId());
+            Optional<DmsDocumentVersion> versionOpt = dmsDocumentVersionRepository.findLastVersionByTenantIdAndDmsDocumentId(tenantId, document.getId());
             if (versionOpt.isEmpty()) {
                 continue;
             }

@@ -9,11 +9,13 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.util.Map;
 
 @Document
-@CompoundIndex(def = "{'category': 1, 'businessKeyValue': 1}", name = "business_key_category_index")
+@CompoundIndex(def = "{'tenantId': 1, 'category': 1, 'businessKeyValue': 1}", name = "business_key_category_tenant_index")
 public class DmsDocument {
 
     @Id
     private String id;
+
+    private String tenantId;
 
     private String filename;
 
@@ -51,6 +53,14 @@ public class DmsDocument {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 
     public String getFilename() {
@@ -131,6 +141,11 @@ public class DmsDocument {
 
         public Builder id(String id) {
             dmsDocument.setId(id);
+            return this;
+        }
+
+        public Builder tenantId(String tenantId) {
+            dmsDocument.setTenantId(tenantId);
             return this;
         }
 
