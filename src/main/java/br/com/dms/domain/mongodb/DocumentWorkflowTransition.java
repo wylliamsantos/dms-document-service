@@ -2,15 +2,19 @@ package br.com.dms.domain.mongodb;
 
 import br.com.dms.domain.core.DocumentWorkflowStatus;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 
 @Document
+@CompoundIndex(def = "{'tenantId': 1, 'documentId': 1, 'changedAt': -1}", name = "tenant_document_transition_idx")
 public class DocumentWorkflowTransition {
 
     @Id
     private String id;
+
+    private String tenantId;
 
     private String documentId;
 
@@ -30,6 +34,14 @@ public class DocumentWorkflowTransition {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 
     public String getDocumentId() {
@@ -89,6 +101,11 @@ public class DocumentWorkflowTransition {
 
         private Builder() {
             this.transition = new DocumentWorkflowTransition();
+        }
+
+        public Builder tenantId(String tenantId) {
+            transition.setTenantId(tenantId);
+            return this;
         }
 
         public Builder documentId(String documentId) {

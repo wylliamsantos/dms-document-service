@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 @Document(collection = "documentCategory")
+@CompoundIndex(def = "{'tenantId': 1, 'name': 1}", name = "tenant_category_name_idx", unique = true)
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
@@ -20,6 +22,7 @@ import java.util.Map;
 public class Category {
     @Id
     private String id;
+    private String tenantId;
     private String name;
     private String title;
     private String description;

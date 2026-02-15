@@ -75,6 +75,7 @@ public class DmsService {
 
     private final MetadataService metadataService;
     private final DocumentValidationService validationService;
+    private final TenantContextService tenantContextService;
 
     public DmsService(AmazonS3Service amazonS3Service,
                       DocumentInformationRepository documentInformationRepository,
@@ -86,7 +87,8 @@ public class DmsService {
                       Environment environment,
                       SigningService signingService,
                       MetadataService metadataService,
-                      DocumentValidationService validationService) {
+                      DocumentValidationService validationService,
+                      TenantContextService tenantContextService) {
         this.amazonS3Service = amazonS3Service;
         this.documentInformationRepository = documentInformationRepository;
         this.dmsDocumentRepository = dmsDocumentRepository;
@@ -98,13 +100,15 @@ public class DmsService {
         this.signingService = signingService;
         this.metadataService = metadataService;
         this.validationService = validationService;
+        this.tenantContextService = tenantContextService;
     }
 
     public ResponseEntity<?> reprove(String transactionId, String documentId, String documentVersion) {
-        DmsDocument document = dmsDocumentRepository.findById(documentId)
+        String tenantId = tenantId();
+        DmsDocument document = dmsDocumentRepository.findByIdAndTenantId(documentId, tenantId)
             .orElseThrow(() -> new DmsBusinessException(String.format("Documento não encontrado para reprovação. Doc=%s", documentId), TypeException.VALID, transactionId));
 
-        dmsDocumentVersionRepository.findByDmsDocumentIdAndVersionNumber(documentId, documentVersion)
+        dmsDocumentVersionRepository.findByTenantIdAndDmsDocumentIdAndVersionNumber(tenantId, documentId, documentVersion)
             .orElseThrow(() -> new DmsBusinessException(String.format("Versão %s não encontrada para documento %s", documentVersion, documentId), TypeException.VALID, transactionId));
 
         transitionWorkflow(document, DocumentWorkflowStatus.REJECTED, "system", "Rejected by workflow action", transactionId);
@@ -122,19 +126,20 @@ public class DmsService {
     }
 
     public void updateMetadata(String transactionId, String documentId, Map<String, Object> jsonMetadata, String fileName) {
-        String businessKeyType = dmsDocumentRepository.findById(documentId)
+        String tenantId = tenantId();
+        String businessKeyType = dmsDocumentRepository.findByIdAndTenantId(documentId, tenantId)
             .map(DmsDocument::getBusinessKeyType)
             .filter(StringUtils::isNotBlank)
             .orElseThrow(() -> new DmsBusinessException("businessKeyType não encontrado para o documento", TypeException.VALID, transactionId));
 
         String businessKeyValue = dmsUtil.getBusinessKeyFromMetadata(jsonMetadata, businessKeyType);
 
-        Optional<DmsDocument> optEntity = dmsDocumentRepository.findByBusinessKeyValueAndFilename(businessKeyValue, fileName);
+        Optional<DmsDocument> optEntity = dmsDocumentRepository.findByTenantIdAndBusinessKeyValueAndFilename(tenantId, businessKeyValue, fileName);
 
         if (optEntity.isPresent()) {
             log.info("DMS - TransactionId: {} - Documento {} encontrado será atualizado", transactionId, documentId);
             var entity = optEntity.get();
-            var dmsDocumentVersion = dmsDocumentVersionRepository.findLastVersionByDmsDocumentId(entity.getId()).orElseThrow();
+            var dmsDocumentVersion = dmsDocumentVersionRepository.findLastVersionByTenantIdAndDmsDocumentId(tenantId(), entity.getId()).orElseThrow();
             dmsDocumentVersion.setMetadata(jsonMetadata);
             dmsDocumentVersion.setModifiedAt(LocalDateTime.now());
             this.dmsDocumentVersionRepository.save(dmsDocumentVersion);
@@ -190,6 +195,7 @@ public class DmsService {
     private DocumentId createOrUpdate(String transactionId, boolean isFinal, ByteArrayInputStream documentData, ByteArrayResource documentResource, LocalDate issuingDate, String author, String metadata, String documentCategoryName,
                                      String filenameDms, String comment) throws IOException {
 
+        String tenantId = tenantId();
         validationService.validateCategory(transactionId, documentCategoryName);
         validationService.validateFilename(transactionId, filenameDms);
         Map<String, Object> jsonMetadata = metadataService.getValideMetadata(transactionId, metadata, documentCategoryName, issuingDate);
@@ -199,13 +205,14 @@ public class DmsService {
         String businessKeyType = resolveBusinessKeyType(documentCategoryName);
         String businessKeyValue = dmsUtil.getBusinessKeyFromMetadata(jsonMetadata, businessKeyType);
         Optional<DmsDocument> optEntity = this.dmsDocumentRepository
-                .findByBusinessKeyTypeAndBusinessKeyValueAndFilenameAndCategory(businessKeyType, businessKeyValue, filenameDms, documentCategoryName);
+                .findByTenantIdAndBusinessKeyTypeAndBusinessKeyValueAndFilenameAndCategory(tenantId, businessKeyType, businessKeyValue, filenameDms, documentCategoryName);
 
         final MimeType mimeType = this.dmsUtil.validateMimeType(transactionId, documentData);
         ByteArrayResource byteArrayResourceSignature = signingService.applyDigitalSignature(mimeType) ? signingService.signPdf(filenameDms, documentResource) : documentResource;
         ByteArrayInputStream inputStreamSignature = new ByteArrayInputStream(byteArrayResourceSignature.getByteArray());
         var entity = optEntity.orElseGet(() -> DmsDocument.of()
                 .id(UUID.randomUUID().toString())
+                .tenantId(tenantId)
                 .businessKeyType(businessKeyType)
                 .businessKeyValue(businessKeyValue)
                 .category(documentCategoryName)
@@ -213,8 +220,9 @@ public class DmsService {
                 .filename(filenameDms)
                 .workflowStatus(DocumentWorkflowStatus.DRAFT)
                 .build());
+        entity.setTenantId(tenantId);
 
-        var maxDmsDocumentVersion = dmsDocumentVersionRepository.findLastVersionByDmsDocumentId(entity.getId());
+        var maxDmsDocumentVersion = dmsDocumentVersionRepository.findLastVersionByTenantIdAndDmsDocumentId(tenantId(), entity.getId());
 
         BigDecimal lastVersion = maxDmsDocumentVersion.map(DmsDocumentVersion::getVersionNumber).orElse(BigDecimal.ZERO);
         var version = dmsUtil.generateVersion(isFinal, lastVersion);
@@ -226,6 +234,7 @@ public class DmsService {
         LocalDateTime versionTimestamp = LocalDateTime.now();
 
         var newVersion = DmsDocumentVersion.of()
+                .tenantId(tenantId())
                 .dmsDocumentId(entity.getId())
                 .versionNumber(version)
                 .versionType(isFinal ? VersionType.MAJOR : VersionType.MINOR)
@@ -260,8 +269,8 @@ public class DmsService {
     public ResponseEntity<DocumentId> approveWithSignatureText(String documentId, String documentVersion, String transactionId, PayloadApprove payloadApprove) throws IOException {
         log.info("approveWithSignatureText documentId {} documentVersion {} transactionId {} signatureText {}", documentId, documentVersion, transactionId, payloadApprove);
 
-        Optional<DmsDocument> optEntity = dmsDocumentRepository.findById(documentId);
-        Optional<DmsDocumentVersion> optEntityVersion = dmsDocumentVersionRepository.findByDmsDocumentIdAndVersionNumber(documentId, documentVersion);
+        Optional<DmsDocument> optEntity = dmsDocumentRepository.findByIdAndTenantId(documentId, tenantId());
+        Optional<DmsDocumentVersion> optEntityVersion = dmsDocumentVersionRepository.findByTenantIdAndDmsDocumentIdAndVersionNumber(tenantId(), documentId, documentVersion);
 
         DmsDocumentVersion currentDmsDocumentVersion = optEntityVersion.orElseThrow(() -> new DmsBusinessException(String.format("Documento e versão não encontrados para aprovação. Doc=%s, Versão=%s", documentId, documentVersion), TypeException.VALID));
         DmsDocument entity = optEntity.orElseThrow();
@@ -283,7 +292,7 @@ public class DmsService {
             }
         }
 
-        DmsDocumentVersion lastDmsDocumentVersionMongo = dmsDocumentVersionRepository.findLastVersionByDmsDocumentId(documentId).get();
+        DmsDocumentVersion lastDmsDocumentVersionMongo = dmsDocumentVersionRepository.findLastVersionByTenantIdAndDmsDocumentId(tenantId(), documentId).get();
         BigDecimal lastVersion = lastDmsDocumentVersionMongo.getVersionNumber();
         BigDecimal newVersion = dmsUtil.generateNewMajorVersion(lastVersion);
         DmsDocumentVersion newVersionMongo = digitalSignatureAndSaveBucket(transactionId, payloadApprove, currentDmsDocumentVersion, entity, newVersion, lastDmsDocumentVersionMongo.getMimeType());
@@ -298,6 +307,7 @@ public class DmsService {
     }
 
     public UrlPresignedResponse generatePresignedUrl(String transactionId, PayloadUrlPresigned payloadUrlPresigned) throws IOException {
+        String tenantId = tenantId();
         validationService.validateAuthor(transactionId, payloadUrlPresigned.getAuthor());
         validationService.validateCategory(transactionId, payloadUrlPresigned.getCategory());
         validationService.validateFilename(transactionId, payloadUrlPresigned.getFileName());
@@ -306,10 +316,11 @@ public class DmsService {
         String businessKeyType = resolveBusinessKeyType(payloadUrlPresigned.getCategory());
         String businessKeyValue = dmsUtil.getBusinessKeyFromMetadata(metadata, businessKeyType);
         Optional<DmsDocument> optEntity = this.dmsDocumentRepository
-                .findByBusinessKeyTypeAndBusinessKeyValueAndFilenameAndCategory(businessKeyType, businessKeyValue, payloadUrlPresigned.getFileName(), payloadUrlPresigned.getCategory());
+                .findByTenantIdAndBusinessKeyTypeAndBusinessKeyValueAndFilenameAndCategory(tenantId, businessKeyType, businessKeyValue, payloadUrlPresigned.getFileName(), payloadUrlPresigned.getCategory());
 
         var entity = optEntity.orElseGet(() -> DmsDocument.of()
                 .id(UUID.randomUUID().toString())
+                .tenantId(tenantId)
                 .businessKeyType(businessKeyType)
                 .businessKeyValue(businessKeyValue)
                 .category(payloadUrlPresigned.getCategory())
@@ -317,8 +328,9 @@ public class DmsService {
                 .filename(payloadUrlPresigned.getFileName())
                 .workflowStatus(DocumentWorkflowStatus.DRAFT)
                 .build());
+        entity.setTenantId(tenantId);
 
-        var maxDmsDocumentVersion = dmsDocumentVersionRepository.findLastVersionByDmsDocumentId(entity.getId());
+        var maxDmsDocumentVersion = dmsDocumentVersionRepository.findLastVersionByTenantIdAndDmsDocumentId(tenantId, entity.getId());
 
         BigDecimal lastVersion = maxDmsDocumentVersion.map(DmsDocumentVersion::getVersionNumber).orElse(BigDecimal.ZERO);
         var version = dmsUtil.generateVersion(payloadUrlPresigned.isFinal(), lastVersion);
@@ -329,6 +341,7 @@ public class DmsService {
         LocalDateTime presignedTimestamp = LocalDateTime.now();
 
         var newVersion = DmsDocumentVersion.of()
+                .tenantId(tenantId())
                 .dmsDocumentId(documentId)
                 .versionNumber(version)
                 .versionType(payloadUrlPresigned.isFinal() ? VersionType.MAJOR : VersionType.MINOR)
@@ -384,7 +397,7 @@ public class DmsService {
     }
 
     public DocumentId finalizeUpload(String transactionId, String documentId, FinalizeUploadRequest request) {
-        var versionOpt = dmsDocumentVersionRepository.findByDmsDocumentIdAndVersionNumber(documentId, request.getVersion());
+        var versionOpt = dmsDocumentVersionRepository.findByTenantIdAndDmsDocumentIdAndVersionNumber(tenantId(), documentId, request.getVersion());
 
         if (versionOpt.isEmpty()) {
             throw new DmsBusinessException(DOCUMENT_VERSION_NOT_FOUND, TypeException.VALID, transactionId);
@@ -421,7 +434,7 @@ public class DmsService {
 
         dmsDocumentVersionRepository.save(version);
 
-        dmsDocumentRepository.findById(documentId).ifPresent(document -> {
+        dmsDocumentRepository.findByIdAndTenantId(documentId, tenantId()).ifPresent(document -> {
             if (StringUtils.isNotBlank(request.getMimeType())) {
                 document.setMimeType(request.getMimeType());
             }
@@ -461,6 +474,7 @@ public class DmsService {
 
         workflowTransitionRepository.save(
             DocumentWorkflowTransition.of()
+                .tenantId(tenantId())
                 .documentId(document.getId())
                 .fromStatus(currentStatus)
                 .toStatus(targetStatus)
@@ -487,7 +501,7 @@ public class DmsService {
                                                          String action,
                                                          String reason,
                                                          String actor) {
-        DmsDocument document = dmsDocumentRepository.findById(documentId)
+        DmsDocument document = dmsDocumentRepository.findByIdAndTenantId(documentId, tenantId())
             .orElseThrow(() -> new DmsBusinessException(String.format("Documento não encontrado para revisão. Doc=%s", documentId), TypeException.VALID, transactionId));
 
         String normalizedAction = StringUtils.trimToEmpty(action).toUpperCase();
@@ -502,7 +516,7 @@ public class DmsService {
             default -> throw new DmsBusinessException("Ação de revisão inválida. Use APPROVE ou REPROVE", TypeException.VALID, transactionId);
         }
 
-        return dmsDocumentRepository.findById(documentId)
+        return dmsDocumentRepository.findByIdAndTenantId(documentId, tenantId())
             .map(DmsDocument::getWorkflowStatus)
             .orElse(DocumentWorkflowStatus.DRAFT);
     }
@@ -512,7 +526,7 @@ public class DmsService {
             throw new DmsBusinessException("Categoria é obrigatória para resolver chave de negócio", TypeException.VALID);
         }
 
-        return categoryRepository.findByName(categoryName)
+        return categoryRepository.findByTenantIdAndName(tenantId(), categoryName)
             .map(category -> StringUtils.trimToNull(category.getBusinessKeyField()))
             .filter(StringUtils::isNotBlank)
             .orElseThrow(() -> new DmsBusinessException(
@@ -526,6 +540,10 @@ public class DmsService {
             throw new DmsBusinessException("businessKeyValue não informado para o documento", TypeException.VALID);
         }
         return document.getBusinessKeyValue();
+    }
+
+    private String tenantId() {
+        return tenantContextService.requireTenantId();
     }
 
     private DmsDocumentVersion digitalSignatureAndSaveBucket(String transactionId, PayloadApprove payloadApprove, DmsDocumentVersion currentDmsDocumentVersion, DmsDocument entity, BigDecimal newVersion, String mimeType) throws IOException {
@@ -550,6 +568,7 @@ public class DmsService {
         }
 
         return DmsDocumentVersion.of()
+                .tenantId(tenantId())
                 .dmsDocumentId(entity.getId())
                 .versionNumber(newVersion)
                 .versionType(VersionType.MAJOR)

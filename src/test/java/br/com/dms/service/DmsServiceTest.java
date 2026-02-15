@@ -99,6 +99,9 @@ class DmsServiceTest {
 	@MockBean
 	private DocumentValidationService documentValidationService;
 
+	@MockBean
+	private TenantContextService tenantContextService;
+
 	@Autowired
 	private Environment environment;
 
@@ -117,9 +120,10 @@ class DmsServiceTest {
 		doNothing().when(documentValidationService).validateCategory(any(), any());
 		doNothing().when(documentValidationService).validateFilename(any(), any());
 
+		when(tenantContextService.requireTenantId()).thenReturn("tenant-dev");
 		when(dmsUtil.getCpfFromMetadata(any())).thenReturn(CPF);
 		when(dmsUtil.getBusinessKeyFromMetadata(any(), any())).thenReturn(CPF);
-		when(categoryRepository.findByName(any())).thenReturn(Optional.of(Category.builder().name("dr:contrato").uniqueAttributes("cpf").businessKeyField("cpf").build()));
+		when(categoryRepository.findByTenantIdAndName(any(), any())).thenReturn(Optional.of(Category.builder().name("dr:contrato").uniqueAttributes("cpf").businessKeyField("cpf").build()));
 		HashMap<String, Object> metadata = new HashMap<>();
 		metadata.put("cpf", CPF);
 		when(dmsUtil.handleObject(any(), any())).thenReturn(metadata);
@@ -146,7 +150,7 @@ class DmsServiceTest {
 		dmsService.createOrUpdate(uuid, true, "f4btgf23fevrg", null, "DMS", "{}", "dr:contrato", "teste.txt", "comment" );
 		verify(validatorCategoryService, times(1)).validateCategory(any(), any(), any(), any());
 		verify(dmsUtil, times(1)).getBusinessKeyFromMetadata(any(), any());
-		verify(dmsDocumentRepository, times(1)).findByBusinessKeyTypeAndBusinessKeyValueAndFilenameAndCategory(any(), any(), any(), any());
+		verify(dmsDocumentRepository, times(1)).findByTenantIdAndBusinessKeyTypeAndBusinessKeyValueAndFilenameAndCategory(any(), any(), any(), any(), any());
 	}
 
 	@Test
@@ -166,17 +170,17 @@ class DmsServiceTest {
 		dmsService.generatePresignedUrl(uuid, presigned);
 		verify(validatorCategoryService, times(1)).validateCategory(any(), any(), any(), any());
 		verify(dmsUtil, times(1)).getBusinessKeyFromMetadata(any(), any());
-		verify(dmsDocumentRepository, times(1)).findByBusinessKeyTypeAndBusinessKeyValueAndFilenameAndCategory(any(), any(), any(), any());
+		verify(dmsDocumentRepository, times(1)).findByTenantIdAndBusinessKeyTypeAndBusinessKeyValueAndFilenameAndCategory(any(), any(), any(), any(), any());
 	}
 
 	@Test
 	void testReprove() {
-		when(dmsDocumentRepository.findById(any())).thenReturn(Optional.of(dmsDocument));
-		when(dmsDocumentVersionRepository.findByDmsDocumentIdAndVersionNumber(any(), any())).thenReturn(Optional.of(dmsDocumentVersion));
+		when(dmsDocumentRepository.findByIdAndTenantId(any(), any())).thenReturn(Optional.of(dmsDocument));
+		when(dmsDocumentVersionRepository.findByTenantIdAndDmsDocumentIdAndVersionNumber(any(), any(), any())).thenReturn(Optional.of(dmsDocumentVersion));
 
 		dmsService.reprove(uuid, DOCUMENT_ID, DOCUMENT_VERSION);
-		verify(dmsDocumentRepository, times(1)).findById(any());
-		verify(dmsDocumentVersionRepository, times(1)).findByDmsDocumentIdAndVersionNumber(any(), any());
+		verify(dmsDocumentRepository, times(1)).findByIdAndTenantId(any(), any());
+		verify(dmsDocumentVersionRepository, times(1)).findByTenantIdAndDmsDocumentIdAndVersionNumber(any(), any(), any());
 		verify(dmsDocumentRepository, atLeastOnce()).save(any());
 		verify(workflowTransitionRepository, times(1)).save(any());
 	}
@@ -184,33 +188,33 @@ class DmsServiceTest {
 	@Test
 	void testUpdateMetadata() {
 		when(dmsUtil.getBusinessKeyFromMetadata(any(), any())).thenReturn(CPF);
-		when(dmsDocumentRepository.findById(any())).thenReturn(Optional.of(dmsDocument));
-		when(dmsDocumentRepository.findByBusinessKeyValueAndFilename(any(), any())).thenReturn(Optional.of(dmsDocument));
-		when(dmsDocumentVersionRepository.findLastVersionByDmsDocumentId(any())).thenReturn(Optional.of(dmsDocumentVersion));
+		when(dmsDocumentRepository.findByIdAndTenantId(any(), any())).thenReturn(Optional.of(dmsDocument));
+		when(dmsDocumentRepository.findByTenantIdAndBusinessKeyValueAndFilename(any(), any(), any())).thenReturn(Optional.of(dmsDocument));
+		when(dmsDocumentVersionRepository.findLastVersionByTenantIdAndDmsDocumentId(any(), any())).thenReturn(Optional.of(dmsDocumentVersion));
 
 		dmsService.updateMetadata(uuid, DOCUMENT_ID, Map.of("cpf", CPF), FILENAME);
 		verify(dmsUtil, times(1)).getBusinessKeyFromMetadata(any(), any());
-		verify(dmsDocumentRepository, times(1)).findByBusinessKeyValueAndFilename(any(), any());
+		verify(dmsDocumentRepository, times(1)).findByTenantIdAndBusinessKeyValueAndFilename(any(), any(), any());
 	}
 
 	@Test
 	void testApproveWithSignatureText() throws IOException {
-		when(dmsDocumentRepository.findById(any())).thenReturn(Optional.of(dmsDocument));
-		when(dmsDocumentVersionRepository.findLastVersionByDmsDocumentId(any())).thenReturn(Optional.of(dmsDocumentVersion));
-		when(dmsDocumentVersionRepository.findByDmsDocumentIdAndVersionNumber(any(), any())).thenReturn(Optional.of(dmsDocumentVersion));
+		when(dmsDocumentRepository.findByIdAndTenantId(any(), any())).thenReturn(Optional.of(dmsDocument));
+		when(dmsDocumentVersionRepository.findLastVersionByTenantIdAndDmsDocumentId(any(), any())).thenReturn(Optional.of(dmsDocumentVersion));
+		when(dmsDocumentVersionRepository.findByTenantIdAndDmsDocumentIdAndVersionNumber(any(), any(), any())).thenReturn(Optional.of(dmsDocumentVersion));
 		when(dmsUtil.generateNewMajorVersion(any())).thenReturn(BigDecimal.ONE);
 
 		dmsService.approveWithSignatureText(DOCUMENT_ID, DOCUMENT_VERSION, uuid, new PayloadApprove());
 
-		verify(dmsDocumentRepository, times(1)).findById(any());
-		verify(dmsDocumentVersionRepository, times(1)).findLastVersionByDmsDocumentId(any());
-		verify(dmsDocumentVersionRepository, times(1)).findByDmsDocumentIdAndVersionNumber(any(), any());
+		verify(dmsDocumentRepository, times(1)).findByIdAndTenantId(any(), any());
+		verify(dmsDocumentVersionRepository, times(1)).findLastVersionByTenantIdAndDmsDocumentId(any(), any());
+		verify(dmsDocumentVersionRepository, times(1)).findByTenantIdAndDmsDocumentIdAndVersionNumber(any(), any(), any());
 		verify(dmsUtil, times(1)).generateNewMajorVersion(any());
 	}
 
 	@Test
 	void testReviewDocumentWorkflowApprove() {
-		when(dmsDocumentRepository.findById(eq(DOCUMENT_ID))).thenReturn(Optional.of(dmsDocument));
+		when(dmsDocumentRepository.findByIdAndTenantId(eq(DOCUMENT_ID), any())).thenReturn(Optional.of(dmsDocument));
 
 		var status = dmsService.reviewDocumentWorkflow(uuid, DOCUMENT_ID, "APPROVE", null, "admin");
 
@@ -220,7 +224,7 @@ class DmsServiceTest {
 
 	@Test
 	void testReviewDocumentWorkflowReproveWithoutReason() {
-		when(dmsDocumentRepository.findById(eq(DOCUMENT_ID))).thenReturn(Optional.of(dmsDocument));
+		when(dmsDocumentRepository.findByIdAndTenantId(eq(DOCUMENT_ID), any())).thenReturn(Optional.of(dmsDocument));
 
 		assertThrows(DmsBusinessException.class, () ->
 			dmsService.reviewDocumentWorkflow(uuid, DOCUMENT_ID, "REPROVE", null, "admin")
@@ -236,13 +240,13 @@ class DmsServiceTest {
 		pendingVersion.setPathToDocument("cpf/file/2.0/video.mp4");
 		pendingVersion.setUploadStatus(UploadStatus.PENDING);
 
-		when(dmsDocumentVersionRepository.findByDmsDocumentIdAndVersionNumber(eq(DOCUMENT_ID), eq("2.0")))
+		when(dmsDocumentVersionRepository.findByTenantIdAndDmsDocumentIdAndVersionNumber(any(), eq(DOCUMENT_ID), eq("2.0")))
 			.thenReturn(Optional.of(pendingVersion));
 		when(amazonS3Service.objectExists(pendingVersion.getPathToDocument())).thenReturn(true);
 		ObjectMetadata metadata = new ObjectMetadata();
 		metadata.setContentLength(2048L);
 		when(amazonS3Service.getObjectMetadata(pendingVersion.getPathToDocument())).thenReturn(metadata);
-		when(dmsDocumentRepository.findById(DOCUMENT_ID)).thenReturn(Optional.of(dmsDocument));
+		when(dmsDocumentRepository.findByIdAndTenantId(eq(DOCUMENT_ID), any())).thenReturn(Optional.of(dmsDocument));
 		when(dmsDocumentRepository.save(any())).thenReturn(dmsDocument);
 
 		FinalizeUploadRequest request = new FinalizeUploadRequest();
@@ -270,7 +274,7 @@ class DmsServiceTest {
 		pendingVersion.setPathToDocument("cpf/file/3.0/video.mp4");
 		pendingVersion.setUploadStatus(UploadStatus.PENDING);
 
-		when(dmsDocumentVersionRepository.findByDmsDocumentIdAndVersionNumber(eq(DOCUMENT_ID), eq("3.0")))
+		when(dmsDocumentVersionRepository.findByTenantIdAndDmsDocumentIdAndVersionNumber(any(), eq(DOCUMENT_ID), eq("3.0")))
 			.thenReturn(Optional.of(pendingVersion));
 		when(amazonS3Service.objectExists(pendingVersion.getPathToDocument())).thenReturn(true);
 		ObjectMetadata metadata = new ObjectMetadata();

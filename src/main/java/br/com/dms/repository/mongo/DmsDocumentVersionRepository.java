@@ -11,6 +11,20 @@ import java.util.Optional;
 @Repository
 public interface DmsDocumentVersionRepository extends MongoRepository<DmsDocumentVersion, String> {
 
+    Optional<DmsDocumentVersion> findByTenantIdAndDmsDocumentIdAndVersionNumber(String tenantId, String dmsDocumentId, String versionNumber);
+
+    @Aggregation(pipeline = {
+            "{ '$match': { 'tenantId': ?0, 'dmsDocumentId' : ?1 } }",
+            "{ '$sort' : { 'versionNumber' : -1 } }",
+            "{ '$limit' : 1 }"
+    }, collation = "{ locale: 'pt', numericOrdering: true}")
+    Optional<DmsDocumentVersion> findLastVersionByTenantIdAndDmsDocumentId(String tenantId, String dmsDocumentId);
+
+    Optional<List<DmsDocumentVersion>> findByTenantIdAndDmsDocumentId(String tenantId, String dmsDocumentId);
+
+    void deleteByTenantIdAndDmsDocumentId(String tenantId, String dmsDocumentId);
+
+    // legacy methods kept temporarily during tenant migration
     Optional<DmsDocumentVersion> findByDmsDocumentIdAndVersionNumber(String dmsDocumentId, String versionNumber);
 
     @Aggregation(pipeline = {
