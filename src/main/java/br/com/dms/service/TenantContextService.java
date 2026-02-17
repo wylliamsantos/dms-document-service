@@ -26,15 +26,17 @@ public class TenantContextService {
 
     public String requireTenantId() {
         String fromToken = resolveFromToken();
+        String fromHeader = resolveFromHeader();
+
         if (StringUtils.isNotBlank(fromToken)) {
+            if (StringUtils.isNotBlank(fromHeader) && !StringUtils.equals(fromToken, fromHeader)) {
+                throw new DmsBusinessException("tenant_id divergente entre token e header X-Tenant-Id", TypeException.VALID);
+            }
             return fromToken;
         }
 
-        if (allowHeaderFallback) {
-            String fromHeader = resolveFromHeader();
-            if (StringUtils.isNotBlank(fromHeader)) {
-                return fromHeader;
-            }
+        if (allowHeaderFallback && StringUtils.isNotBlank(fromHeader)) {
+            return fromHeader;
         }
 
         throw new DmsBusinessException("tenant_id não informado no token e nenhum tenant de fallback foi recebido", TypeException.VALID);
