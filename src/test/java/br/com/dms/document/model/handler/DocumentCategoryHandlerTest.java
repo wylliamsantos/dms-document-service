@@ -6,6 +6,7 @@ import br.com.dms.domain.core.DocumentCategory;
 import br.com.dms.domain.core.DocumentGroup;
 import br.com.dms.repository.mongo.CategoryRepository;
 import br.com.dms.exception.DmsBusinessException;
+import br.com.dms.service.TenantContextService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,12 +41,16 @@ class DocumentCategoryHandlerTest {
     @Mock
     private Environment environment;
 
+    @Mock
+    private TenantContextService tenantContextService;
+
     @InjectMocks
     private DocumentCategoryHandler handler;
 
     @BeforeEach
     void setUp() {
         when(environment.getProperty("dms.msg.typeInvalid")).thenReturn("Tipo inválido");
+        when(tenantContextService.requireTenantId()).thenReturn("tenant-a");
     }
 
     @Test
@@ -58,7 +63,7 @@ class DocumentCategoryHandlerTest {
                 .documentGroup(DocumentGroup.PERSONAL)
                 .build();
 
-        when(categoryRepository.findByName("category::test")).thenReturn(Optional.of(category));
+        when(categoryRepository.findByTenantIdAndName("tenant-a", "category::test")).thenReturn(Optional.of(category));
 
         DocumentCategory documentCategory = handler.loadCategory(TRANSACTION_ID, "category::test");
 
@@ -70,7 +75,7 @@ class DocumentCategoryHandlerTest {
 
     @Test
     void loadCategoryShouldThrowWhenUnknown() {
-        when(categoryRepository.findByName("unknown")).thenReturn(Optional.empty());
+        when(categoryRepository.findByTenantIdAndName("tenant-a", "unknown")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> handler.loadCategory(TRANSACTION_ID, "unknown"))
                 .isInstanceOf(DmsBusinessException.class)
@@ -91,7 +96,7 @@ class DocumentCategoryHandlerTest {
                 .types(List.of(drivingLicense))
                 .build();
 
-        when(categoryRepository.findByName("category::test")).thenReturn(Optional.of(category));
+        when(categoryRepository.findByTenantIdAndName("tenant-a", "category::test")).thenReturn(Optional.of(category));
 
         DocumentCategory documentCategory = handler.loadCategoryWithType(TRANSACTION_ID, "category::test", "CNH");
 
@@ -107,7 +112,7 @@ class DocumentCategoryHandlerTest {
                 .types(List.of())
                 .build();
 
-        when(categoryRepository.findByName("category::test")).thenReturn(Optional.of(category));
+        when(categoryRepository.findByTenantIdAndName("tenant-a", "category::test")).thenReturn(Optional.of(category));
 
         assertThatThrownBy(() -> handler.loadCategoryWithType(TRANSACTION_ID, "category::test", "CNH"))
                 .isInstanceOf(DmsBusinessException.class)
@@ -128,7 +133,7 @@ class DocumentCategoryHandlerTest {
                 .types(List.of(drivingLicense))
                 .build();
 
-        when(categoryRepository.findByName("category::test")).thenReturn(Optional.of(category));
+        when(categoryRepository.findByTenantIdAndName("tenant-a", "category::test")).thenReturn(Optional.of(category));
 
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("tipoDocumento", "CNH");
@@ -145,7 +150,7 @@ class DocumentCategoryHandlerTest {
                 .name("category::test")
                 .build();
 
-        when(categoryRepository.findByName("category::test")).thenReturn(Optional.of(category));
+        when(categoryRepository.findByTenantIdAndName("tenant-a", "category::test")).thenReturn(Optional.of(category));
 
         DocumentCategory documentCategory = handler.resolveCategory(TRANSACTION_ID, "category::test", Map.of());
 
