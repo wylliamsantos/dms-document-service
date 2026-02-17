@@ -1,13 +1,10 @@
-FROM harbor.dms-shared.in/dockerhub/library/eclipse-temurin:18-jre-alpine
+FROM gradle:8.7-jdk21 AS build
+WORKDIR /app
+COPY . .
+RUN chmod +x gradlew && ./gradlew clean bootJar -x test --no-daemon
 
-COPY build/libs/lib /libs
-COPY build/libs/dms-document-service-*.jar /application.jar
-
-ENTRYPOINT java \
-           -Xverify:none -XX:TieredStopAtLevel=1 \
-           -Dspring.jmx.enabled=false \
-           $JAVA_OPTS \
-           -cp "/application.jar:/libs/*" \
-           br.com.dms.Application
-
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+COPY --from=build /app/build/libs/dms-document-service.jar /app/app.jar
 EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

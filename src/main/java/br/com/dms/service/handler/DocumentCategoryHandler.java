@@ -7,6 +7,7 @@ import br.com.dms.domain.core.DocumentType;
 import br.com.dms.repository.mongo.CategoryRepository;
 import br.com.dms.exception.DmsBusinessException;
 import br.com.dms.exception.TypeException;
+import br.com.dms.service.TenantContextService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.cache.annotation.CacheConfig;
@@ -29,11 +30,14 @@ public class DocumentCategoryHandler {
     private final CategoryRepository categoryRepository;
 
     private final Environment environment;
+    private final TenantContextService tenantContextService;
 
     public DocumentCategoryHandler(CategoryRepository categoryRepository,
-                                   Environment environment) {
+                                   Environment environment,
+                                   TenantContextService tenantContextService) {
         this.categoryRepository = categoryRepository;
         this.environment = environment;
+        this.tenantContextService = tenantContextService;
     }
 
     public DocumentCategory loadCategory(String transactionId, String documentCategoryName) {
@@ -50,11 +54,12 @@ public class DocumentCategoryHandler {
         return documentCategory;
     }
 
-    @Cacheable(cacheNames = "documentCategory", key = "#documentCategoryName.toLowerCase()")
+    @Cacheable(cacheNames = "documentCategory", key = "@tenantContextService.requireTenantId() + '::' + #documentCategoryName.toLowerCase()")
     protected DocumentCategory findCategory(String transactionId, String documentCategoryName) {
-        Category category = categoryRepository.findByName(documentCategoryName)
+        String tenantId = tenantContextService.requireTenantId();
+        Category category = categoryRepository.findByTenantIdAndName(tenantId, documentCategoryName)
                 .orElseThrow(() -> {
-                    log.info("DMS - TransactionId: {} - Type invalid {}", transactionId, documentCategoryName);
+                    log.info("DMS - TransactionId: {} - Type invalid {} for tenant {}", transactionId, documentCategoryName, tenantId);
                     return new DmsBusinessException(environment.getProperty("dms.msg.typeInvalid"), TypeException.VALID, transactionId);
                 });
 
@@ -68,9 +73,10 @@ public class DocumentCategoryHandler {
         return documentCategory;
     }
 
-    @Cacheable(cacheNames = "documentType", key = "#documentCategoryName.toLowerCase() + '::' + #documentTypeName.toLowerCase()")
+    @Cacheable(cacheNames = "documentType", key = "@tenantContextService.requireTenantId() + '::' + #documentCategoryName.toLowerCase() + '::' + #documentTypeName.toLowerCase()")
     protected DocumentType findDocumentType(String transactionId, String documentCategoryName, String documentTypeName) {
-        Category category = categoryRepository.findByName(documentCategoryName)
+        String tenantId = tenantContextService.requireTenantId();
+        Category category = categoryRepository.findByTenantIdAndName(tenantId, documentCategoryName)
                 .orElseThrow(() -> new DmsBusinessException(environment.getProperty("dms.msg.typeInvalid"), TypeException.VALID, transactionId));
 
         if (category.getTypes() == null) {
