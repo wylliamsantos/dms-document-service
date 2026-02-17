@@ -24,16 +24,20 @@ import static br.com.dms.domain.Messages.*;
 @Slf4j
 public class ValidatorCategoryService {
     private final CategoryRepository categoryRepository;
+    private final TenantContextService tenantContextService;
 
-    public ValidatorCategoryService(CategoryRepository categoryRepository) {
+    public ValidatorCategoryService(CategoryRepository categoryRepository,
+                                    TenantContextService tenantContextService) {
         this.categoryRepository = categoryRepository;
+        this.tenantContextService = tenantContextService;
     }
 
     public Set<ValidationMessage> validateCategory(String categoryName, Map<String, Object> jsonMetadata, LocalDate issuingDate, String transactionId) throws IOException {
         log.info("DMS - Validar categoria: {}", categoryName);
-        var category = this.categoryRepository.findByName(categoryName)
+        String tenantId = tenantContextService.requireTenantId();
+        var category = this.categoryRepository.findByTenantIdAndName(tenantId, categoryName)
                 .orElseThrow(() -> {
-                    log.error("DMS - Categoria {} não encontrada", categoryName);
+                    log.error("DMS - Categoria {} não encontrada para tenant {}", categoryName, tenantId);
                     throw new DmsBusinessException(CATEGORY_NOT_FOUND, TypeException.VALID, transactionId);
                 });
 

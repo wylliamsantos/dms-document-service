@@ -10,13 +10,17 @@ import java.util.List;
 public class DocumentTypeService {
 
     private final CategoryRepository categoryRepository;
+    private final TenantContextService tenantContextService;
 
-    public DocumentTypeService(CategoryRepository categoryRepository) {
+    public DocumentTypeService(CategoryRepository categoryRepository,
+                               TenantContextService tenantContextService) {
         this.categoryRepository = categoryRepository;
+        this.tenantContextService = tenantContextService;
     }
 
     public List<String> findByDocumentCategoryName(String documentCategoryName) {
-        return categoryRepository.findByName(documentCategoryName)
+        String tenantId = tenantContextService.requireTenantId();
+        return categoryRepository.findByTenantIdAndName(tenantId, documentCategoryName)
                 .map(category -> {
                     if (category.getTypes() == null) {
                         return List.<String>of();
