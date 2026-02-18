@@ -123,6 +123,14 @@ O `docker-compose.yml` agora inclui um serviço `dms-keycloak` com um realm de e
    - Ajustar o frontend para autenticar via Keycloak (PKCE) em vez da tela de login simulada.
    - Criar uma configuração equivalente no `dms-search-service` para padronizar a segurança entre os serviços.
 
+### Checkpoint de limite de usuários (billing)
+
+Para integrar o serviço oficial de identidade/provisionamento com o enforcement de assentos por plano, use o endpoint:
+
+- `POST /v1/billing/limits/users/check` (roles `ROLE_OWNER`/`ROLE_ADMIN`)
+
+Contrato completo e exemplos em `docs/billing-user-provisioning-contract.md`.
+
 ### Observabilidade
 
 - Actuator: `/actuator/health`, `/actuator/prometheus` habilitados.
