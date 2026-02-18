@@ -20,13 +20,16 @@ public class BillingService {
     private final TenantContextService tenantContextService;
     private final TenantSubscriptionRepository tenantSubscriptionRepository;
     private final BillingWebhookEventRepository billingWebhookEventRepository;
+    private final BillingProviderClient billingProviderClient;
 
     public BillingService(TenantContextService tenantContextService,
                           TenantSubscriptionRepository tenantSubscriptionRepository,
-                          BillingWebhookEventRepository billingWebhookEventRepository) {
+                          BillingWebhookEventRepository billingWebhookEventRepository,
+                          BillingProviderClient billingProviderClient) {
         this.tenantContextService = tenantContextService;
         this.tenantSubscriptionRepository = tenantSubscriptionRepository;
         this.billingWebhookEventRepository = billingWebhookEventRepository;
+        this.billingProviderClient = billingProviderClient;
     }
 
     public BillingSubscriptionResponse getOrStartTrialForAuthenticatedTenant() {
@@ -35,6 +38,32 @@ public class BillingService {
                 .orElseGet(() -> createTrialSubscription(tenantId));
 
         return toResponse(subscription);
+    }
+
+    public BillingSubscriptionResponse refreshSubscriptionFromProviderForAuthenticatedTenant() {
+        String tenantId = tenantContextService.requireTenantId();
+        var subscription = tenantSubscriptionRepository.findByTenantId(tenantId)
+                .orElseGet(() -> createTrialSubscription(tenantId));
+
+        if (subscription.getExternalSubscriptionId() == null || subscription.getExternalSubscriptionId().isBlank()) {
+            return toResponse(subscription);
+        }
+
+        var providerSnapshot = billingProviderClient.fetchSubscription(subscription.getExternalSubscriptionId());
+        if (providerSnapshot.isEmpty()) {
+            return toResponse(subscription);
+        }
+
+        var snapshot = providerSnapshot.get();
+        if (snapshot.getPlan() != null) {
+            subscription.setPlan(snapshot.getPlan());
+        }
+        if (snapshot.getStatus() != null) {
+            subscription.setStatus(snapshot.getStatus());
+        }
+        subscription.setUpdatedAt(Instant.now());
+
+        return toResponse(tenantSubscriptionRepository.save(subscription));
     }
 
     public BillingSubscriptionResponse applyWebhook(BillingWebhookRequest request) {

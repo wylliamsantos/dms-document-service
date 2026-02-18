@@ -20,11 +20,13 @@ class BillingServiceTest {
     private final TenantContextService tenantContextService = mock(TenantContextService.class);
     private final TenantSubscriptionRepository tenantSubscriptionRepository = mock(TenantSubscriptionRepository.class);
     private final BillingWebhookEventRepository billingWebhookEventRepository = mock(BillingWebhookEventRepository.class);
+    private final BillingProviderClient billingProviderClient = mock(BillingProviderClient.class);
 
     private final BillingService service = new BillingService(
             tenantContextService,
             tenantSubscriptionRepository,
-            billingWebhookEventRepository
+            billingWebhookEventRepository,
+            billingProviderClient
     );
 
     @Test
@@ -90,6 +92,48 @@ class BillingServiceTest {
         assertThat(response.getExternalSubscriptionId()).isEqualTo("sub_123");
         verify(tenantSubscriptionRepository, times(1)).save(any());
         verify(billingWebhookEventRepository, times(1)).save(any());
+    }
+
+    @Test
+    void shouldRefreshSubscriptionFromProviderWhenExternalSubscriptionExists() {
+        when(tenantContextService.requireTenantId()).thenReturn("tenant-dev");
+        when(tenantSubscriptionRepository.findByTenantId("tenant-dev")).thenReturn(Optional.of(TenantSubscription.builder()
+                .tenantId("tenant-dev")
+                .plan(BillingPlan.STARTER)
+                .status(BillingStatus.PAST_DUE)
+                .externalSubscriptionId("sub_123")
+                .build()));
+        when(billingProviderClient.fetchSubscription("sub_123")).thenReturn(Optional.of(BillingProviderSubscriptionSnapshot.builder()
+                .externalSubscriptionId("sub_123")
+                .plan(BillingPlan.PRO)
+                .status(BillingStatus.ACTIVE)
+                .build()));
+        when(tenantSubscriptionRepository.save(any(TenantSubscription.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = service.refreshSubscriptionFromProviderForAuthenticatedTenant();
+
+        assertThat(response.getTenantId()).isEqualTo("tenant-dev");
+        assertThat(response.getPlan()).isEqualTo(BillingPlan.PRO);
+        assertThat(response.getStatus()).isEqualTo(BillingStatus.ACTIVE);
+        verify(tenantSubscriptionRepository, times(1)).save(any(TenantSubscription.class));
+    }
+
+    @Test
+    void shouldSkipProviderRefreshWhenNoExternalSubscriptionExists() {
+        when(tenantContextService.requireTenantId()).thenReturn("tenant-dev");
+        when(tenantSubscriptionRepository.findByTenantId("tenant-dev")).thenReturn(Optional.of(TenantSubscription.builder()
+                .tenantId("tenant-dev")
+                .plan(BillingPlan.TRIAL)
+                .status(BillingStatus.TRIALING)
+                .build()));
+
+        var response = service.refreshSubscriptionFromProviderForAuthenticatedTenant();
+
+        assertThat(response.getTenantId()).isEqualTo("tenant-dev");
+        assertThat(response.getPlan()).isEqualTo(BillingPlan.TRIAL);
+        assertThat(response.getStatus()).isEqualTo(BillingStatus.TRIALING);
+        verifyNoInteractions(billingProviderClient);
+        verify(tenantSubscriptionRepository, never()).save(any(TenantSubscription.class));
     }
 
     @Test

@@ -41,6 +41,13 @@ public class BillingController {
         return new ResponseEntity<>(billingService.getOrStartTrialForAuthenticatedTenant(), HttpStatus.OK);
     }
 
+    @PostMapping("/subscription/refresh")
+    @PreAuthorize("hasAnyAuthority('ROLE_OWNER','ROLE_ADMIN')")
+    public ResponseEntity<BillingSubscriptionResponse> refreshSubscription(@RequestHeader(name = "TransactionId") String transactionId) {
+        log.info("DMS version v1 - BillingSubscriptionRefresh - transactionId: {}", transactionId);
+        return new ResponseEntity<>(billingService.refreshSubscriptionFromProviderForAuthenticatedTenant(), HttpStatus.OK);
+    }
+
     @PostMapping("/webhook")
     @PreAuthorize("hasAnyAuthority('ROLE_OWNER','ROLE_ADMIN')")
     public ResponseEntity<BillingSubscriptionResponse> applyWebhook(@RequestHeader(name = "TransactionId") String transactionId,
