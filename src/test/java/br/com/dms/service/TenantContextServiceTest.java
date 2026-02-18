@@ -13,6 +13,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TenantContextServiceTest {
 
@@ -51,14 +52,25 @@ class TenantContextServiceTest {
     }
 
     @Test
-    void shouldPreferTokenOverHeaderWhenBothArePresent() {
+    void shouldResolveTenantWhenTokenAndHeaderMatch() {
         TenantContextService service = new TenantContextService(true);
         setJwtTenant("tenant-token");
-        setRequestHeader("X-Tenant-Id", "tenant-header");
+        setRequestHeader("X-Tenant-Id", "tenant-token");
 
         String tenantId = service.requireTenantId();
 
         assertEquals("tenant-token", tenantId);
+    }
+
+    @Test
+    void shouldRejectWhenTokenAndHeaderMismatch() {
+        TenantContextService service = new TenantContextService(true);
+        setJwtTenant("tenant-token");
+        setRequestHeader("X-Tenant-Id", "tenant-header");
+
+        DmsBusinessException exception = assertThrows(DmsBusinessException.class, service::requireTenantId);
+
+        assertTrue(exception.getMessage().contains("divergente"));
     }
 
     private void setJwtTenant(String tenantId) {
