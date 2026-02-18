@@ -4,6 +4,7 @@ import br.com.dms.controller.request.BillingWebhookRequest;
 import br.com.dms.controller.response.BillingSubscriptionResponse;
 import br.com.dms.service.BillingService;
 import br.com.dms.service.BillingWebhookSignatureService;
+import br.com.dms.service.PlanLimitService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -24,13 +25,16 @@ public class BillingController {
 
     private final BillingService billingService;
     private final BillingWebhookSignatureService billingWebhookSignatureService;
+    private final PlanLimitService planLimitService;
     private final ObjectMapper objectMapper;
 
     public BillingController(BillingService billingService,
                              BillingWebhookSignatureService billingWebhookSignatureService,
+                             PlanLimitService planLimitService,
                              ObjectMapper objectMapper) {
         this.billingService = billingService;
         this.billingWebhookSignatureService = billingWebhookSignatureService;
+        this.planLimitService = planLimitService;
         this.objectMapper = objectMapper;
     }
 
@@ -46,6 +50,14 @@ public class BillingController {
     public ResponseEntity<BillingSubscriptionResponse> refreshSubscription(@RequestHeader(name = "TransactionId") String transactionId) {
         log.info("DMS version v1 - BillingSubscriptionRefresh - transactionId: {}", transactionId);
         return new ResponseEntity<>(billingService.refreshSubscriptionFromProviderForAuthenticatedTenant(), HttpStatus.OK);
+    }
+
+    @PostMapping("/limits/users/check")
+    @PreAuthorize("hasAnyAuthority('ROLE_OWNER','ROLE_ADMIN')")
+    public ResponseEntity<Void> checkUserProvisionLimit(@RequestHeader(name = "TransactionId") String transactionId) {
+        log.info("DMS version v1 - BillingUserLimitCheck - transactionId: {}", transactionId);
+        planLimitService.assertCanProvisionUser(transactionId);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/webhook")

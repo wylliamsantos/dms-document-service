@@ -22,6 +22,8 @@ dms:
   enablePermanentDelete: false
   lockConfig: "{\"timeToExpire\":0,\"type\":\"ALLOW_OWNER_CHANGES\",\"lifetime\":\"PERSISTENT\"}"
   hashAlgorithm: MD5
+  billing:
+    plan-limits-enabled: false
   personalDocuments: "ac:identificacao"
   identificacao.path: /pessoas/%s/cpf_%s/identificacao
   groupDateMask: yyyy/MM/dd
