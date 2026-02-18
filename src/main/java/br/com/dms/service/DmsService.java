@@ -76,6 +76,7 @@ public class DmsService {
     private final MetadataService metadataService;
     private final DocumentValidationService validationService;
     private final TenantContextService tenantContextService;
+    private final PlanLimitService planLimitService;
 
     public DmsService(AmazonS3Service amazonS3Service,
                       DocumentInformationRepository documentInformationRepository,
@@ -88,7 +89,8 @@ public class DmsService {
                       SigningService signingService,
                       MetadataService metadataService,
                       DocumentValidationService validationService,
-                      TenantContextService tenantContextService) {
+                      TenantContextService tenantContextService,
+                      PlanLimitService planLimitService) {
         this.amazonS3Service = amazonS3Service;
         this.documentInformationRepository = documentInformationRepository;
         this.dmsDocumentRepository = dmsDocumentRepository;
@@ -101,6 +103,7 @@ public class DmsService {
         this.metadataService = metadataService;
         this.validationService = validationService;
         this.tenantContextService = tenantContextService;
+        this.planLimitService = planLimitService;
     }
 
     public ResponseEntity<?> reprove(String transactionId, String documentId, String documentVersion) {
@@ -196,6 +199,7 @@ public class DmsService {
                                      String filenameDms, String comment) throws IOException {
 
         String tenantId = tenantId();
+        planLimitService.assertCanUploadDocument(transactionId);
         validationService.validateCategory(transactionId, documentCategoryName);
         validationService.validateFilename(transactionId, filenameDms);
         Map<String, Object> jsonMetadata = metadataService.getValideMetadata(transactionId, metadata, documentCategoryName, issuingDate);
@@ -308,6 +312,7 @@ public class DmsService {
 
     public UrlPresignedResponse generatePresignedUrl(String transactionId, PayloadUrlPresigned payloadUrlPresigned) throws IOException {
         String tenantId = tenantId();
+        planLimitService.assertCanUploadDocument(transactionId);
         validationService.validateAuthor(transactionId, payloadUrlPresigned.getAuthor());
         validationService.validateCategory(transactionId, payloadUrlPresigned.getCategory());
         validationService.validateFilename(transactionId, payloadUrlPresigned.getFileName());

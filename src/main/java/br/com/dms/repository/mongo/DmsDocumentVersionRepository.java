@@ -5,6 +5,7 @@ import org.springframework.data.mongodb.repository.Aggregation;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -23,6 +24,12 @@ public interface DmsDocumentVersionRepository extends MongoRepository<DmsDocumen
     Optional<List<DmsDocumentVersion>> findByTenantIdAndDmsDocumentId(String tenantId, String dmsDocumentId);
 
     void deleteByTenantIdAndDmsDocumentId(String tenantId, String dmsDocumentId);
+
+    long countByTenantIdAndCreationDateGreaterThanEqualAndCreationDateLessThan(
+            String tenantId,
+            LocalDateTime start,
+            LocalDateTime end
+    );
 
     // legacy methods kept temporarily during tenant migration
     Optional<DmsDocumentVersion> findByDmsDocumentIdAndVersionNumber(String dmsDocumentId, String versionNumber);
