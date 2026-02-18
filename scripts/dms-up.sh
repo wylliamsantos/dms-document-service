@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-WORKDIR="${WORKDIR:-$HOME/.openclaw/workspace}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ -z "${WORKDIR:-}" ]]; then
+  if [[ "$(basename "$SCRIPT_DIR")" == "scripts" ]]; then
+    WORKDIR="$(dirname "$SCRIPT_DIR")"
+  else
+    WORKDIR="$SCRIPT_DIR"
+  fi
+fi
+
 STACK_DIR="$WORKDIR/dms-stack"
 LOG_DIR="$WORKDIR/.dms-logs"
 
@@ -14,6 +23,8 @@ REPOS=(
 )
 
 mkdir -p "$WORKDIR" "$STACK_DIR" "$LOG_DIR"
+
+echo "📁 WORKDIR: $WORKDIR"
 
 PREBUILD_MODE="${PREBUILD_MODE:-test}" # test | build | skip
 
@@ -90,11 +101,37 @@ seed_keycloak() {
     -s publicClient=true \
     -s directAccessGrantsEnabled=true \
     -s standardFlowEnabled=true \
-    -s 'redirectUris=["http://localhost:5173/*","http://127.0.0.1:5173/*"]' \
+    -s 'redirectUris=["http://localhost:5173","http://localhost:5173/*","http://127.0.0.1:5173","http://127.0.0.1:5173/*"]' \
     -s 'webOrigins=["http://localhost:5173","http://127.0.0.1:5173"]' >/dev/null 2>&1 || true
 
-  docker exec dms-keycloak /opt/keycloak/bin/kcadm.sh create users -r dms -s username=testuser -s enabled=true >/dev/null 2>&1 || true
+  for role in OWNER ADMIN REVIEWER VIEWER DOCUMENT_VIEWER; do
+    docker exec dms-keycloak /opt/keycloak/bin/kcadm.sh create roles -r dms -s name=$role >/dev/null 2>&1 || true
+  done
+
+  docker exec dms-keycloak /opt/keycloak/bin/kcadm.sh create users -r dms -s username=testuser -s enabled=true -s firstName=Test -s lastName=User -s email=testuser@local.dev -s emailVerified=true >/dev/null 2>&1 || true
   docker exec dms-keycloak /opt/keycloak/bin/kcadm.sh set-password -r dms --username testuser --new-password test123 >/dev/null 2>&1 || true
+  for role in DOCUMENT_VIEWER VIEWER; do
+    docker exec dms-keycloak /opt/keycloak/bin/kcadm.sh add-roles -r dms --uusername testuser --rolename $role >/dev/null 2>&1 || true
+  done
+
+  docker exec dms-keycloak /opt/keycloak/bin/kcadm.sh create users -r dms -s username=admin1 -s enabled=true -s firstName=Admin -s lastName=One -s email=admin1@local.dev -s emailVerified=true >/dev/null 2>&1 || true
+  docker exec dms-keycloak /opt/keycloak/bin/kcadm.sh set-password -r dms --username admin1 --new-password admin123 >/dev/null 2>&1 || true
+  for role in OWNER ADMIN REVIEWER VIEWER DOCUMENT_VIEWER; do
+    docker exec dms-keycloak /opt/keycloak/bin/kcadm.sh add-roles -r dms --uusername admin1 --rolename $role >/dev/null 2>&1 || true
+  done
+
+  local client_id
+  client_id=$(docker exec dms-keycloak /opt/keycloak/bin/kcadm.sh get clients -r dms -q clientId=dms-frontend | python3 -c 'import sys,json;print(json.load(sys.stdin)[0]["id"])')
+
+  docker exec dms-keycloak /opt/keycloak/bin/kcadm.sh create clients/$client_id/protocol-mappers/models -r dms \
+    -s name=tenant_id_hardcoded \
+    -s protocol=openid-connect \
+    -s protocolMapper=oidc-hardcoded-claim-mapper \
+    -s 'config."claim.name"=tenant_id' \
+    -s 'config."claim.value"=tenant-dev' \
+    -s 'config."jsonType.label"=String' \
+    -s 'config."id.token.claim"=true' \
+    -s 'config."access.token.claim"=true' >/dev/null 2>&1 || true
 
   local discovery_code
   discovery_code=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:8180/realms/dms/.well-known/openid-configuration" || true)
