@@ -79,17 +79,7 @@ public class PlanLimitService {
             );
         }
 
-        long userLimit = resolveUserLimit(subscription.getPlan());
-        if (userLimit > 0 && tenantUserDirectoryClient != null) {
-            var activeUsers = tenantUserDirectoryClient.countActiveUsers(tenantId);
-            if (activeUsers.isPresent() && activeUsers.get() >= userLimit) {
-                throw new DmsBusinessException(
-                        String.format("Limite de usuários ativos do plano atingido (%d/%d). Faça upgrade para adicionar novos usuários.", activeUsers.get(), userLimit),
-                        TypeException.VALID,
-                        transactionId
-                );
-            }
-        }
+        assertCanAddUserForSubscription(subscription, tenantId, transactionId);
 
         long monthlyLimit = resolveMonthlyDocumentLimit(subscription.getPlan());
         if (monthlyLimit > 0) {
@@ -129,6 +119,48 @@ public class PlanLimitService {
                             humanReadableBytes(projectedStorage),
                             humanReadableBytes(storageLimitBytes)
                     ),
+                    TypeException.VALID,
+                    transactionId
+            );
+        }
+    }
+
+    public void assertCanProvisionUser(String transactionId) {
+        if (!planLimitsEnabled || tenantContextService == null || tenantSubscriptionRepository == null) {
+            return;
+        }
+
+        String tenantId = tenantContextService.requireTenantId();
+        var subscription = tenantSubscriptionRepository.findByTenantId(tenantId)
+                .orElseGet(() -> br.com.dms.domain.mongodb.TenantSubscription.builder()
+                        .tenantId(tenantId)
+                        .plan(BillingPlan.TRIAL)
+                        .status(BillingStatus.TRIALING)
+                        .build());
+
+        if (subscription.getStatus() == BillingStatus.CANCELED || subscription.getStatus() == BillingStatus.PAST_DUE) {
+            throw new DmsBusinessException(
+                    "Assinatura inativa para provisionamento de usuários. Regularize a assinatura para continuar.",
+                    TypeException.VALID,
+                    transactionId
+            );
+        }
+
+        assertCanAddUserForSubscription(subscription, tenantId, transactionId);
+    }
+
+    private void assertCanAddUserForSubscription(br.com.dms.domain.mongodb.TenantSubscription subscription,
+                                                 String tenantId,
+                                                 String transactionId) {
+        long userLimit = resolveUserLimit(subscription.getPlan());
+        if (userLimit <= 0 || tenantUserDirectoryClient == null) {
+            return;
+        }
+
+        var activeUsers = tenantUserDirectoryClient.countActiveUsers(tenantId);
+        if (activeUsers.isPresent() && activeUsers.get() >= userLimit) {
+            throw new DmsBusinessException(
+                    String.format("Limite de usuários ativos do plano atingido (%d/%d). Faça upgrade para adicionar novos usuários.", activeUsers.get(), userLimit),
                     TypeException.VALID,
                     transactionId
             );

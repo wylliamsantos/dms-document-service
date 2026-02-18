@@ -137,4 +137,32 @@ class PlanLimitServiceTest {
                 .hasMessageContaining("Limite de usuários ativos do plano atingido")
                 .hasMessageContaining("Faça upgrade");
     }
+
+    @Test
+    void shouldAllowUserProvisionWhenBelowLimit() {
+        when(tenantContextService.requireTenantId()).thenReturn("tenant-dev");
+        when(tenantSubscriptionRepository.findByTenantId("tenant-dev")).thenReturn(Optional.of(TenantSubscription.builder()
+                .tenantId("tenant-dev")
+                .plan(BillingPlan.STARTER)
+                .status(BillingStatus.ACTIVE)
+                .build()));
+        when(tenantUserDirectoryClient.countActiveUsers("tenant-dev")).thenReturn(Optional.of(9L));
+
+        assertThatCode(() -> service.assertCanProvisionUser("tx-7")).doesNotThrowAnyException();
+        verifyNoInteractions(dmsDocumentVersionRepository);
+    }
+
+    @Test
+    void shouldBlockUserProvisionWhenSubscriptionIsInactive() {
+        when(tenantContextService.requireTenantId()).thenReturn("tenant-dev");
+        when(tenantSubscriptionRepository.findByTenantId("tenant-dev")).thenReturn(Optional.of(TenantSubscription.builder()
+                .tenantId("tenant-dev")
+                .plan(BillingPlan.STARTER)
+                .status(BillingStatus.CANCELED)
+                .build()));
+
+        assertThatThrownBy(() -> service.assertCanProvisionUser("tx-8"))
+                .isInstanceOf(DmsBusinessException.class)
+                .hasMessageContaining("Assinatura inativa para provisionamento de usuários");
+    }
 }
