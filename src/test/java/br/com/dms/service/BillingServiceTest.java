@@ -91,4 +91,44 @@ class BillingServiceTest {
         verify(tenantSubscriptionRepository, times(1)).save(any());
         verify(billingWebhookEventRepository, times(1)).save(any());
     }
+
+    @Test
+    void shouldSupportUpgradeAndDowngradeLifecycleViaWebhook() {
+        var existing = TenantSubscription.builder()
+                .tenantId("tenant-dev")
+                .plan(BillingPlan.STARTER)
+                .status(BillingStatus.ACTIVE)
+                .externalSubscriptionId("sub_123")
+                .build();
+
+        when(billingWebhookEventRepository.existsByEventId("evt-upgrade")).thenReturn(false);
+        when(billingWebhookEventRepository.existsByEventId("evt-downgrade")).thenReturn(false);
+        when(tenantSubscriptionRepository.findByTenantId("tenant-dev")).thenReturn(Optional.of(existing));
+        when(tenantSubscriptionRepository.save(any(TenantSubscription.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var upgraded = service.applyWebhook(BillingWebhookRequest.builder()
+                .eventId("evt-upgrade")
+                .eventType("subscription.updated")
+                .tenantId("tenant-dev")
+                .plan(BillingPlan.PRO)
+                .status(BillingStatus.ACTIVE)
+                .externalSubscriptionId("sub_123")
+                .build());
+
+        var downgraded = service.applyWebhook(BillingWebhookRequest.builder()
+                .eventId("evt-downgrade")
+                .eventType("subscription.updated")
+                .tenantId("tenant-dev")
+                .plan(BillingPlan.STARTER)
+                .status(BillingStatus.PAST_DUE)
+                .externalSubscriptionId("sub_123")
+                .build());
+
+        assertThat(upgraded.getPlan()).isEqualTo(BillingPlan.PRO);
+        assertThat(upgraded.getStatus()).isEqualTo(BillingStatus.ACTIVE);
+        assertThat(downgraded.getPlan()).isEqualTo(BillingPlan.STARTER);
+        assertThat(downgraded.getStatus()).isEqualTo(BillingStatus.PAST_DUE);
+        verify(tenantSubscriptionRepository, times(2)).save(any());
+        verify(billingWebhookEventRepository, times(2)).save(any());
+    }
 }
