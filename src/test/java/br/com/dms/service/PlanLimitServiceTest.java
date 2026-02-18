@@ -43,8 +43,9 @@ class PlanLimitServiceTest {
                 .build()));
         when(dmsDocumentVersionRepository.countByTenantIdAndCreationDateGreaterThanEqualAndCreationDateLessThan(eq("tenant-dev"), any(), any()))
                 .thenReturn(49L);
+        when(dmsDocumentVersionRepository.sumCompletedFileSizeByTenantId("tenant-dev")).thenReturn(10L);
 
-        assertThatCode(() -> service.assertCanUploadDocument("tx-1")).doesNotThrowAnyException();
+        assertThatCode(() -> service.assertCanUploadDocument("tx-1", 100L)).doesNotThrowAnyException();
     }
 
     @Test
@@ -90,5 +91,26 @@ class PlanLimitServiceTest {
         assertThatThrownBy(() -> service.assertCanUploadDocument("tx-4"))
                 .isInstanceOf(DmsBusinessException.class)
                 .hasMessageContaining("Assinatura inativa");
+    }
+
+    @Test
+    void shouldBlockUploadWhenStorageLimitIsReached() {
+        when(tenantContextService.requireTenantId()).thenReturn("tenant-dev");
+        when(tenantSubscriptionRepository.findByTenantId("tenant-dev")).thenReturn(Optional.of(TenantSubscription.builder()
+                .tenantId("tenant-dev")
+                .plan(BillingPlan.TRIAL)
+                .status(BillingStatus.TRIALING)
+                .build()));
+        when(dmsDocumentVersionRepository.countByTenantIdAndCreationDateGreaterThanEqualAndCreationDateLessThan(eq("tenant-dev"), any(), any()))
+                .thenReturn(1L);
+
+        long gb = 1024L * 1024L * 1024L;
+        when(dmsDocumentVersionRepository.sumCompletedFileSizeByTenantId("tenant-dev"))
+                .thenReturn(5L * gb);
+
+        assertThatThrownBy(() -> service.assertCanUploadDocument("tx-5", 1L))
+                .isInstanceOf(DmsBusinessException.class)
+                .hasMessageContaining("Limite de armazenamento do plano atingido")
+                .hasMessageContaining("Faça upgrade");
     }
 }

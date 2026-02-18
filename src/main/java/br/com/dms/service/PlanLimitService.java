@@ -50,6 +50,10 @@ public class PlanLimitService {
     }
 
     public void assertCanUploadDocument(String transactionId) {
+        assertCanUploadDocument(transactionId, null);
+    }
+
+    public void assertCanUploadDocument(String transactionId, Long incomingFileSizeBytes) {
         if (!planLimitsEnabled || tenantContextService == null || tenantSubscriptionRepository == null || dmsDocumentVersionRepository == null) {
             return;
         }
@@ -72,23 +76,43 @@ public class PlanLimitService {
         }
 
         long monthlyLimit = resolveMonthlyDocumentLimit(subscription.getPlan());
-        if (monthlyLimit <= 0) {
+        if (monthlyLimit > 0) {
+            YearMonth currentMonth = YearMonth.now(clock);
+            LocalDateTime monthStart = currentMonth.atDay(1).atStartOfDay();
+            LocalDateTime nextMonthStart = currentMonth.plusMonths(1).atDay(1).atStartOfDay();
+
+            long uploadsThisMonth = dmsDocumentVersionRepository.countByTenantIdAndCreationDateGreaterThanEqualAndCreationDateLessThan(
+                    tenantId,
+                    monthStart,
+                    nextMonthStart
+            );
+
+            if (uploadsThisMonth >= monthlyLimit) {
+                throw new DmsBusinessException(
+                        String.format("Limite mensal do plano atingido (%d/%d uploads). Faça upgrade para continuar enviando documentos.", uploadsThisMonth, monthlyLimit),
+                        TypeException.VALID,
+                        transactionId
+                );
+            }
+        }
+
+        long storageLimitBytes = resolveStorageLimitBytes(subscription.getPlan());
+        if (storageLimitBytes <= 0) {
             return;
         }
 
-        YearMonth currentMonth = YearMonth.now(clock);
-        LocalDateTime monthStart = currentMonth.atDay(1).atStartOfDay();
-        LocalDateTime nextMonthStart = currentMonth.plusMonths(1).atDay(1).atStartOfDay();
+        Long currentStorageQuery = dmsDocumentVersionRepository.sumCompletedFileSizeByTenantId(tenantId);
+        long currentStorageBytes = currentStorageQuery == null ? 0L : currentStorageQuery;
+        long incomingBytes = incomingFileSizeBytes == null ? 0L : Math.max(incomingFileSizeBytes, 0L);
+        long projectedStorage = currentStorageBytes + incomingBytes;
 
-        long uploadsThisMonth = dmsDocumentVersionRepository.countByTenantIdAndCreationDateGreaterThanEqualAndCreationDateLessThan(
-                tenantId,
-                monthStart,
-                nextMonthStart
-        );
-
-        if (uploadsThisMonth >= monthlyLimit) {
+        if (projectedStorage > storageLimitBytes) {
             throw new DmsBusinessException(
-                    String.format("Limite mensal do plano atingido (%d/%d uploads). Faça upgrade para continuar enviando documentos.", uploadsThisMonth, monthlyLimit),
+                    String.format(
+                            "Limite de armazenamento do plano atingido (%s/%s). Faça upgrade para continuar enviando documentos.",
+                            humanReadableBytes(projectedStorage),
+                            humanReadableBytes(storageLimitBytes)
+                    ),
                     TypeException.VALID,
                     transactionId
             );
@@ -106,5 +130,28 @@ public class PlanLimitService {
             case PRO -> 1000L;
             case ENTERPRISE -> -1L;
         };
+    }
+
+    private long resolveStorageLimitBytes(BillingPlan plan) {
+        long gb = 1024L * 1024L * 1024L;
+        if (plan == null) {
+            return 5L * gb;
+        }
+
+        return switch (plan) {
+            case TRIAL -> 5L * gb;
+            case STARTER -> 20L * gb;
+            case PRO -> 100L * gb;
+            case ENTERPRISE -> -1L;
+        };
+    }
+
+    private String humanReadableBytes(long bytes) {
+        long gb = 1024L * 1024L * 1024L;
+        long mb = 1024L * 1024L;
+        if (bytes >= gb) {
+            return String.format("%.2f GB", (double) bytes / gb);
+        }
+        return String.format("%.2f MB", (double) bytes / mb);
     }
 }

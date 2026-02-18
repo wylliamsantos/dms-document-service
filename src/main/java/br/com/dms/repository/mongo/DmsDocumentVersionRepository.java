@@ -31,6 +31,13 @@ public interface DmsDocumentVersionRepository extends MongoRepository<DmsDocumen
             LocalDateTime end
     );
 
+    @Aggregation(pipeline = {
+            "{ '$match': { 'tenantId': ?0, 'uploadStatus': 'COMPLETED' } }",
+            "{ '$group': { '_id': null, 'total': { '$sum': { '$ifNull': ['$fileSize', 0] } } } }",
+            "{ '$project': { '_id': 0, 'total': 1 } }"
+    })
+    Long sumCompletedFileSizeByTenantId(String tenantId);
+
     // legacy methods kept temporarily during tenant migration
     Optional<DmsDocumentVersion> findByDmsDocumentIdAndVersionNumber(String dmsDocumentId, String versionNumber);
 

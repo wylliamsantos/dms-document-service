@@ -199,7 +199,7 @@ public class DmsService {
                                      String filenameDms, String comment) throws IOException {
 
         String tenantId = tenantId();
-        planLimitService.assertCanUploadDocument(transactionId);
+        planLimitService.assertCanUploadDocument(transactionId, documentResource.contentLength());
         validationService.validateCategory(transactionId, documentCategoryName);
         validationService.validateFilename(transactionId, filenameDms);
         Map<String, Object> jsonMetadata = metadataService.getValideMetadata(transactionId, metadata, documentCategoryName, issuingDate);
@@ -312,7 +312,7 @@ public class DmsService {
 
     public UrlPresignedResponse generatePresignedUrl(String transactionId, PayloadUrlPresigned payloadUrlPresigned) throws IOException {
         String tenantId = tenantId();
-        planLimitService.assertCanUploadDocument(transactionId);
+        planLimitService.assertCanUploadDocument(transactionId, payloadUrlPresigned.getFileSize());
         validationService.validateAuthor(transactionId, payloadUrlPresigned.getAuthor());
         validationService.validateCategory(transactionId, payloadUrlPresigned.getCategory());
         validationService.validateFilename(transactionId, payloadUrlPresigned.getFileName());
