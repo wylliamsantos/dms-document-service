@@ -6,6 +6,7 @@ import br.com.dms.domain.mongodb.TenantSubscription;
 import br.com.dms.exception.DmsBusinessException;
 import br.com.dms.repository.mongo.DmsDocumentVersionRepository;
 import br.com.dms.repository.mongo.TenantSubscriptionRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
@@ -20,15 +21,22 @@ import static org.mockito.Mockito.*;
 
 class PlanLimitServiceTest {
 
+    @BeforeEach
+    void setup() {
+        when(tenantUserDirectoryClient.countActiveUsers(any())).thenReturn(Optional.empty());
+    }
+
     private final TenantContextService tenantContextService = mock(TenantContextService.class);
     private final TenantSubscriptionRepository tenantSubscriptionRepository = mock(TenantSubscriptionRepository.class);
     private final DmsDocumentVersionRepository dmsDocumentVersionRepository = mock(DmsDocumentVersionRepository.class);
+    private final TenantUserDirectoryClient tenantUserDirectoryClient = mock(TenantUserDirectoryClient.class);
     private final Clock fixedClock = Clock.fixed(Instant.parse("2026-02-18T18:00:00Z"), ZoneOffset.UTC);
 
     private final PlanLimitService service = new PlanLimitService(
             tenantContextService,
             tenantSubscriptionRepository,
             dmsDocumentVersionRepository,
+            tenantUserDirectoryClient,
             fixedClock,
             true
     );
@@ -111,6 +119,22 @@ class PlanLimitServiceTest {
         assertThatThrownBy(() -> service.assertCanUploadDocument("tx-5", 1L))
                 .isInstanceOf(DmsBusinessException.class)
                 .hasMessageContaining("Limite de armazenamento do plano atingido")
+                .hasMessageContaining("Faça upgrade");
+    }
+
+    @Test
+    void shouldBlockUploadWhenUserLimitIsReached() {
+        when(tenantContextService.requireTenantId()).thenReturn("tenant-dev");
+        when(tenantSubscriptionRepository.findByTenantId("tenant-dev")).thenReturn(Optional.of(TenantSubscription.builder()
+                .tenantId("tenant-dev")
+                .plan(BillingPlan.STARTER)
+                .status(BillingStatus.ACTIVE)
+                .build()));
+        when(tenantUserDirectoryClient.countActiveUsers("tenant-dev")).thenReturn(Optional.of(10L));
+
+        assertThatThrownBy(() -> service.assertCanUploadDocument("tx-6", 100L))
+                .isInstanceOf(DmsBusinessException.class)
+                .hasMessageContaining("Limite de usuários ativos do plano atingido")
                 .hasMessageContaining("Faça upgrade");
     }
 }

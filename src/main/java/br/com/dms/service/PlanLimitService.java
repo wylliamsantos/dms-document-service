@@ -20,6 +20,7 @@ public class PlanLimitService {
     private TenantContextService tenantContextService;
     private TenantSubscriptionRepository tenantSubscriptionRepository;
     private DmsDocumentVersionRepository dmsDocumentVersionRepository;
+    private TenantUserDirectoryClient tenantUserDirectoryClient;
     private Clock clock;
     private boolean planLimitsEnabled;
 
@@ -33,18 +34,21 @@ public class PlanLimitService {
     public PlanLimitService(TenantContextService tenantContextService,
                             TenantSubscriptionRepository tenantSubscriptionRepository,
                             DmsDocumentVersionRepository dmsDocumentVersionRepository,
+                            TenantUserDirectoryClient tenantUserDirectoryClient,
                             @Value("${dms.billing.plan-limits-enabled:true}") boolean planLimitsEnabled) {
-        this(tenantContextService, tenantSubscriptionRepository, dmsDocumentVersionRepository, Clock.systemUTC(), planLimitsEnabled);
+        this(tenantContextService, tenantSubscriptionRepository, dmsDocumentVersionRepository, tenantUserDirectoryClient, Clock.systemUTC(), planLimitsEnabled);
     }
 
     PlanLimitService(TenantContextService tenantContextService,
                      TenantSubscriptionRepository tenantSubscriptionRepository,
                      DmsDocumentVersionRepository dmsDocumentVersionRepository,
+                     TenantUserDirectoryClient tenantUserDirectoryClient,
                      Clock clock,
                      boolean planLimitsEnabled) {
         this.tenantContextService = tenantContextService;
         this.tenantSubscriptionRepository = tenantSubscriptionRepository;
         this.dmsDocumentVersionRepository = dmsDocumentVersionRepository;
+        this.tenantUserDirectoryClient = tenantUserDirectoryClient;
         this.clock = clock;
         this.planLimitsEnabled = planLimitsEnabled;
     }
@@ -73,6 +77,18 @@ public class PlanLimitService {
                     TypeException.VALID,
                     transactionId
             );
+        }
+
+        long userLimit = resolveUserLimit(subscription.getPlan());
+        if (userLimit > 0 && tenantUserDirectoryClient != null) {
+            var activeUsers = tenantUserDirectoryClient.countActiveUsers(tenantId);
+            if (activeUsers.isPresent() && activeUsers.get() >= userLimit) {
+                throw new DmsBusinessException(
+                        String.format("Limite de usuários ativos do plano atingido (%d/%d). Faça upgrade para adicionar novos usuários.", activeUsers.get(), userLimit),
+                        TypeException.VALID,
+                        transactionId
+                );
+            }
         }
 
         long monthlyLimit = resolveMonthlyDocumentLimit(subscription.getPlan());
@@ -128,6 +144,19 @@ public class PlanLimitService {
             case TRIAL -> 50L;
             case STARTER -> 200L;
             case PRO -> 1000L;
+            case ENTERPRISE -> -1L;
+        };
+    }
+
+    private long resolveUserLimit(BillingPlan plan) {
+        if (plan == null) {
+            return 3L;
+        }
+
+        return switch (plan) {
+            case TRIAL -> 3L;
+            case STARTER -> 10L;
+            case PRO -> 50L;
             case ENTERPRISE -> -1L;
         };
     }
