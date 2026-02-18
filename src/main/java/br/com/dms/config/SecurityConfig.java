@@ -15,6 +15,7 @@ import org.springframework.security.web.SecurityFilterChain;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Stream;
@@ -57,6 +58,7 @@ public class SecurityConfig {
 
         Stream.concat(extractRolesFromRealm(jwt), extractRolesFromClients(jwt))
             .map(role -> role.startsWith("ROLE_") ? role : "ROLE_" + role)
+            .map(role -> role.toUpperCase(Locale.ROOT))
             .map(SimpleGrantedAuthority::new)
             .forEach(authorities::add);
 
