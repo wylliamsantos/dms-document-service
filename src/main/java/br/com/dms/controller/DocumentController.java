@@ -25,6 +25,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import static br.com.dms.config.AuthorizationRules.MANAGE;
+import static br.com.dms.config.AuthorizationRules.READ;
+
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
@@ -33,7 +36,7 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/v1/documents")
 @Slf4j
-@PreAuthorize("hasAuthority('ROLE_DOCUMENT_VIEWER')")
+@PreAuthorize(READ)
 public class DocumentController {
 
     private static final String API_VERSION = "v1";
@@ -58,7 +61,7 @@ public class DocumentController {
             @ApiResponse(responseCode = "417", description = "Business Error", content = {@Content(schema = @Schema(implementation = DefaultError.class))}),
             @ApiResponse(responseCode = "500", description = "Server Error", content = {@Content(schema = @Schema(implementation = DefaultError.class))})
     })
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize(MANAGE)
     public ResponseEntity<?> delete(@RequestHeader(name = "TransactionId") String transactionId,
                                     @RequestHeader(name = "Authorization") String authorization,
                                     @PathVariable(value = "documentId") String documentId) {
@@ -163,7 +166,7 @@ public class DocumentController {
             @ApiResponse(responseCode = "413", description = "Payload too large"),
             @ApiResponse(responseCode = "500", description = "Server Error", content = {@Content(schema = @Schema(implementation = DefaultError.class))})
     })
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize(MANAGE)
     public ResponseEntity<?> createOrUpdate(@RequestHeader(name = "TransactionId") String transactionId,
                                             @RequestHeader(name = "Authorization") String authorization,
                                             @RequestParam(name = "comment", required = false) String comment,
@@ -190,7 +193,7 @@ public class DocumentController {
             @ApiResponse(responseCode = "413", description = "Payload too large"),
             @ApiResponse(responseCode = "500", description = "Server Error", content = {@Content(schema = @Schema(implementation = DefaultError.class))})
     })
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize(MANAGE)
     public ResponseEntity<DocumentId> createOrUpdate(@RequestHeader(name = "transactionId") String transactionId,
                                                      @RequestHeader(name = "Authorization") String authorization,
                                                      @RequestBody @Valid PayloadDocument payloadDocument) throws IOException {
@@ -217,7 +220,7 @@ public class DocumentController {
             @ApiResponse(responseCode = "413", description = "Payload too large"),
             @ApiResponse(responseCode = "500", description = "Server Error", content = {@Content(schema = @Schema(implementation = DefaultError.class))})
     })
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize(MANAGE)
     public ResponseEntity<?> approve(@RequestHeader(name = "transactionId") String transactionId,
                                      @RequestHeader(name = "Authorization") String authorization,
                                      @PathVariable(value = "id") String documentId,
@@ -238,7 +241,7 @@ public class DocumentController {
             @ApiResponse(responseCode = "413", description = "Payload too large"),
             @ApiResponse(responseCode = "500", description = "Server Error", content = {@Content(schema = @Schema(implementation = DefaultError.class))})
     })
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize(MANAGE)
     public ResponseEntity<?> reprove(@RequestHeader(name = "transactionId") String transactionId,
                                      @RequestHeader(name = "Authorization") String authorization,
                                      @PathVariable(value = "id") String documentId,
@@ -257,7 +260,7 @@ public class DocumentController {
             @ApiResponse(responseCode = "417", description = "Business Error", content = {@Content(schema = @Schema(implementation = DefaultError.class))}),
             @ApiResponse(responseCode = "500", description = "Server Error", content = {@Content(schema = @Schema(implementation = DefaultError.class))})
     })
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize(MANAGE)
     public ResponseEntity<?> updateMetadata(@RequestHeader(name = "TransactionId") String transactionId,
                                             @RequestHeader(name = "Authorization") String authorization,
                                             @PathVariable(value = "documentId") String documentId,
@@ -276,7 +279,7 @@ public class DocumentController {
             @ApiResponse(responseCode = "417", description = "Business Error", content = {@Content(schema = @Schema(implementation = DefaultError.class))}),
             @ApiResponse(responseCode = "500", description = "Server Error", content = {@Content(schema = @Schema(implementation = DefaultError.class))})
     })
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize(MANAGE)
     public ResponseEntity<UrlPresignedResponse> generatePresignedUrl(@RequestHeader(name = "TransactionId") String transactionId,
                                                                      @RequestHeader(name = "Authorization") String authorization,
                                                                      @RequestBody @Valid PayloadUrlPresigned payloadUrlPresigned) throws IOException {
@@ -294,7 +297,7 @@ public class DocumentController {
             @ApiResponse(responseCode = "417", description = "Business Error", content = {@Content(schema = @Schema(implementation = DefaultError.class))}),
             @ApiResponse(responseCode = "500", description = "Server Error", content = {@Content(schema = @Schema(implementation = DefaultError.class))})
     })
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize(MANAGE)
     public ResponseEntity<DocumentId> finalizeUpload(@RequestHeader(name = "TransactionId") String transactionId,
                                                      @RequestHeader(name = "Authorization") String authorization,
                                                      @PathVariable("documentId") String documentId,

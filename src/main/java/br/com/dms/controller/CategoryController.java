@@ -11,12 +11,15 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import static br.com.dms.config.AuthorizationRules.MANAGE;
+import static br.com.dms.config.AuthorizationRules.READ;
+
 import java.util.List;
 
 @RestController
 @RequestMapping("/v1/categories")
 @Slf4j
-@PreAuthorize("hasAuthority('ROLE_DOCUMENT_VIEWER')")
+@PreAuthorize(READ)
 public class CategoryController {
 
     private final CategoryService service;
@@ -28,7 +31,7 @@ public class CategoryController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize(MANAGE)
     public ResponseEntity<CategoryResponse> create(@RequestHeader(name = "TransactionId") String transactionId,
                                                    @RequestHeader(name = "Authorization") String authorization,
                                                    @RequestBody @Valid CategoryRequest categoryRequest) {
@@ -37,7 +40,7 @@ public class CategoryController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize(MANAGE)
     public ResponseEntity<CategoryResponse> update(@RequestHeader(name = "TransactionId") String transactionId,
                                                    @RequestHeader(name = "Authorization") String authorization,
                                                    @PathVariable("id") String id, @RequestBody @Valid CategoryRequest categoryRequest) {

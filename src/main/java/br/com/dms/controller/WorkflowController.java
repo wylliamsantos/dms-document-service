@@ -20,12 +20,15 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import static br.com.dms.config.AuthorizationRules.READ;
+import static br.com.dms.config.AuthorizationRules.REVIEW;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
 @RequestMapping("/v1/workflow")
-@PreAuthorize("hasAuthority('ROLE_DOCUMENT_VIEWER')")
+@PreAuthorize(READ)
 public class WorkflowController {
 
     private final WorkflowQueryService workflowQueryService;
@@ -60,7 +63,7 @@ public class WorkflowController {
     }
 
     @PostMapping(path = "/documents/{documentId}/review", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize(REVIEW)
     public ResponseEntity<WorkflowReviewResponse> reviewDocument(
         @RequestHeader(name = "TransactionId") String transactionId,
         @RequestHeader(name = "Authorization") String authorization,
