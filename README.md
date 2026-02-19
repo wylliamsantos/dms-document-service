@@ -137,6 +137,11 @@ Contrato completo e exemplos em `docs/billing-user-provisioning-contract.md`.
 - Ehcache 2.x para cache de categorias/tipos/localizações.
 - Painel mínimo (alpha) e thresholds recomendados: `docs/observability-panel-minimo.md`.
 
+### Segurança operacional
+
+- Checklist de validação alpha: `docs/security-operational-checklist.md`.
+- Contrato de enforcement de assentos no provisionamento: `docs/billing-user-provisioning-contract.md`.
+
 ## dms-search-service
 
 Serviço de consulta que expõe as pesquisas para o DMS, agora inteiramente alimentado por MongoDB.

@@ -79,3 +79,14 @@ dms:
     allowed-methods: ${DMS_CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,OPTIONS}
     allowed-headers: ${DMS_CORS_ALLOWED_HEADERS:*}
     allow-credentials: ${DMS_CORS_ALLOW_CREDENTIALS:true}
+  security:
+    environment: ${DMS_SECURITY_ENVIRONMENT:dev}
+    redirect-root-to-swagger-enabled: ${DMS_SECURITY_REDIRECT_ROOT_TO_SWAGGER_ENABLED:true}
+    cors:
+      fail-on-insecure-production-config: ${DMS_SECURITY_CORS_FAIL_ON_INSECURE_PRODUCTION_CONFIG:true}
+    rate-limit:
+      enabled: ${DMS_SECURITY_RATE_LIMIT_ENABLED:true}
+      backend: ${DMS_SECURITY_RATE_LIMIT_BACKEND:in-memory}
+      redis-key-prefix: ${DMS_SECURITY_RATE_LIMIT_REDIS_KEY_PREFIX:dms:rate-limit}
+      requests-per-minute: ${DMS_SECURITY_RATE_LIMIT_REQUESTS_PER_MINUTE:120}
+      critical-path-limits: ${DMS_SECURITY_RATE_LIMIT_CRITICAL_PATH_LIMITS:/v1/documents/multipart=30,/v1/documents/base64=30,/v1/documents/presigned-url=60,/v1/billing/webhook=60}
