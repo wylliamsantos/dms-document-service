@@ -80,3 +80,4 @@ dms:
     rate-limit:
       enabled: ${DMS_SECURITY_RATE_LIMIT_ENABLED:true}
       requests-per-minute: ${DMS_SECURITY_RATE_LIMIT_REQUESTS_PER_MINUTE:120}
+      critical-path-limits: ${DMS_SECURITY_RATE_LIMIT_CRITICAL_PATH_LIMITS:/v1/documents/multipart=30,/v1/documents/base64=30,/v1/documents/presigned-url=60,/v1/billing/webhook=60}
