@@ -135,6 +135,7 @@ Contrato completo e exemplos em `docs/billing-user-provisioning-contract.md`.
 
 - Actuator: `/actuator/health`, `/actuator/prometheus` habilitados.
 - Ehcache 2.x para cache de categorias/tipos/localizações.
+- Painel mínimo (alpha) e thresholds recomendados: `docs/observability-panel-minimo.md`.
 
 ## dms-search-service
 
