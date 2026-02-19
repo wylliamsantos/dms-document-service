@@ -162,6 +162,7 @@ Runbook inicial + scripts operacionais:
 - Handoff de go-to-market (RACI + evidências mínimas): `docs/commercial-gtm-handoff-alpha.md`
 - FAQ comercial de vendas/pré-vendas: `docs/commercial-sales-faq-alpha.md`
 - Métricas de lançamento comercial (D0-D+14): `docs/commercial-launch-metrics-alpha.md`
+- Registro de riscos comerciais (alpha): `docs/commercial-risk-register-alpha.md`
 
 ## dms-search-service
 
