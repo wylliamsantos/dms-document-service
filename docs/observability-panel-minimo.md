@@ -14,7 +14,7 @@ Acompanhar 3 sinais essenciais em tempo real:
 
 - `dms-document-service` com actuator ativo (`/actuator/prometheus`)
 - Prometheus coletando o target `document-service`
-- Labels padrão esperadas: `job`, `uri`, `method`, `status`
+- Labels padrão esperadas: `job`, `method`, `status`, `tenant`, `exception` (quando aplicável)
 
 ## Painel mínimo (3 widgets)
 
@@ -23,7 +23,7 @@ Acompanhar 3 sinais essenciais em tempo real:
 **Tipo:** Stat
 
 ```promql
-max(up{job="document-service"})
+max(up{job="dms-document-service"})
 ```
 
 **Leitura esperada:**
@@ -38,7 +38,7 @@ max(up{job="document-service"})
 histogram_quantile(
   0.95,
   sum by (le) (
-    rate(http_server_requests_seconds_bucket{job="document-service", uri!="UNKNOWN"}[5m])
+    rate(dms_http_server_latency_seconds_bucket{job="dms-document-service"}[5m])
   )
 )
 ```
@@ -52,9 +52,9 @@ histogram_quantile(
 **Tipo:** Time series
 
 ```promql
-sum(rate(http_server_requests_seconds_count{job="document-service", status=~"5.."}[5m]))
+sum(rate(http_server_requests_seconds_count{job="dms-document-service", status=~"5.."}[5m]))
 /
-clamp_min(sum(rate(http_server_requests_seconds_count{job="document-service"}[5m])), 0.001)
+clamp_min(sum(rate(http_server_requests_seconds_count{job="dms-document-service"}[5m])), 0.001)
 ```
 
 **Threshold operacional alpha:**
@@ -64,8 +64,8 @@ clamp_min(sum(rate(http_server_requests_seconds_count{job="document-service"}[5m
 ## Alertas recomendados (alinhamento com stack)
 
 - `DmsDocumentServiceDown`: `up == 0`
-- `DmsDocumentServiceHighP95Latency`: p95 acima do threshold por janela contínua
-- `DmsDocumentServiceHigh5xxRate`: taxa 5xx acima do threshold por janela contínua
+- `DmsDocumentServiceHighP95LatencyWarning` / `DmsDocumentServiceHighP95LatencyCritical`
+- `DmsDocumentServiceHigh5xxRateWarning` / `DmsDocumentServiceHigh5xxRateCritical`
 
 > Os nomes acima devem permanecer consistentes com os arquivos de regra em `dms-stack/monitoring/alerts`.
 
