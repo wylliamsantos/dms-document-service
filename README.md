@@ -152,6 +152,33 @@ Runbook inicial + scripts operacionais:
 - Checklist de validação alpha: `docs/security-operational-checklist.md`.
 - Contrato de enforcement de assentos no provisionamento: `docs/billing-user-provisioning-contract.md`.
 
+### Prontidão comercial mínima (alpha)
+
+- Pricing: `docs/commercial-pricing-alpha.md`
+- Termos comerciais mínimos: `docs/commercial-terms-alpha.md`
+- Política de privacidade (resumo operacional): `docs/commercial-privacy-policy-alpha.md`
+- Playbook de suporte: `docs/commercial-support-playbook-alpha.md`
+- Checklist de go-live comercial: `docs/commercial-go-live-checklist-alpha.md`
+- Templates de comunicação de suporte: `docs/commercial-support-templates-alpha.md`
+- Handoff de go-to-market (RACI + evidências mínimas): `docs/commercial-gtm-handoff-alpha.md`
+- FAQ comercial de vendas/pré-vendas: `docs/commercial-sales-faq-alpha.md`
+- Métricas de lançamento comercial (D0-D+14): `docs/commercial-launch-metrics-alpha.md`
+- Registro de riscos comerciais (alpha): `docs/commercial-risk-register-alpha.md`
+- Log de decisão de go-live comercial (GO/ATTENTION/NO-GO): `docs/commercial-go-live-decision-log-alpha.md`
+- Matriz de aprovação por área (sign-off antes do GO): `docs/commercial-approval-matrix-alpha.md`
+- Plano de comunicação de lançamento (D0 a D+14): `docs/commercial-launch-communications-alpha.md`
+- Scorecard de prontidão comercial por rodada: `docs/commercial-go-live-scorecard-alpha.md`
+- Playbook de onboarding comercial do cliente (D0-D+7): `docs/commercial-customer-onboarding-playbook-alpha.md`
+- Playbook de retenção/churn (D0-D+30): `docs/commercial-churn-retention-playbook-alpha.md`
+- Runbook de Revenue Operations (cobrança, inadimplência e conciliação): `docs/commercial-revops-runbook-alpha.md`
+- Guia de enablement de parceiros (guardrails + operação): `docs/commercial-partner-enablement-alpha.md`
+- Checklist de contratação comercial (pré-fechamento + handoff): `docs/commercial-contracting-checklist-alpha.md`
+- Política de aprovação de descontos (guardrails + alçadas): `docs/commercial-discount-approval-policy-alpha.md`
+- Playbook de tratamento de objeções comerciais: `docs/commercial-objection-handling-playbook-alpha.md`
+- Playbook de conversão trial → pago (D-7 a D+7): `docs/commercial-trial-conversion-playbook-alpha.md`
+- Playbook de renovação e expansão comercial (D-30 a D+7): `docs/commercial-renewal-expansion-playbook-alpha.md`
+- Programa de referências de clientes (D0 a D+21): `docs/commercial-customer-reference-program-alpha.md`
+
 ## dms-search-service
 
 Serviço de consulta que expõe as pesquisas para o DMS, agora inteiramente alimentado por MongoDB.
