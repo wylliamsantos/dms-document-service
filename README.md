@@ -168,6 +168,7 @@ Runbook inicial + scripts operacionais:
 - Plano de comunicação de lançamento (D0 a D+14): `docs/commercial-launch-communications-alpha.md`
 - Scorecard de prontidão comercial por rodada: `docs/commercial-go-live-scorecard-alpha.md`
 - Playbook de onboarding comercial do cliente (D0-D+7): `docs/commercial-customer-onboarding-playbook-alpha.md`
+- Playbook de retenção/churn (D0-D+30): `docs/commercial-churn-retention-playbook-alpha.md`
 
 ## dms-search-service
 
