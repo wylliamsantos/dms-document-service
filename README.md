@@ -151,6 +151,13 @@ Runbook inicial + scripts operacionais:
 - Checklist de validação alpha: `docs/security-operational-checklist.md`.
 - Contrato de enforcement de assentos no provisionamento: `docs/billing-user-provisioning-contract.md`.
 
+### Prontidão comercial mínima (alpha)
+
+- Pricing: `docs/commercial-pricing-alpha.md`
+- Termos comerciais mínimos: `docs/commercial-terms-alpha.md`
+- Política de privacidade (resumo operacional): `docs/commercial-privacy-policy-alpha.md`
+- Playbook de suporte: `docs/commercial-support-playbook-alpha.md`
+
 ## dms-search-service
 
 Serviço de consulta que expõe as pesquisas para o DMS, agora inteiramente alimentado por MongoDB.
