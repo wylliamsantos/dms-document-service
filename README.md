@@ -172,6 +172,7 @@ Runbook inicial + scripts operacionais:
 - Runbook de Revenue Operations (cobrança, inadimplência e conciliação): `docs/commercial-revops-runbook-alpha.md`
 - Guia de enablement de parceiros (guardrails + operação): `docs/commercial-partner-enablement-alpha.md`
 - Checklist de contratação comercial (pré-fechamento + handoff): `docs/commercial-contracting-checklist-alpha.md`
+- Política de aprovação de descontos (guardrails + alçadas): `docs/commercial-discount-approval-policy-alpha.md`
 
 ## dms-search-service
 
