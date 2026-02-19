@@ -166,6 +166,7 @@ Runbook inicial + scripts operacionais:
 - Log de decisão de go-live comercial (GO/ATTENTION/NO-GO): `docs/commercial-go-live-decision-log-alpha.md`
 - Matriz de aprovação por área (sign-off antes do GO): `docs/commercial-approval-matrix-alpha.md`
 - Plano de comunicação de lançamento (D0 a D+14): `docs/commercial-launch-communications-alpha.md`
+- Scorecard de prontidão comercial por rodada: `docs/commercial-go-live-scorecard-alpha.md`
 
 ## dms-search-service
 
