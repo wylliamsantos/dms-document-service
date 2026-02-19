@@ -65,6 +65,30 @@ Saída esperada:
 - **RPO alvo:** até 24h (backup diário).
 - **RTO alvo:** até 60 min (restore + smoke).
 
+## 6) Drill E2E automatizado (recomendado)
+Para executar o ciclo completo em uma tacada (backup -> verify-restore -> restore -> smoke -> medição SLO):
+
+```bash
+cd dms-document-service
+MONGO_URI="mongodb://localhost:27017/dms" \
+HEALTHCHECK_URL="http://localhost:18080/actuator/health" \
+./scripts/run-backup-restore-drill.sh
+```
+
+### Modo container (fallback)
+Quando `mongodump/mongorestore` não estiverem no host:
+
+```bash
+cd dms-document-service
+MONGO_URI="mongodb://dms:dms@localhost:27017/dms?authSource=dms" \
+USE_DOCKER_EXEC=true \
+MONGO_CONTAINER_NAME=dms-mongo \
+HEALTHCHECK_URL="http://localhost:18080/actuator/health" \
+./scripts/run-backup-restore-drill.sh
+```
+
+O script gera log versionado em `.dms-logs/backup-restore-drill-<UTC>.log`.
+
 ## Fallback operacional (sem `mongodump`/`mongorestore` no host)
 Quando os binários não estiverem instalados no host, execute backup/restore usando o container `dms-mongo` com `docker exec -i`:
 
