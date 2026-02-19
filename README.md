@@ -139,6 +139,7 @@ Runbook inicial + scripts operacionais:
 - `scripts/restore-mongo.sh`
 - `scripts/verify-restore-mongo.sh` (dry-run de restaurabilidade + medição de tempo)
 - `scripts/measure-backup-restore-slo.sh` (checagem de conformidade RPO/RTO)
+- `scripts/run-backup-restore-drill.sh` (drill E2E: backup + verify + restore + smoke + SLO)
 
 ### Observabilidade
 
