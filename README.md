@@ -170,6 +170,7 @@ Runbook inicial + scripts operacionais:
 - Playbook de onboarding comercial do cliente (D0-D+7): `docs/commercial-customer-onboarding-playbook-alpha.md`
 - Playbook de retenção/churn (D0-D+30): `docs/commercial-churn-retention-playbook-alpha.md`
 - Runbook de Revenue Operations (cobrança, inadimplência e conciliação): `docs/commercial-revops-runbook-alpha.md`
+- Guia de enablement de parceiros (guardrails + operação): `docs/commercial-partner-enablement-alpha.md`
 
 ## dms-search-service
 
