@@ -165,6 +165,7 @@ Runbook inicial + scripts operacionais:
 - Registro de riscos comerciais (alpha): `docs/commercial-risk-register-alpha.md`
 - Log de decisão de go-live comercial (GO/ATTENTION/NO-GO): `docs/commercial-go-live-decision-log-alpha.md`
 - Matriz de aprovação por área (sign-off antes do GO): `docs/commercial-approval-matrix-alpha.md`
+- Plano de comunicação de lançamento (D0 a D+14): `docs/commercial-launch-communications-alpha.md`
 
 ## dms-search-service
 
