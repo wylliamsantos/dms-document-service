@@ -175,6 +175,7 @@ Runbook inicial + scripts operacionais:
 - Política de aprovação de descontos (guardrails + alçadas): `docs/commercial-discount-approval-policy-alpha.md`
 - Playbook de tratamento de objeções comerciais: `docs/commercial-objection-handling-playbook-alpha.md`
 - Playbook de conversão trial → pago (D-7 a D+7): `docs/commercial-trial-conversion-playbook-alpha.md`
+- Playbook de renovação e expansão comercial (D-30 a D+7): `docs/commercial-renewal-expansion-playbook-alpha.md`
 
 ## dms-search-service
 
