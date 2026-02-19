@@ -17,10 +17,17 @@ spring:
         jwt:
           issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/dms}
 management:
-  endpoints.web.exposure.include: 'health,prometheus'
+  endpoints.web.exposure.include: 'health,prometheus,metrics'
   endpoint:
-    metrics.enabled: false
+    metrics.enabled: true
     prometheus.enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        dms.http.server.latency: true
   health:
     consul.enabled: false
     vault.enabled: false
