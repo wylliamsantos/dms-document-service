@@ -1,6 +1,8 @@
 package br.com.dms.config;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
@@ -8,8 +10,10 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.*;
 
 class RateLimitFilterTest {
 
@@ -84,5 +88,24 @@ class RateLimitFilterTest {
         MockHttpServletResponse blocked = new MockHttpServletResponse();
         filter.doFilter(nonCriticalRequest, blocked, (req, res) -> ((MockHttpServletResponse) res).setStatus(200));
         assertThat(blocked.getStatus()).isEqualTo(429);
+    }
+
+    @Test
+    void shouldUseRedisStoreWithTtlOnFirstIncrement() {
+        StringRedisTemplate template = mock(StringRedisTemplate.class);
+        @SuppressWarnings("unchecked")
+        ValueOperations<String, String> valueOperations = mock(ValueOperations.class);
+
+        when(template.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.increment("dms:rate-limit:tenant:t1::/v1/documents/multipart")).thenReturn(1L, 2L);
+
+        RateLimitFilter.RedisCounterStore store = new RateLimitFilter.RedisCounterStore(template, "dms:rate-limit");
+
+        long first = store.increment("tenant:t1::/v1/documents/multipart", 60);
+        long second = store.increment("tenant:t1::/v1/documents/multipart", 60);
+
+        assertThat(first).isEqualTo(1L);
+        assertThat(second).isEqualTo(2L);
+        verify(template, times(1)).expire("dms:rate-limit:tenant:t1::/v1/documents/multipart", 60, TimeUnit.SECONDS);
     }
 }

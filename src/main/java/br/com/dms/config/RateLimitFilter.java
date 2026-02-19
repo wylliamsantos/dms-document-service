@@ -5,8 +5,10 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -19,6 +21,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -33,27 +36,43 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private final boolean enabled;
     private final int requestsPerMinute;
     private final Map<String, Integer> criticalPathLimits;
-    private final Clock clock;
-    private final Map<String, WindowCounter> counters = new ConcurrentHashMap<>();
+    private final CounterStore counterStore;
 
     @Autowired
     public RateLimitFilter(
             @Value("${dms.security.rate-limit.enabled:true}") boolean enabled,
             @Value("${dms.security.rate-limit.requests-per-minute:120}") int requestsPerMinute,
-            @Value("${dms.security.rate-limit.critical-path-limits:" + CRITICAL_PATH_LIMITS_DEFAULT + "}") String criticalPathLimits
+            @Value("${dms.security.rate-limit.critical-path-limits:" + CRITICAL_PATH_LIMITS_DEFAULT + "}") String criticalPathLimits,
+            @Value("${dms.security.rate-limit.backend:in-memory}") String backend,
+            @Value("${dms.security.rate-limit.redis-key-prefix:dms:rate-limit}") String redisKeyPrefix,
+            ObjectProvider<StringRedisTemplate> redisTemplateProvider
     ) {
-        this(enabled, requestsPerMinute, parseCriticalPathLimits(criticalPathLimits), Clock.systemUTC());
+        this(
+            enabled,
+            requestsPerMinute,
+            parseCriticalPathLimits(criticalPathLimits),
+            buildCounterStore(backend, redisKeyPrefix, redisTemplateProvider),
+            Clock.systemUTC()
+        );
     }
 
     RateLimitFilter(boolean enabled, int requestsPerMinute, Clock clock) {
-        this(enabled, requestsPerMinute, Collections.emptyMap(), clock);
+        this(enabled, requestsPerMinute, Collections.emptyMap(), new InMemoryCounterStore(clock), clock);
     }
 
     RateLimitFilter(boolean enabled, int requestsPerMinute, Map<String, Integer> criticalPathLimits, Clock clock) {
+        this(enabled, requestsPerMinute, criticalPathLimits, new InMemoryCounterStore(clock), clock);
+    }
+
+    RateLimitFilter(boolean enabled,
+                    int requestsPerMinute,
+                    Map<String, Integer> criticalPathLimits,
+                    CounterStore counterStore,
+                    Clock clock) {
         this.enabled = enabled;
         this.requestsPerMinute = Math.max(1, requestsPerMinute);
         this.criticalPathLimits = criticalPathLimits == null ? Collections.emptyMap() : new ConcurrentHashMap<>(criticalPathLimits);
-        this.clock = clock;
+        this.counterStore = counterStore == null ? new InMemoryCounterStore(clock) : counterStore;
     }
 
     @Override
@@ -68,23 +87,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
         String path = normalizePath(request.getRequestURI());
         int limit = resolveLimitForPath(path);
-        String key = resolveKey(request) + "::" + path;
-        long currentWindow = clock.millis() / 60_000;
+        String bucketKey = resolveKey(request) + "::" + path;
 
-        WindowCounter counter = counters.computeIfAbsent(key, ignored -> new WindowCounter(currentWindow));
-        synchronized (counter) {
-            if (counter.window() != currentWindow) {
-                counter.window = currentWindow;
-                counter.count.set(0);
-            }
-
-            int currentCount = counter.count.incrementAndGet();
-            if (currentCount > limit) {
-                response.setStatus(429);
-                response.setContentType("application/json");
-                response.getWriter().write("{\"error\":\"rate_limit_exceeded\",\"message\":\"Too many requests. Please retry in about one minute.\"}");
-                return;
-            }
+        long currentCount = counterStore.increment(bucketKey, 60);
+        if (currentCount > limit) {
+            response.setStatus(429);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"error\":\"rate_limit_exceeded\",\"message\":\"Too many requests. Please retry in about one minute.\"}");
+            return;
         }
 
         filterChain.doFilter(request, response);
@@ -131,6 +141,66 @@ public class RateLimitFilter extends OncePerRequestFilter {
             .map(parts -> Map.entry(StringUtils.trimToEmpty(parts[0]), StringUtils.trimToEmpty(parts[1])))
             .filter(entry -> StringUtils.isNotBlank(entry.getKey()) && StringUtils.isNumeric(entry.getValue()))
             .collect(Collectors.toMap(Map.Entry::getKey, entry -> Math.max(1, Integer.parseInt(entry.getValue())), (left, right) -> right));
+    }
+
+    private static CounterStore buildCounterStore(String backend,
+                                                  String redisKeyPrefix,
+                                                  ObjectProvider<StringRedisTemplate> redisTemplateProvider) {
+        if ("redis".equalsIgnoreCase(StringUtils.trimToEmpty(backend))) {
+            StringRedisTemplate template = redisTemplateProvider.getIfAvailable();
+            if (template != null) {
+                return new RedisCounterStore(template, redisKeyPrefix);
+            }
+        }
+        return new InMemoryCounterStore(Clock.systemUTC());
+    }
+
+    interface CounterStore {
+        long increment(String key, long ttlSeconds);
+    }
+
+    static class InMemoryCounterStore implements CounterStore {
+
+        private final Clock clock;
+        private final Map<String, WindowCounter> counters = new ConcurrentHashMap<>();
+
+        InMemoryCounterStore(Clock clock) {
+            this.clock = clock;
+        }
+
+        @Override
+        public long increment(String key, long ttlSeconds) {
+            long currentWindow = clock.millis() / (Math.max(1, ttlSeconds) * 1_000);
+            WindowCounter counter = counters.computeIfAbsent(key, ignored -> new WindowCounter(currentWindow));
+            synchronized (counter) {
+                if (counter.window() != currentWindow) {
+                    counter.window = currentWindow;
+                    counter.count.set(0);
+                }
+                return counter.count.incrementAndGet();
+            }
+        }
+    }
+
+    static class RedisCounterStore implements CounterStore {
+
+        private final StringRedisTemplate redisTemplate;
+        private final String keyPrefix;
+
+        RedisCounterStore(StringRedisTemplate redisTemplate, String keyPrefix) {
+            this.redisTemplate = redisTemplate;
+            this.keyPrefix = StringUtils.defaultIfBlank(keyPrefix, "dms:rate-limit");
+        }
+
+        @Override
+        public long increment(String key, long ttlSeconds) {
+            String redisKey = keyPrefix + ":" + key;
+            Long current = redisTemplate.opsForValue().increment(redisKey);
+            if (current != null && current == 1L) {
+                redisTemplate.expire(redisKey, Math.max(1, ttlSeconds), TimeUnit.SECONDS);
+            }
+            return current == null ? 1L : current;
+        }
     }
 
     private static class WindowCounter {

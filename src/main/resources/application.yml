@@ -79,5 +79,7 @@ dms:
       fail-on-insecure-production-config: ${DMS_SECURITY_CORS_FAIL_ON_INSECURE_PRODUCTION_CONFIG:true}
     rate-limit:
       enabled: ${DMS_SECURITY_RATE_LIMIT_ENABLED:true}
+      backend: ${DMS_SECURITY_RATE_LIMIT_BACKEND:in-memory}
+      redis-key-prefix: ${DMS_SECURITY_RATE_LIMIT_REDIS_KEY_PREFIX:dms:rate-limit}
       requests-per-minute: ${DMS_SECURITY_RATE_LIMIT_REQUESTS_PER_MINUTE:120}
       critical-path-limits: ${DMS_SECURITY_RATE_LIMIT_CRITICAL_PATH_LIMITS:/v1/documents/multipart=30,/v1/documents/base64=30,/v1/documents/presigned-url=60,/v1/billing/webhook=60}
