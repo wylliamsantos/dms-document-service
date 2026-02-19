@@ -29,7 +29,21 @@ DROP_BEFORE_RESTORE=true \
 ./scripts/restore-mongo.sh
 ```
 
-## 3) Validação pós-restore (smoke)
+## 3) Validação de restaurabilidade (dry-run)
+Antes do restore real, valide o artefato de backup com dry-run:
+
+```bash
+cd dms-document-service
+MONGO_URI="mongodb://localhost:27017/dms" \
+ARCHIVE_PATH="./backups/dms-<UTC>.archive.gz" \
+./scripts/verify-restore-mongo.sh
+```
+
+Saída esperada:
+- `verify-restore done`
+- `elapsedSeconds=<n>` para medição operacional de restore (baseline de RTO).
+
+## 4) Validação pós-restore (smoke)
 - `GET /actuator/health` => `200`
 - Buscar categoria/documento conhecido do tenant de teste e confirmar presença.
 
