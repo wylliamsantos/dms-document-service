@@ -159,6 +159,7 @@ Runbook inicial + scripts operacionais:
 - Playbook de suporte: `docs/commercial-support-playbook-alpha.md`
 - Checklist de go-live comercial: `docs/commercial-go-live-checklist-alpha.md`
 - Templates de comunicação de suporte: `docs/commercial-support-templates-alpha.md`
+- Handoff de go-to-market (RACI + evidências mínimas): `docs/commercial-gtm-handoff-alpha.md`
 
 ## dms-search-service
 
