@@ -51,4 +51,34 @@ Saída esperada:
 - **RPO alvo:** até 24h (backup diário).
 - **RTO alvo:** até 60 min (restore + smoke).
 
+## Fallback operacional (sem `mongodump`/`mongorestore` no host)
+Quando os binários não estiverem instalados no host, execute backup/restore usando o container `dms-mongo` com `docker exec -i`:
+
+```bash
+# backup
+cd dms-document-service
+ARTIFACT="./backups/dms-$(date -u +%Y%m%dT%H%M%SZ).archive.gz"
+docker exec dms-mongo sh -lc \
+  'mongodump --uri="mongodb://dms:dms@localhost:27017/dms?authSource=dms" --gzip --archive' \
+  > "$ARTIFACT"
+
+# verify-restore (dry-run)
+docker exec -i dms-mongo sh -lc \
+  'mongorestore --uri="mongodb://dms:dms@localhost:27017/dms?authSource=dms" --gzip --archive --dryRun' \
+  < "$ARTIFACT"
+
+# restore real (com drop)
+docker exec -i dms-mongo sh -lc \
+  'mongorestore --uri="mongodb://dms:dms@localhost:27017/dms?authSource=dms" --gzip --archive --drop' \
+  < "$ARTIFACT"
+```
+
+## Evidência operacional (stack local)
+- Execução validada em `2026-02-19T11:37Z` com log versionado em:
+  - `.dms-logs/backup-restore-stack-20260219T113728Z.log`
+- Resultado:
+  - `verify-restore` (dry-run) concluído com sucesso (`elapsedSeconds=1`);
+  - `restore` real com `--drop` concluído sem falhas (`39 documents restored`);
+  - smoke pós-restore: `GET /actuator/health` => **200**.
+
 > Observação: valores serão refinados após automação recorrente e medição em ambiente de produção.
