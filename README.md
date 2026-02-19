@@ -136,6 +136,11 @@ Contrato completo e exemplos em `docs/billing-user-provisioning-contract.md`.
 - Actuator: `/actuator/health`, `/actuator/prometheus` habilitados.
 - Ehcache 2.x para cache de categorias/tipos/localizações.
 
+### Segurança operacional
+
+- Checklist de validação alpha: `docs/security-operational-checklist.md`.
+- Contrato de enforcement de assentos no provisionamento: `docs/billing-user-provisioning-contract.md`.
+
 ## dms-search-service
 
 Serviço de consulta que expõe as pesquisas para o DMS, agora inteiramente alimentado por MongoDB.
