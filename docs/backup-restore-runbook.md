@@ -47,6 +47,20 @@ Saída esperada:
 - `GET /actuator/health` => `200`
 - Buscar categoria/documento conhecido do tenant de teste e confirmar presença.
 
+## 5) Medir conformidade de RPO/RTO (SLO)
+Após executar `verify-restore`, registre a medição com o script abaixo:
+
+```bash
+cd dms-document-service
+BACKUP_ARTIFACT="./backups/dms-<UTC>.archive.gz" \
+VERIFY_ELAPSED_SECONDS="<valor do verify-restore>" \
+./scripts/measure-backup-restore-slo.sh
+```
+
+Saída esperada:
+- `status=WITHIN_TARGET` quando `RPO <= 24h` e `RTO <= 60min`;
+- `status=OUT_OF_TARGET` (exit code `2`) quando qualquer alvo for violado.
+
 ## Baseline inicial (alpha)
 - **RPO alvo:** até 24h (backup diário).
 - **RTO alvo:** até 60 min (restore + smoke).
