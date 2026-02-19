@@ -169,6 +169,7 @@ Runbook inicial + scripts operacionais:
 - Scorecard de prontidão comercial por rodada: `docs/commercial-go-live-scorecard-alpha.md`
 - Playbook de onboarding comercial do cliente (D0-D+7): `docs/commercial-customer-onboarding-playbook-alpha.md`
 - Playbook de retenção/churn (D0-D+30): `docs/commercial-churn-retention-playbook-alpha.md`
+- Runbook de Revenue Operations (cobrança, inadimplência e conciliação): `docs/commercial-revops-runbook-alpha.md`
 
 ## dms-search-service
 
