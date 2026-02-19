@@ -73,6 +73,10 @@ dms:
     allowed-headers: ${DMS_CORS_ALLOWED_HEADERS:*}
     allow-credentials: ${DMS_CORS_ALLOW_CREDENTIALS:true}
   security:
+    environment: ${DMS_SECURITY_ENVIRONMENT:dev}
+    redirect-root-to-swagger-enabled: ${DMS_SECURITY_REDIRECT_ROOT_TO_SWAGGER_ENABLED:true}
+    cors:
+      fail-on-insecure-production-config: ${DMS_SECURITY_CORS_FAIL_ON_INSECURE_PRODUCTION_CONFIG:true}
     rate-limit:
       enabled: ${DMS_SECURITY_RATE_LIMIT_ENABLED:true}
       requests-per-minute: ${DMS_SECURITY_RATE_LIMIT_REQUESTS_PER_MINUTE:120}
