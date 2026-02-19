@@ -163,6 +163,7 @@ Runbook inicial + scripts operacionais:
 - FAQ comercial de vendas/pré-vendas: `docs/commercial-sales-faq-alpha.md`
 - Métricas de lançamento comercial (D0-D+14): `docs/commercial-launch-metrics-alpha.md`
 - Registro de riscos comerciais (alpha): `docs/commercial-risk-register-alpha.md`
+- Log de decisão de go-live comercial (GO/ATTENTION/NO-GO): `docs/commercial-go-live-decision-log-alpha.md`
 
 ## dms-search-service
 
