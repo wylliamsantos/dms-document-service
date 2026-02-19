@@ -131,6 +131,15 @@ Para integrar o serviço oficial de identidade/provisionamento com o enforcement
 
 Contrato completo e exemplos em `docs/billing-user-provisioning-contract.md`.
 
+### Backup/Restore (alpha)
+
+Runbook inicial + scripts operacionais:
+- `docs/backup-restore-runbook.md`
+- `scripts/backup-mongo.sh`
+- `scripts/restore-mongo.sh`
+- `scripts/verify-restore-mongo.sh` (dry-run de restaurabilidade + medição de tempo)
+- `scripts/measure-backup-restore-slo.sh` (checagem de conformidade RPO/RTO)
+
 ### Observabilidade
 
 - Actuator: `/actuator/health`, `/actuator/prometheus` habilitados.
