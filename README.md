@@ -161,6 +161,7 @@ Runbook inicial + scripts operacionais:
 - Templates de comunicação de suporte: `docs/commercial-support-templates-alpha.md`
 - Handoff de go-to-market (RACI + evidências mínimas): `docs/commercial-gtm-handoff-alpha.md`
 - FAQ comercial de vendas/pré-vendas: `docs/commercial-sales-faq-alpha.md`
+- Métricas de lançamento comercial (D0-D+14): `docs/commercial-launch-metrics-alpha.md`
 
 ## dms-search-service
 
