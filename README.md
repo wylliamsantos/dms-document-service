@@ -174,6 +174,7 @@ Runbook inicial + scripts operacionais:
 - Checklist de contratação comercial (pré-fechamento + handoff): `docs/commercial-contracting-checklist-alpha.md`
 - Política de aprovação de descontos (guardrails + alçadas): `docs/commercial-discount-approval-policy-alpha.md`
 - Playbook de tratamento de objeções comerciais: `docs/commercial-objection-handling-playbook-alpha.md`
+- Playbook de conversão trial → pago (D-7 a D+7): `docs/commercial-trial-conversion-playbook-alpha.md`
 
 ## dms-search-service
 
