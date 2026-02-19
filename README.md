@@ -157,6 +157,8 @@ Runbook inicial + scripts operacionais:
 - Termos comerciais mínimos: `docs/commercial-terms-alpha.md`
 - Política de privacidade (resumo operacional): `docs/commercial-privacy-policy-alpha.md`
 - Playbook de suporte: `docs/commercial-support-playbook-alpha.md`
+- Checklist de go-live comercial: `docs/commercial-go-live-checklist-alpha.md`
+- Templates de comunicação de suporte: `docs/commercial-support-templates-alpha.md`
 
 ## dms-search-service
 
