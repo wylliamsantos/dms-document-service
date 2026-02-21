@@ -178,6 +178,7 @@ Runbook inicial + scripts operacionais:
 - Playbook de conversão trial → pago (D-7 a D+7): `docs/commercial-trial-conversion-playbook-alpha.md`
 - Playbook de renovação e expansão comercial (D-30 a D+7): `docs/commercial-renewal-expansion-playbook-alpha.md`
 - Programa de referências de clientes (D0 a D+21): `docs/commercial-customer-reference-program-alpha.md`
+- Sessão operacional de decisão GO/NO-GO (agenda + ata): `docs/commercial-go-no-go-session-2026-02-20.md`
 
 ## dms-search-service
 
