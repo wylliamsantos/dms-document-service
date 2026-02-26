@@ -57,5 +57,28 @@ Objetivo: registrar decisões formais de **GO / ATTENTION / NO-GO** por rodada d
 Pacote documental mínimo está consolidado, porém ainda existem pendências técnicas com impacto comercial direto (deduplicação fim-a-fim no consumidor oficial e governança final das PRs abertas relacionadas ao hardening operacional).
 
 ### Ações obrigatórias
-- [ ] Fechar evidência downstream de deduplicação fim-a-fim por `idempotencyKey` (item 7).
-- [ ] Consolidar governança final das PRs comerciais/hardening ainda abertas.
+- [x] Fechar evidência downstream de deduplicação fim-a-fim por `idempotencyKey` (item 7).
+- [x] Consolidar governança final das PRs comerciais/hardening ainda abertas.
+
+## 2026-02-25 — Rodada 2 (pré-sessão stakeholders)
+
+- Decisão: ATTENTION
+- Escopo avaliado: prontidão final pré-ritual GO/NO-GO com stakeholders (engenharia/comercial/operação)
+- Responsáveis pela decisão:
+  - Produto: pendente nomeação
+  - Engenharia: pendente nomeação
+  - Comercial: pendente nomeação
+  - Suporte: pendente nomeação
+
+### Evidências consultadas
+- `dms-go-live-alpha-roadmap.md` (itens 1–10 concluídos)
+- PR de governança final mergeada: `dms-document-service#22`
+- `docs/commercial-go-no-go-session-2026-02-20.md`
+- `docs/commercial-go-live-checklist-alpha.md`
+
+### Justificativa
+A trilha técnica e de governança de PR está concluída, sem pendências abertas nos repositórios críticos. O único gap remanescente para decisão formal de lançamento é executar a sessão síncrona GO/NO-GO com stakeholders e registrar o veredito final (GO/ATTENTION/NO-GO) com owners nomeados.
+
+### Ações obrigatórias
+- [ ] Conduzir sessão GO/NO-GO com stakeholders e preencher responsáveis por área.
+- [ ] Registrar decisão final e plano de comunicação no log/roadmap.
