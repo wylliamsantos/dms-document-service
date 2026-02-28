@@ -105,3 +105,26 @@ Todos os repositórios críticos estão sem PRs abertas e sem pendências técni
 ### Ações obrigatórias
 - [ ] Agendar e conduzir sessão GO/NO-GO final com stakeholders (Produto, Engenharia, Comercial, Suporte).
 - [ ] Registrar decisão final (`GO/ATTENTION/NO-GO`) com riscos residuais, owners e janela de comunicação no roadmap e neste log.
+
+## 2026-02-28 — Rodada 4 (checkpoint pós-merge da PR final)
+
+- Decisão: ATTENTION
+- Escopo avaliado: prontidão final com governança técnica encerrada e preparação do ritual final de lançamento
+- Responsáveis pela decisão:
+  - Produto: pendente nomeação
+  - Engenharia: pendente nomeação
+  - Comercial: pendente nomeação
+  - Suporte: pendente nomeação
+
+### Evidências consultadas
+- `dms-go-live-alpha-roadmap.md` (itens 1–10 concluídos)
+- PR crítica final mergeada: `dms-document-service#24`
+- `docs/commercial-go-no-go-session-2026-02-28.md`
+- `docs/commercial-launch-communications-alpha.md`
+
+### Justificativa
+A trilha técnica está concluída e sem PRs abertas nos repositórios críticos. O único bloqueio remanescente é de governança: falta a sessão síncrona final para decisão formal (`GO/ATTENTION/NO-GO`) com owners nomeados e confirmação da janela de comunicação.
+
+### Ações obrigatórias
+- [ ] Conduzir sessão GO/NO-GO final com stakeholders e registrar ata.
+- [ ] Registrar decisão final com owners por área e plano de comunicação no roadmap e neste log.
