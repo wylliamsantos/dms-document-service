@@ -1,10 +1,13 @@
 package br.com.dms.service;
 
 import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.model.AmazonS3Exception;
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
+import br.com.dms.exception.DmsBusinessException;
+import br.com.dms.exception.TypeException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
@@ -51,8 +54,12 @@ public class AmazonS3Service {
         String pathDocument = getPathToDocument(fileName, cpf, String.valueOf(newVersion));
         ObjectMetadata metadata = new ObjectMetadata();
         metadata.setContentLength(contentLength);
-        amazonS3.putObject(bucketName, pathDocument, documentData, metadata);
-        return pathDocument;
+        try {
+            amazonS3.putObject(bucketName, pathDocument, documentData, metadata);
+            return pathDocument;
+        } catch (AmazonS3Exception exception) {
+            throw mapS3Exception(bucketName, exception);
+        }
     }
 
     public byte[] getDocumentContentFromS3(String filename, String cpf, String documentVersion) throws IOException {
@@ -62,16 +69,24 @@ public class AmazonS3Service {
 
     public byte[] getDocumentContentFromS3(String pathDocument) throws IOException {
         String bucketName = getBucketName();
-        S3Object s3Document = amazonS3.getObject(bucketName, pathDocument);
-        return s3Document.getObjectContent().readAllBytes();
+        try {
+            S3Object s3Document = amazonS3.getObject(bucketName, pathDocument);
+            return s3Document.getObjectContent().readAllBytes();
+        } catch (AmazonS3Exception exception) {
+            throw mapS3Exception(bucketName, exception);
+        }
     }
 
     public String copyDocumentS3(String fileName, String cpf, BigDecimal newVersion, BigDecimal oldVersion) {
         String bucketName = getBucketName();
         String pathDocumentNewVersion = getPathToDocument(fileName, cpf, String.valueOf(newVersion));
         String pathDocumentOldVersion = getPathToDocument(fileName, cpf, String.valueOf(oldVersion));
-        amazonS3.copyObject(bucketName, pathDocumentOldVersion, bucketName, pathDocumentNewVersion);
-        return pathDocumentNewVersion;
+        try {
+            amazonS3.copyObject(bucketName, pathDocumentOldVersion, bucketName, pathDocumentNewVersion);
+            return pathDocumentNewVersion;
+        } catch (AmazonS3Exception exception) {
+            throw mapS3Exception(bucketName, exception);
+        }
     }
 
     public void deleteAllVersions(String cpf, String filename) {
@@ -90,14 +105,36 @@ public class AmazonS3Service {
     }
 
     public URL generatePresignedUrl(GeneratePresignedUrlRequest generatePresignedUrlRequest) {
-        return amazonS3.generatePresignedUrl(generatePresignedUrlRequest);
+        try {
+            return amazonS3.generatePresignedUrl(generatePresignedUrlRequest);
+        } catch (AmazonS3Exception exception) {
+            throw mapS3Exception(getBucketName(), exception);
+        }
     }
 
     public boolean objectExists(String key) {
-        return amazonS3.doesObjectExist(getBucketName(), key);
+        try {
+            return amazonS3.doesObjectExist(getBucketName(), key);
+        } catch (AmazonS3Exception exception) {
+            throw mapS3Exception(getBucketName(), exception);
+        }
     }
 
     public ObjectMetadata getObjectMetadata(String key) {
-        return amazonS3.getObjectMetadata(getBucketName(), key);
+        try {
+            return amazonS3.getObjectMetadata(getBucketName(), key);
+        } catch (AmazonS3Exception exception) {
+            throw mapS3Exception(getBucketName(), exception);
+        }
+    }
+
+    private DmsBusinessException mapS3Exception(String bucketName, AmazonS3Exception exception) {
+        if (exception.getStatusCode() == 404 && "NoSuchBucket".equalsIgnoreCase(exception.getErrorCode())) {
+            return new DmsBusinessException(
+                    String.format("Bucket '%s' não existe no storage configurado. Execute o bootstrap/local setup para criar o bucket.", bucketName),
+                    TypeException.VALID
+            );
+        }
+        return new DmsBusinessException(exception.getMessage(), TypeException.VALID);
     }
 }
