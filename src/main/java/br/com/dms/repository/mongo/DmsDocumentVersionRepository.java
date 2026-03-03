@@ -3,6 +3,7 @@ package br.com.dms.repository.mongo;
 import br.com.dms.domain.mongodb.DmsDocumentVersion;
 import org.springframework.data.mongodb.repository.Aggregation;
 import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -25,11 +26,8 @@ public interface DmsDocumentVersionRepository extends MongoRepository<DmsDocumen
 
     void deleteByTenantIdAndDmsDocumentId(String tenantId, String dmsDocumentId);
 
-    long countByTenantIdAndCreationDateGreaterThanEqualAndCreationDateLessThan(
-            String tenantId,
-            LocalDateTime start,
-            LocalDateTime end
-    );
+    @Query(value = "{ 'tenantId': ?0, 'creationDate': { '$gte': ?1, '$lt': ?2 } }", count = true)
+    long countByTenantIdAndCreationDateBetween(String tenantId, LocalDateTime start, LocalDateTime end);
 
     @Aggregation(pipeline = {
             "{ '$match': { 'tenantId': ?0, 'uploadStatus': 'COMPLETED' } }",
