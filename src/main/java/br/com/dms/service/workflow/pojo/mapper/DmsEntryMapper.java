@@ -26,7 +26,7 @@ public class DmsEntryMapper {
         throw new IllegalStateException("Utility class");
     }
 
-    public static DmsEntry of(String id, LocalDateTime createdAt, LocalDateTime modifiedAt, String filename, String category, String mimeType, Long fileSize, Map<String, Object> properties, String version, String versionType) {
+    public static DmsEntry of(String id, LocalDateTime createdAt, LocalDateTime modifiedAt, String filename, String category, String mimeType, Long fileSize, Map<String, Object> properties, String version, String versionType, String workflowStatus) {
         var entry = new DmsEntry();
 
         entry.setModifiedAt(Optional.ofNullable(modifiedAt).map(modified -> modified.atOffset(ZoneOffset.UTC).format(DATE_TIME_FORMATTER)).orElse(null));
@@ -37,6 +37,7 @@ public class DmsEntryMapper {
         entry.setProperties(properties);
         entry.setVersion(version);
         entry.setVersionType(versionType);
+        entry.setWorkflowStatus(workflowStatus);
 
         var content = new DmsContent();
         content.setMimeType(mimeType);
