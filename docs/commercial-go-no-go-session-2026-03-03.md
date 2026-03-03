@@ -13,7 +13,7 @@ Formalizar a decisão final de lançamento (`GO`, `ATTENTION` ou `NO-GO`) para o
 
 ## Evidências de entrada
 - `dms-go-live-alpha-roadmap.md` (itens 1–10 concluídos)
-- PR crítica final mergeada: `dms-document-service#25`
+- PRs de fechamento técnico/documental mergeadas: `dms-document-service#25`, `#26`, `#27`, `#28`
 - `docs/commercial-go-live-decision-log-alpha.md`
 - `docs/commercial-launch-communications-alpha.md`
 

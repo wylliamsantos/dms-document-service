@@ -151,3 +151,26 @@ Com o merge da PR `#25`, a trilha técnica e documental permanece concluída e s
 ### Ações obrigatórias
 - [ ] Realizar a sessão GO/NO-GO final com stakeholders e registrar ata com participantes.
 - [ ] Publicar decisão final no roadmap e neste log com owners nomeados e janela de comunicação confirmada.
+
+## 2026-03-03 — Rodada 6 (checkpoint pós-merge das correções de upload)
+
+- Decisão: ATTENTION
+- Escopo avaliado: prontidão final após estabilizações de upload e fechamento de checkpoints documentais
+- Responsáveis pela decisão:
+  - Produto: pendente nomeação
+  - Engenharia: pendente nomeação
+  - Comercial: pendente nomeação
+  - Suporte: pendente nomeação
+
+### Evidências consultadas
+- `dms-go-live-alpha-roadmap.md` (itens 1–10 concluídos)
+- PRs mergeadas no fechamento técnico/documental: `dms-document-service#26`, `#27`, `#28`
+- `docs/commercial-go-no-go-session-2026-03-03.md`
+- `docs/commercial-launch-communications-alpha.md`
+
+### Justificativa
+As correções recentes de governança e upload foram mergeadas com CI verde e não há PRs abertas nos repositórios críticos. O bloqueio remanescente continua exclusivamente de governança executiva: realizar a sessão final síncrona GO/NO-GO, nomear owners por área e confirmar a janela final de comunicação.
+
+### Ações obrigatórias
+- [ ] Realizar a sessão GO/NO-GO final com stakeholders e registrar ata com participantes.
+- [ ] Publicar decisão final no roadmap e neste log com owners nomeados e janela de comunicação confirmada.
