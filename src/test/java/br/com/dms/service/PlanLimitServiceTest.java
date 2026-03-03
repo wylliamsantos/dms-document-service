@@ -49,7 +49,7 @@ class PlanLimitServiceTest {
                 .plan(BillingPlan.TRIAL)
                 .status(BillingStatus.TRIALING)
                 .build()));
-        when(dmsDocumentVersionRepository.countByTenantIdAndCreationDateGreaterThanEqualAndCreationDateLessThan(eq("tenant-dev"), any(), any()))
+        when(dmsDocumentVersionRepository.countByTenantIdAndCreationDateBetween(eq("tenant-dev"), any(), any()))
                 .thenReturn(49L);
         when(dmsDocumentVersionRepository.sumCompletedFileSizeByTenantId("tenant-dev")).thenReturn(10L);
 
@@ -64,7 +64,7 @@ class PlanLimitServiceTest {
                 .plan(BillingPlan.TRIAL)
                 .status(BillingStatus.TRIALING)
                 .build()));
-        when(dmsDocumentVersionRepository.countByTenantIdAndCreationDateGreaterThanEqualAndCreationDateLessThan(eq("tenant-dev"), any(), any()))
+        when(dmsDocumentVersionRepository.countByTenantIdAndCreationDateBetween(eq("tenant-dev"), any(), any()))
                 .thenReturn(50L);
 
         assertThatThrownBy(() -> service.assertCanUploadDocument("tx-2"))
@@ -84,7 +84,7 @@ class PlanLimitServiceTest {
 
         assertThatCode(() -> service.assertCanUploadDocument("tx-3")).doesNotThrowAnyException();
         verify(dmsDocumentVersionRepository, never())
-                .countByTenantIdAndCreationDateGreaterThanEqualAndCreationDateLessThan(any(), any(), any());
+                .countByTenantIdAndCreationDateBetween(any(), any(), any());
     }
 
     @Test
@@ -109,7 +109,7 @@ class PlanLimitServiceTest {
                 .plan(BillingPlan.TRIAL)
                 .status(BillingStatus.TRIALING)
                 .build()));
-        when(dmsDocumentVersionRepository.countByTenantIdAndCreationDateGreaterThanEqualAndCreationDateLessThan(eq("tenant-dev"), any(), any()))
+        when(dmsDocumentVersionRepository.countByTenantIdAndCreationDateBetween(eq("tenant-dev"), any(), any()))
                 .thenReturn(1L);
 
         long gb = 1024L * 1024L * 1024L;

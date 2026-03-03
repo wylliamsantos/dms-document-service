@@ -93,7 +93,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if (currentCount > limit) {
             response.setStatus(429);
             response.setContentType("application/json");
-            response.getWriter().write("{\"error\":\"rate_limit_exceeded\",\"message\":\"Too many requests. Please retry in about one minute.\"}");
+            response.setHeader("Retry-After", "60");
+            response.getWriter().write("{\"error\":\"rate_limit_exceeded\",\"message\":\"Você atingiu o limite de requisições temporariamente. Tente novamente em cerca de 1 minuto.\"}");
             return;
         }
 

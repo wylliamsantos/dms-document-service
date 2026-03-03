@@ -87,7 +87,7 @@ public class PlanLimitService {
             LocalDateTime monthStart = currentMonth.atDay(1).atStartOfDay();
             LocalDateTime nextMonthStart = currentMonth.plusMonths(1).atDay(1).atStartOfDay();
 
-            long uploadsThisMonth = dmsDocumentVersionRepository.countByTenantIdAndCreationDateGreaterThanEqualAndCreationDateLessThan(
+            long uploadsThisMonth = dmsDocumentVersionRepository.countByTenantIdAndCreationDateBetween(
                     tenantId,
                     monthStart,
                     nextMonthStart
