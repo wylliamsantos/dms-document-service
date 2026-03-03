@@ -14,6 +14,7 @@ public class DmsEntry {
     private String category;
     private String version;
     private String versionType;
+    private String workflowStatus;
     private DmsContent content;
     private Map<String, Object> properties;
 
@@ -88,5 +89,13 @@ public class DmsEntry {
 
     public void setVersionType(String versionType) {
         this.versionType = versionType;
+    }
+
+    public String getWorkflowStatus() {
+        return workflowStatus;
+    }
+
+    public void setWorkflowStatus(String workflowStatus) {
+        this.workflowStatus = workflowStatus;
     }
 }
