@@ -14,6 +14,11 @@ spring:
   redis:
     host: localhost
     port: 6379
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
   http:
     multipart:
       max-file-size: 11MB
@@ -27,6 +32,10 @@ logging:
 dms:
   fallback:
     enabled: true
+  audit:
+    enabled: true
+    exchange: audit.events
+    routing-key: audit.#
   s3:
     region: us-east-1
     bucket-name: dms-local

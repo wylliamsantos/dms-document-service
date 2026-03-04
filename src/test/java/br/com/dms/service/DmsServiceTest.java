@@ -1,5 +1,7 @@
 package br.com.dms.service;
 
+import br.com.dms.audit.AuditActorResolver;
+import br.com.dms.audit.AuditEventPublisher;
 import br.com.dms.config.MongoConfig;
 import br.com.dms.controller.request.FinalizeUploadRequest;
 import br.com.dms.controller.request.PayloadApprove;
@@ -102,6 +104,12 @@ class DmsServiceTest {
 	@MockBean
 	private TenantContextService tenantContextService;
 
+	@MockBean
+	private AuditEventPublisher auditEventPublisher;
+
+	@MockBean
+	private AuditActorResolver auditActorResolver;
+
 	@Autowired
 	private Environment environment;
 
@@ -121,6 +129,7 @@ class DmsServiceTest {
 		doNothing().when(documentValidationService).validateFilename(any(), any());
 
 		when(tenantContextService.requireTenantId()).thenReturn("tenant-dev");
+		when(auditActorResolver.resolveUserId()).thenReturn("test-user");
 		when(dmsUtil.getCpfFromMetadata(any())).thenReturn(CPF);
 		when(dmsUtil.getBusinessKeyFromMetadata(any(), any())).thenReturn(CPF);
 		when(categoryRepository.findByTenantIdAndName(any(), any())).thenReturn(Optional.of(Category.builder().name("dr:contrato").uniqueAttributes("cpf").businessKeyField("cpf").build()));
