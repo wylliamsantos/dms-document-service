@@ -33,6 +33,8 @@ public class DmsDocument {
 
     private Map<String, Object> metadata;
 
+    private String ocrText;
+
     private DocumentWorkflowStatus workflowStatus;
 
     public DmsDocument() {
@@ -119,6 +121,14 @@ public class DmsDocument {
         this.businessKeyType = businessKeyType;
     }
 
+    public String getOcrText() {
+        return ocrText;
+    }
+
+    public void setOcrText(String ocrText) {
+        this.ocrText = ocrText;
+    }
+
     public DocumentWorkflowStatus getWorkflowStatus() {
         return workflowStatus;
     }
@@ -181,6 +191,11 @@ public class DmsDocument {
 
         public Builder businessKeyType(String businessKeyType) {
             dmsDocument.setBusinessKeyType(businessKeyType);
+            return this;
+        }
+
+        public Builder ocrText(String ocrText) {
+            dmsDocument.setOcrText(ocrText);
             return this;
         }
 

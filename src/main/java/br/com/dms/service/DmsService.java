@@ -83,6 +83,7 @@ public class DmsService {
     private final PlanLimitService planLimitService;
     private final AuditEventPublisher auditEventPublisher;
     private final AuditActorResolver auditActorResolver;
+    private final OcrPipelineService ocrPipelineService;
 
     public DmsService(AmazonS3Service amazonS3Service,
                       DocumentInformationRepository documentInformationRepository,
@@ -98,7 +99,8 @@ public class DmsService {
                       TenantContextService tenantContextService,
                       PlanLimitService planLimitService,
                       AuditEventPublisher auditEventPublisher,
-                      AuditActorResolver auditActorResolver) {
+                      AuditActorResolver auditActorResolver,
+                      OcrPipelineService ocrPipelineService) {
         this.amazonS3Service = amazonS3Service;
         this.documentInformationRepository = documentInformationRepository;
         this.dmsDocumentRepository = dmsDocumentRepository;
@@ -114,6 +116,7 @@ public class DmsService {
         this.planLimitService = planLimitService;
         this.auditEventPublisher = auditEventPublisher;
         this.auditActorResolver = auditActorResolver;
+        this.ocrPipelineService = ocrPipelineService;
     }
 
     public ResponseEntity<?> reprove(String transactionId, String documentId, String documentVersion) {
@@ -277,6 +280,7 @@ public class DmsService {
 
         documentInformationRepository.delete(documentId, null);
         publishAuditEvent("DOCUMENT_UPLOADED", entity, documentId, filenameDms, jsonMetadata, buildAttributes("category", documentCategoryName, "version", String.valueOf(version)));
+        ocrPipelineService.processAsync(tenantId, documentId, String.valueOf(version), pathToNewDocument, mimeType.getName(), filenameDms);
         return new DocumentId(documentId, String.valueOf(version));
     }
 
@@ -460,6 +464,17 @@ public class DmsService {
 
         documentInformationRepository.delete(documentId, null);
         documentInformationRepository.delete(documentId, version.getVersionNumber().toPlainString());
+
+        dmsDocumentRepository.findByIdAndTenantId(documentId, tenantId()).ifPresent(document ->
+            ocrPipelineService.processAsync(
+                tenantId(),
+                documentId,
+                version.getVersionNumber().toPlainString(),
+                version.getPathToDocument(),
+                StringUtils.defaultIfBlank(version.getMimeType(), document.getMimeType()),
+                document.getFilename()
+            )
+        );
 
         return new DocumentId(documentId, version.getVersionNumber().toPlainString());
     }
