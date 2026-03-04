@@ -79,6 +79,10 @@ dms:
     allowed-methods: ${DMS_CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,OPTIONS}
     allowed-headers: ${DMS_CORS_ALLOWED_HEADERS:*}
     allow-credentials: ${DMS_CORS_ALLOW_CREDENTIALS:true}
+  audit:
+    enabled: ${DMS_AUDIT_ENABLED:true}
+    exchange: ${DMS_AUDIT_EXCHANGE:audit.events}
+    routing-key: ${DMS_AUDIT_ROUTING_KEY:audit.#}
   security:
     environment: ${DMS_SECURITY_ENVIRONMENT:dev}
     redirect-root-to-swagger-enabled: ${DMS_SECURITY_REDIRECT_ROOT_TO_SWAGGER_ENABLED:true}

@@ -1,5 +1,8 @@
 package br.com.dms.service;
 
+import br.com.dms.audit.AuditActorResolver;
+import br.com.dms.audit.AuditEventMessage;
+import br.com.dms.audit.AuditEventPublisher;
 import br.com.dms.controller.request.FinalizeUploadRequest;
 import br.com.dms.controller.request.PayloadApprove;
 import br.com.dms.controller.request.PayloadUrlPresigned;
@@ -48,6 +51,7 @@ import java.util.Date;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.Instant;
 
 import static br.com.dms.domain.Messages.*;
 
@@ -77,6 +81,8 @@ public class DmsService {
     private final DocumentValidationService validationService;
     private final TenantContextService tenantContextService;
     private final PlanLimitService planLimitService;
+    private final AuditEventPublisher auditEventPublisher;
+    private final AuditActorResolver auditActorResolver;
 
     public DmsService(AmazonS3Service amazonS3Service,
                       DocumentInformationRepository documentInformationRepository,
@@ -90,7 +96,9 @@ public class DmsService {
                       MetadataService metadataService,
                       DocumentValidationService validationService,
                       TenantContextService tenantContextService,
-                      PlanLimitService planLimitService) {
+                      PlanLimitService planLimitService,
+                      AuditEventPublisher auditEventPublisher,
+                      AuditActorResolver auditActorResolver) {
         this.amazonS3Service = amazonS3Service;
         this.documentInformationRepository = documentInformationRepository;
         this.dmsDocumentRepository = dmsDocumentRepository;
@@ -104,6 +112,8 @@ public class DmsService {
         this.validationService = validationService;
         this.tenantContextService = tenantContextService;
         this.planLimitService = planLimitService;
+        this.auditEventPublisher = auditEventPublisher;
+        this.auditActorResolver = auditActorResolver;
     }
 
     public ResponseEntity<?> reprove(String transactionId, String documentId, String documentVersion) {
@@ -266,6 +276,7 @@ public class DmsService {
         }
 
         documentInformationRepository.delete(documentId, null);
+        publishAuditEvent("DOCUMENT_UPLOADED", entity, documentId, filenameDms, jsonMetadata, buildAttributes("category", documentCategoryName, "version", String.valueOf(version)));
         return new DocumentId(documentId, String.valueOf(version));
     }
 
@@ -444,6 +455,7 @@ public class DmsService {
                 document.setMimeType(request.getMimeType());
             }
             dmsDocumentRepository.save(document);
+            publishAuditEvent("DOCUMENT_UPLOADED", document, documentId, document.getFilename(), document.getMetadata(), buildAttributes("category", document.getCategory(), "version", version.getVersionNumber().toPlainString(), "source", "presigned"));
         });
 
         documentInformationRepository.delete(documentId, null);
@@ -549,6 +561,43 @@ public class DmsService {
 
     private String tenantId() {
         return tenantContextService.requireTenantId();
+    }
+
+    private Map<String, Object> buildAttributes(String... keyValues) {
+        Map<String, Object> attributes = new java.util.HashMap<>();
+        if (keyValues == null) {
+            return attributes;
+        }
+        for (int i = 0; i + 1 < keyValues.length; i += 2) {
+            String key = keyValues[i];
+            String value = keyValues[i + 1];
+            if (key != null && value != null) {
+                attributes.put(key, value);
+            }
+        }
+        return attributes;
+    }
+
+    private void publishAuditEvent(String eventType,
+                                   DmsDocument document,
+                                   String documentId,
+                                   String filename,
+                                   Map<String, Object> metadata,
+                                   Map<String, Object> attributes) {
+        if (document == null) {
+            return;
+        }
+        auditEventPublisher.publish(new AuditEventMessage(
+                eventType,
+                Instant.now(),
+                auditActorResolver.resolveUserId(),
+                document.getTenantId(),
+                "DOCUMENT",
+                documentId,
+                filename,
+                metadata,
+                attributes
+        ));
     }
 
     private DmsDocumentVersion digitalSignatureAndSaveBucket(String transactionId, PayloadApprove payloadApprove, DmsDocumentVersion currentDmsDocumentVersion, DmsDocument entity, BigDecimal newVersion, String mimeType) throws IOException {

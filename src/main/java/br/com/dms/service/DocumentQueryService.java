@@ -1,5 +1,8 @@
 package br.com.dms.service;
 
+import br.com.dms.audit.AuditActorResolver;
+import br.com.dms.audit.AuditEventMessage;
+import br.com.dms.audit.AuditEventPublisher;
 import br.com.dms.controller.request.DocumentInformationRequest;
 import br.com.dms.domain.mongodb.DmsDocument;
 import br.com.dms.domain.mongodb.DmsDocumentVersion;
@@ -33,6 +36,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
+import java.time.Instant;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -52,17 +56,23 @@ public class DocumentQueryService {
     private final ObjectMapper objectMapper;
 
     private final AmazonS3Service amazonS3Service;
+    private final AuditEventPublisher auditEventPublisher;
+    private final AuditActorResolver auditActorResolver;
 
     public DocumentQueryService(DocumentInformationRepository documentInformationRepository,
                                 DmsDocumentRepository dmsDocumentRepository,
                                 DmsDocumentVersionRepository dmsDocumentVersionRepository,
                                 ObjectMapper objectMapper,
-                                AmazonS3Service amazonS3Service) {
+                                AmazonS3Service amazonS3Service,
+                                AuditEventPublisher auditEventPublisher,
+                                AuditActorResolver auditActorResolver) {
         this.documentInformationRepository = documentInformationRepository;
         this.dmsDocumentRepository = dmsDocumentRepository;
         this.dmsDocumentVersionRepository = dmsDocumentVersionRepository;
         this.objectMapper = objectMapper;
         this.amazonS3Service = amazonS3Service;
+        this.auditEventPublisher = auditEventPublisher;
+        this.auditActorResolver = auditActorResolver;
     }
 
     public DocumentContent getDocumentContent(String transactionId, String documentId, Optional<String> version) {
@@ -84,6 +94,24 @@ public class DocumentQueryService {
         try {
             byte[] content = loadDocumentContent(entity, versionEntity);
             String mimeType = Objects.nonNull(versionEntity.getMimeType()) ? versionEntity.getMimeType() : entity.getMimeType();
+            Map<String, Object> attributes = new HashMap<>();
+            if (entity.getCategory() != null) {
+                attributes.put("category", entity.getCategory());
+            }
+            if (versionEntity.getVersionNumber() != null) {
+                attributes.put("version", String.valueOf(versionEntity.getVersionNumber()));
+            }
+            auditEventPublisher.publish(new AuditEventMessage(
+                    "DOCUMENT_VIEWED",
+                    Instant.now(),
+                    auditActorResolver.resolveUserId(),
+                    entity.getTenantId(),
+                    "DOCUMENT",
+                    entity.getId(),
+                    entity.getFilename(),
+                    versionEntity.getMetadata(),
+                    attributes
+            ));
             return new DocumentContent(content, mimeType);
         } catch (AmazonS3Exception s3Exception) {
             if (s3Exception.getStatusCode() == 404) {
