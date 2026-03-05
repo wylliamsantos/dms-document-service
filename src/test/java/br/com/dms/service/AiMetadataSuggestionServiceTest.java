@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
@@ -51,7 +52,7 @@ class AiMetadataSuggestionServiceTest {
             .tenantId(tenantId)
             .category("CONTRATO")
             .filename("contrato.pdf")
-            .ocrText("CPF: 123.456.789-01\nData Emissao: 05/03/2026")
+            .ocrText("CPF: 529.982.247-25\nData Emissao: 05/03/2026")
             .build();
 
         DmsDocumentVersion version = DmsDocumentVersion.of()
@@ -75,10 +76,12 @@ class AiMetadataSuggestionServiceTest {
 
         MetadataSuggestionResponse response = service.suggest(documentId, Optional.empty());
 
-        assertEquals("123.456.789-01", response.getSuggestedMetadata().get("cpf"));
+        assertEquals("529.982.247-25", response.getSuggestedMetadata().get("cpf"));
         assertEquals("05/03/2026", response.getSuggestedMetadata().get("dataEmissao"));
         assertEquals("CONTRATO", response.getSuggestedCategory());
         assertTrue(response.getConfidence() > 0);
+        assertTrue(response.getSummary().contains("Resumo OCR"));
+        assertTrue(response.getConsistencyWarnings().isEmpty());
     }
 
     @Test
@@ -111,5 +114,45 @@ class AiMetadataSuggestionServiceTest {
         MetadataSuggestionResponse response = service.suggest(documentId, Optional.empty());
 
         assertEquals("NOTA_FISCAL", response.getSuggestedCategory());
+        assertFalse(response.getConsistencyWarnings().isEmpty());
+    }
+
+    @Test
+    void shouldFlagInvalidCpfAndFutureDateWarnings() {
+        String tenantId = "t1";
+        String documentId = "doc-3";
+
+        DmsDocument document = DmsDocument.of()
+            .id(documentId)
+            .tenantId(tenantId)
+            .category("CONTRATO")
+            .filename("contrato.pdf")
+            .ocrText("CPF: 111.111.111-11\nData Emissao: 05/03/2099")
+            .build();
+
+        DmsDocumentVersion version = DmsDocumentVersion.of()
+            .dmsDocumentId(documentId)
+            .versionNumber(new BigDecimal("1.0"))
+            .build();
+
+        Category category = Category.builder()
+            .name("CONTRATO")
+            .schema(Map.of("properties", Map.of(
+                "cpf", Map.of("title", "CPF"),
+                "dataEmissao", Map.of("title", "Data Emissao")
+            )))
+            .build();
+
+        when(tenantContextService.requireTenantId()).thenReturn(tenantId);
+        when(dmsDocumentRepository.findByIdAndTenantId(documentId, tenantId)).thenReturn(Optional.of(document));
+        when(dmsDocumentVersionRepository.findLastVersionByTenantIdAndDmsDocumentId(tenantId, documentId)).thenReturn(Optional.of(version));
+        when(categoryRepository.findByTenantIdAndName(tenantId, "CONTRATO")).thenReturn(Optional.of(category));
+        when(categoryRepository.findAllByTenantId(tenantId)).thenReturn(List.of(category));
+
+        MetadataSuggestionResponse response = service.suggest(documentId, Optional.empty());
+
+        assertTrue(response.getConsistencyWarnings().stream().anyMatch(msg -> msg.contains("CPF")));
+        assertTrue(response.getConsistencyWarnings().stream().anyMatch(msg -> msg.contains("futuro")));
+        assertTrue(response.getConfidence() < 0.65d);
     }
 }

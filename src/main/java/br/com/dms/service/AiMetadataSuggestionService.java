@@ -12,6 +12,8 @@ import br.com.dms.repository.mongo.DmsDocumentVersionRepository;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -23,6 +25,8 @@ public class AiMetadataSuggestionService {
     private static final Set<String> STOPWORDS = Set.of(
         "de", "da", "do", "das", "dos", "e", "a", "o", "as", "os", "em", "para", "com", "sem"
     );
+
+    private static final DateTimeFormatter BRAZILIAN_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final DmsDocumentRepository dmsDocumentRepository;
     private final DmsDocumentVersionRepository dmsDocumentVersionRepository;
@@ -65,7 +69,10 @@ public class AiMetadataSuggestionService {
         }
 
         String suggestedCategory = suggestCategoryName(tenantId, textBase).orElse(document.getCategory());
-        double confidence = suggestions.isEmpty() ? 0.0 : Math.min(0.95d, 0.45d + (suggestions.size() * 0.1d));
+        List<String> consistencyWarnings = buildConsistencyWarnings(document, suggestedCategory, suggestions);
+
+        double baseConfidence = suggestions.isEmpty() ? 0.0 : Math.min(0.95d, 0.45d + (suggestions.size() * 0.1d));
+        double confidence = Math.max(0.0d, baseConfidence - Math.min(0.35d, consistencyWarnings.size() * 0.07d));
 
         return MetadataSuggestionResponse.builder()
             .documentId(documentId)
@@ -73,9 +80,170 @@ public class AiMetadataSuggestionService {
             .category(document.getCategory())
             .suggestedCategory(suggestedCategory)
             .suggestedMetadata(suggestions)
+            .summary(buildSummary(textBase, suggestions, consistencyWarnings))
+            .consistencyWarnings(consistencyWarnings)
             .confidence(confidence)
             .source("ocr+heuristics")
             .build();
+    }
+
+    private String buildSummary(String textBase, Map<String, Object> suggestions, List<String> consistencyWarnings) {
+        String textSnippet = Arrays.stream(StringUtils.defaultString(textBase).split("\\R"))
+            .map(StringUtils::trimToNull)
+            .filter(Objects::nonNull)
+            .filter(line -> line.length() > 3)
+            .limit(2)
+            .collect(Collectors.joining(" | "));
+
+        if (textSnippet.length() > 160) {
+            textSnippet = textSnippet.substring(0, 157) + "...";
+        }
+
+        String metadataPreview = suggestions.entrySet().stream()
+            .limit(3)
+            .map(e -> e.getKey() + "=" + e.getValue())
+            .collect(Collectors.joining(", "));
+
+        String warningsInfo = consistencyWarnings.isEmpty() ? "sem alertas" : consistencyWarnings.size() + " alerta(s)";
+
+        if (StringUtils.isBlank(textSnippet) && StringUtils.isBlank(metadataPreview)) {
+            return "Sem conteúdo OCR suficiente para resumir.";
+        }
+
+        return String.format(Locale.ROOT, "Resumo OCR: %s. Campos sugeridos: %s. Consistência: %s.",
+            StringUtils.defaultIfBlank(textSnippet, "n/a"),
+            StringUtils.defaultIfBlank(metadataPreview, "n/a"),
+            warningsInfo);
+    }
+
+    private List<String> buildConsistencyWarnings(DmsDocument document,
+                                                  String suggestedCategory,
+                                                  Map<String, Object> suggestions) {
+        List<String> warnings = new ArrayList<>();
+
+        if (StringUtils.isNotBlank(document.getCategory())
+            && StringUtils.isNotBlank(suggestedCategory)
+            && !StringUtils.equals(document.getCategory(), suggestedCategory)) {
+            warnings.add("Categoria atual difere da categoria sugerida por OCR");
+        }
+
+        Optional<String> cpfValue = findFirstByKeyContains(suggestions, "cpf");
+        cpfValue.ifPresent(value -> {
+            if (!isValidCpf(value)) {
+                warnings.add("CPF extraído possui formato/dígitos inválidos");
+            }
+        });
+
+        Optional<String> cnpjValue = findFirstByKeyContains(suggestions, "cnpj");
+        cnpjValue.ifPresent(value -> {
+            if (!isValidCnpj(value)) {
+                warnings.add("CNPJ extraído possui formato/dígitos inválidos");
+            }
+        });
+
+        if (cpfValue.isPresent() && cnpjValue.isPresent()) {
+            warnings.add("Documento contém CPF e CNPJ ao mesmo tempo (verificar contexto)");
+        }
+
+        findFirstByKeyContains(suggestions, "data").ifPresent(value -> {
+            try {
+                LocalDate parsed = LocalDate.parse(value, BRAZILIAN_DATE);
+                if (parsed.isAfter(LocalDate.now().plusDays(1))) {
+                    warnings.add("Data extraída está no futuro");
+                }
+            } catch (Exception ignored) {
+                warnings.add("Data extraída não segue formato dd/MM/yyyy");
+            }
+        });
+
+        findFirstByAnyKeyContains(suggestions, List.of("valor", "amount", "total")).ifPresent(value -> {
+            double normalizedValue = parseMonetaryValue(value);
+            if (normalizedValue <= 0.0d) {
+                warnings.add("Valor monetário extraído é zero/negativo");
+            }
+        });
+
+        return warnings;
+    }
+
+    private Optional<String> findFirstByAnyKeyContains(Map<String, Object> suggestions, List<String> fragments) {
+        for (String fragment : fragments) {
+            Optional<String> value = findFirstByKeyContains(suggestions, fragment);
+            if (value.isPresent()) {
+                return value;
+            }
+        }
+        return Optional.empty();
+    }
+
+    private Optional<String> findFirstByKeyContains(Map<String, Object> suggestions, String keyFragment) {
+        return suggestions.entrySet().stream()
+            .filter(entry -> StringUtils.containsIgnoreCase(entry.getKey(), keyFragment))
+            .map(Map.Entry::getValue)
+            .filter(Objects::nonNull)
+            .map(String::valueOf)
+            .findFirst();
+    }
+
+    private double parseMonetaryValue(String value) {
+        String normalized = StringUtils.defaultString(value)
+            .replace(".", "")
+            .replace(",", ".")
+            .replaceAll("[^0-9.-]", "");
+
+        try {
+            return Double.parseDouble(normalized);
+        } catch (Exception ignored) {
+            return 0.0d;
+        }
+    }
+
+    private boolean isValidCpf(String value) {
+        String digits = StringUtils.defaultString(value).replaceAll("\\D", "");
+        if (digits.length() != 11 || digits.chars().distinct().count() == 1) {
+            return false;
+        }
+
+        int firstDigit = calculateBrazilianCheckDigit(digits.substring(0, 9), 10);
+        int secondDigit = calculateBrazilianCheckDigit(digits.substring(0, 9) + firstDigit, 11);
+
+        return digits.equals(digits.substring(0, 9) + firstDigit + secondDigit);
+    }
+
+    private boolean isValidCnpj(String value) {
+        String digits = StringUtils.defaultString(value).replaceAll("\\D", "");
+        if (digits.length() != 14 || digits.chars().distinct().count() == 1) {
+            return false;
+        }
+
+        int firstDigit = calculateCnpjDigit(digits.substring(0, 12));
+        int secondDigit = calculateCnpjDigit(digits.substring(0, 12) + firstDigit);
+
+        return digits.equals(digits.substring(0, 12) + firstDigit + secondDigit);
+    }
+
+    private int calculateBrazilianCheckDigit(String base, int weightStart) {
+        int sum = 0;
+        for (int i = 0; i < base.length(); i++) {
+            sum += Character.getNumericValue(base.charAt(i)) * (weightStart - i);
+        }
+
+        int remainder = sum % 11;
+        return remainder < 2 ? 0 : 11 - remainder;
+    }
+
+    private int calculateCnpjDigit(String base) {
+        int[] weights = base.length() == 12
+            ? new int[]{5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2}
+            : new int[]{6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2};
+
+        int sum = 0;
+        for (int i = 0; i < base.length(); i++) {
+            sum += Character.getNumericValue(base.charAt(i)) * weights[i];
+        }
+
+        int remainder = sum % 11;
+        return remainder < 2 ? 0 : 11 - remainder;
     }
 
     private Optional<String> suggestCategoryName(String tenantId, String textBase) {
