@@ -12,6 +12,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -45,6 +46,7 @@ public class DocumentInsightService {
                 .confidence(suggestion.getConfidence())
                 .confidenceBand(resolveConfidenceBand(suggestion.getConfidence()))
                 .source(suggestion.getSource())
+                .generatedAt(Instant.now().toString())
                 .signals(resolveSignals(suggestion))
                 .build();
     }

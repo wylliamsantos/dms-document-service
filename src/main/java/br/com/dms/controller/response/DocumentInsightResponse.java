@@ -17,5 +17,6 @@ public class DocumentInsightResponse {
     double confidence;
     String confidenceBand;
     String source;
+    String generatedAt;
     List<InsightSignalResponse> signals;
 }
