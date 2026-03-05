@@ -9,6 +9,8 @@ import br.com.dms.domain.mongodb.DmsDocument;
 import br.com.dms.exception.DmsDocumentNotFoundException;
 import br.com.dms.exception.TypeException;
 import br.com.dms.repository.mongo.DmsDocumentRepository;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -28,24 +30,28 @@ public class DocumentInsightService {
     private final AiMetadataSuggestionService aiMetadataSuggestionService;
     private final TenantContextService tenantContextService;
     private final DmsDocumentRepository dmsDocumentRepository;
+    private final MeterRegistry meterRegistry;
     private final boolean ragEnabled;
     private final Set<String> ragEnabledTenants;
 
     public DocumentInsightService(AiMetadataSuggestionService aiMetadataSuggestionService,
                                   TenantContextService tenantContextService,
                                   DmsDocumentRepository dmsDocumentRepository,
+                                  MeterRegistry meterRegistry,
                                   @Value("${dms.ai.rag.document.enabled:false}") boolean ragEnabled,
                                   @Value("${dms.ai.rag.document.enabled-tenants:}") String ragEnabledTenants) {
         this.aiMetadataSuggestionService = aiMetadataSuggestionService;
         this.tenantContextService = tenantContextService;
         this.dmsDocumentRepository = dmsDocumentRepository;
+        this.meterRegistry = meterRegistry;
         this.ragEnabled = ragEnabled;
         this.ragEnabledTenants = parseEnabledTenants(ragEnabledTenants);
     }
 
     public DocumentInsightResponse getInsight(String documentId, Optional<String> version) {
+        String tenantId = tenantContextService.requireTenantId();
         MetadataSuggestionResponse suggestion = aiMetadataSuggestionService.suggest(documentId, version);
-        DmsDocument document = resolveDocument(documentId);
+        DmsDocument document = resolveDocument(documentId, tenantId);
 
         Map<String, Object> persistedMetadataPreview = extractMetadataPreview(document);
         Map<String, Object> resolvedMetadata = new LinkedHashMap<>();
@@ -56,6 +62,15 @@ public class DocumentInsightService {
             resolvedMetadata.putAll(persistedMetadataPreview);
         }
 
+        String confidenceBand = resolveConfidenceBand(suggestion.getConfidence());
+        Counter.builder("dms.ai.document.insight.requests")
+                .description("Insight requests by tenant/confidence/source")
+                .tag("tenant", sanitizeTenantTag(tenantId))
+                .tag("confidence_band", confidenceBand)
+                .tag("source", sanitizeMetricTag(suggestion.getSource(), "unknown"))
+                .register(meterRegistry)
+                .increment();
+
         return DocumentInsightResponse.builder()
                 .documentId(suggestion.getDocumentId())
                 .version(suggestion.getVersion())
@@ -63,7 +78,7 @@ public class DocumentInsightService {
                 .keyMetadata(resolvedMetadata)
                 .warnings(suggestion.getConsistencyWarnings())
                 .confidence(suggestion.getConfidence())
-                .confidenceBand(resolveConfidenceBand(suggestion.getConfidence()))
+                .confidenceBand(confidenceBand)
                 .source(suggestion.getSource())
                 .generatedAt(Instant.now().toString())
                 .signals(resolveSignals(suggestion))
@@ -92,8 +107,7 @@ public class DocumentInsightService {
         );
     }
 
-    private DmsDocument resolveDocument(String documentId) {
-        String tenantId = tenantContextService.requireTenantId();
+    private DmsDocument resolveDocument(String documentId, String tenantId) {
         return dmsDocumentRepository.findByIdAndTenantId(documentId, tenantId).orElse(null);
     }
 
@@ -134,6 +148,7 @@ public class DocumentInsightService {
         String tenantId = tenantContextService.requireTenantId();
 
         if (!ragEnabled) {
+            incrementRagCounter(tenantId, "DISABLED", 0);
             return DocumentRagContextResponse.builder()
                     .documentId(documentId)
                     .version(version.orElse(null))
@@ -145,6 +160,7 @@ public class DocumentInsightService {
         }
 
         if (!ragEnabledTenants.isEmpty() && !ragEnabledTenants.contains(tenantId)) {
+            incrementRagCounter(tenantId, "TENANT_DISABLED", 0);
             return DocumentRagContextResponse.builder()
                     .documentId(documentId)
                     .version(version.orElse(null))
@@ -159,6 +175,7 @@ public class DocumentInsightService {
                 .orElseThrow(() -> new DmsDocumentNotFoundException("Document not found", TypeException.VALID));
 
         List<RagContextChunkResponse> chunks = buildChunks(document);
+        incrementRagCounter(tenantId, "READY", chunks.size());
         return DocumentRagContextResponse.builder()
                 .documentId(documentId)
                 .version(version.orElse(null))
@@ -196,6 +213,41 @@ public class DocumentInsightService {
             }
         }
         return chunks;
+    }
+
+    private void incrementRagCounter(String tenantId, String status, int chunkCount) {
+        Counter.builder("dms.ai.document.rag.requests")
+                .description("RAG context requests by tenant/status/chunk volume")
+                .tag("tenant", sanitizeTenantTag(tenantId))
+                .tag("status", sanitizeMetricTag(status, "unknown"))
+                .tag("chunk_bucket", resolveChunkBucket(chunkCount))
+                .register(meterRegistry)
+                .increment();
+    }
+
+    private String resolveChunkBucket(int chunkCount) {
+        if (chunkCount <= 0) {
+            return "0";
+        }
+        if (chunkCount <= 2) {
+            return "1-2";
+        }
+        if (chunkCount <= 5) {
+            return "3-5";
+        }
+        return "6+";
+    }
+
+    private String sanitizeTenantTag(String tenantId) {
+        return sanitizeMetricTag(tenantId, "unknown");
+    }
+
+    private String sanitizeMetricTag(String value, String fallback) {
+        String normalized = StringUtils.lowerCase(StringUtils.trimToEmpty(value));
+        if (StringUtils.isBlank(normalized)) {
+            return fallback;
+        }
+        return normalized.replaceAll("[^a-z0-9._-]", "_");
     }
 
     private Set<String> parseEnabledTenants(String raw) {
