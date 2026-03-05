@@ -22,6 +22,8 @@ REPOS=(
   dms-frontend
 )
 
+OLLAMA_DEFAULT_MODEL="${DMS_AI_PROVIDER_LOCAL_MODEL:-llama3.1:8b}"
+
 mkdir -p "$WORKDIR" "$STACK_DIR" "$LOG_DIR"
 
 echo "📁 WORKDIR: $WORKDIR"
@@ -143,6 +145,24 @@ seed_keycloak() {
   echo "  - Keycloak realm dms pronto"
 }
 
+ensure_ollama_model() {
+  echo "  - aguardando Ollama ficar disponível..."
+  for _ in {1..60}; do
+    if curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:11434/api/tags" | grep -q "200"; then
+      break
+    fi
+    sleep 2
+  done
+
+  if curl -s "http://127.0.0.1:11434/api/tags" | grep -q "\"name\":\"$OLLAMA_DEFAULT_MODEL\""; then
+    echo "  - modelo $OLLAMA_DEFAULT_MODEL já disponível"
+    return
+  fi
+
+  echo "  - baixando modelo Ollama padrão: $OLLAMA_DEFAULT_MODEL (primeira execução pode demorar)"
+  docker exec dms-ollama ollama pull "$OLLAMA_DEFAULT_MODEL"
+}
+
 cat > "$STACK_DIR/docker-compose.yml" <<'YAML'
 services:
   mongo:
@@ -199,6 +219,15 @@ services:
     ports:
       - "9200:9200"
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: dms-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+
   keycloak:
     image: quay.io/keycloak/keycloak:25.0
     container_name: dms-keycloak
@@ -213,6 +242,7 @@ services:
 volumes:
   mongo-data:
   minio-data:
+  ollama-data:
 YAML
 
 cat > "$STACK_DIR/mongo-init.js" <<'JS'
@@ -232,10 +262,10 @@ try {
 }
 JS
 
-echo "[1/9] Detectando Java..."
+echo "[1/10] Detectando Java..."
 resolve_java
 
-echo "[2/9] Clonando/atualizando repositórios..."
+echo "[2/10] Clonando/atualizando repositórios..."
 for repo in "${REPOS[@]}"; do
   if [[ -d "$WORKDIR/$repo/.git" ]]; then
     git -C "$WORKDIR/$repo" fetch --all --prune >/dev/null 2>&1 || true
@@ -244,17 +274,20 @@ for repo in "${REPOS[@]}"; do
   fi
 done
 
-echo "[3/9] Subindo infraestrutura (docker compose)..."
+echo "[3/10] Subindo infraestrutura (docker compose)..."
 docker compose -f "$STACK_DIR/docker-compose.yml" up -d
 
-echo "[4/9] Seed do Keycloak (realm/client/user)..."
+echo "[4/10] Preparando Ollama (modelo local padrão)..."
+ensure_ollama_model
+
+echo "[5/10] Seed do Keycloak (realm/client/user)..."
 seed_keycloak
 
-echo "[5/9] Preparando bucket MinIO dms-local..."
+echo "[6/10] Preparando bucket MinIO dms-local..."
 docker run --rm --network host minio/mc alias set local http://127.0.0.1:9000 dms dmssecret >/dev/null 2>&1 || true
 docker run --rm --network host minio/mc mb -p local/dms-local >/dev/null 2>&1 || true
 
-echo "[6/9] Configurando frontend para modo local..."
+echo "[7/10] Configurando frontend para modo local..."
 cat > "$WORKDIR/dms-frontend/.env.local" <<'ENV'
 VITE_PORT=5173
 VITE_DOCUMENT_API_BASE_URL=http://localhost:8080
@@ -287,22 +320,22 @@ start_or_restart() {
   nohup bash -lc "$cmd" >"$log" 2>&1 &
 }
 
-echo "[7/9] Prebuild backend (${PREBUILD_MODE})..."
+echo "[8/10] Prebuild backend (${PREBUILD_MODE})..."
 prebuild_backend "$WORKDIR/dms-document-service" "$PREBUILD_MODE"
 prebuild_backend "$WORKDIR/dms-search-service" "$PREBUILD_MODE"
 prebuild_backend "$WORKDIR/dms-watch-service" "$PREBUILD_MODE"
 prebuild_backend "$WORKDIR/dms-audit-service" "$PREBUILD_MODE"
 
-echo "[8/9] Subindo serviços da aplicação..."
+echo "[9/10] Subindo serviços da aplicação..."
 CORS_ORIGINS="${DMS_CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}"
 
-start_or_restart "dms-document-service.*bootRun" "cd '$WORKDIR/dms-document-service' && export JAVA_HOME='$JAVA_HOME' && export PATH='$JAVA_HOME/bin:$PATH' && export DMS_CORS_ALLOWED_ORIGINS='$CORS_ORIGINS' && export DMS_AI_RAG_DOCUMENT_ENABLED='true' && export DMS_AI_CHAT_DOCUMENT_ENABLED='true' && export DMS_AI_PROVIDER_LOCAL_ENABLED='true' && SPRING_PROFILES_ACTIVE=local ./gradlew bootRun" "$LOG_DIR/document.log"
+start_or_restart "dms-document-service.*bootRun" "cd '$WORKDIR/dms-document-service' && export JAVA_HOME='$JAVA_HOME' && export PATH='$JAVA_HOME/bin:$PATH' && export DMS_CORS_ALLOWED_ORIGINS='$CORS_ORIGINS' && export DMS_AI_RAG_DOCUMENT_ENABLED='true' && export DMS_AI_CHAT_DOCUMENT_ENABLED='true' && export DMS_AI_PROVIDER_LOCAL_ENABLED='true' && export DMS_AI_PROVIDER_LOCAL_BASE_URL='http://localhost:11434' && export DMS_AI_PROVIDER_LOCAL_MODEL='$OLLAMA_DEFAULT_MODEL' && SPRING_PROFILES_ACTIVE=local ./gradlew bootRun" "$LOG_DIR/document.log"
 start_or_restart "dms-search-service.*bootRun" "cd '$WORKDIR/dms-search-service' && export JAVA_HOME='$JAVA_HOME' && export PATH='$JAVA_HOME/bin:$PATH' && export DMS_CORS_ALLOWED_ORIGINS='$CORS_ORIGINS' && SPRING_PROFILES_ACTIVE=local ./gradlew bootRun" "$LOG_DIR/search.log"
 start_or_restart "dms-watch-service.*bootRun" "cd '$WORKDIR/dms-watch-service' && export JAVA_HOME='$JAVA_HOME' && export PATH='$JAVA_HOME/bin:$PATH' && export DMS_CORS_ALLOWED_ORIGINS='$CORS_ORIGINS' && SPRING_PROFILES_ACTIVE=local ./gradlew bootRun" "$LOG_DIR/watch.log"
 start_or_restart "dms-audit-service.*bootRun" "cd '$WORKDIR/dms-audit-service' && export JAVA_HOME='$JAVA_HOME' && export PATH='$JAVA_HOME/bin:$PATH' && export DMS_CORS_ALLOWED_ORIGINS='$CORS_ORIGINS' && SPRING_PROFILES_ACTIVE=local ./gradlew bootRun" "$LOG_DIR/audit.log"
 start_or_restart "dms-frontend.*vite --host localhost --port 5173" "cd '$WORKDIR/dms-frontend' && npm ci && npm run dev -- --host localhost --port 5173" "$LOG_DIR/frontend.log"
 
-echo "[9/9] Health check rápido..."
+echo "[10/10] Health check rápido..."
 sleep 5
 for url in \
   "http://localhost:5173" \

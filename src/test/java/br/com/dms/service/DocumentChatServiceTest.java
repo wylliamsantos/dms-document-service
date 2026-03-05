@@ -32,7 +32,9 @@ class DocumentChatServiceTest {
                 false,
                 true,
                 "http://localhost:11434",
-                "llama3.1:8b"
+                "llama3.1:8b",
+                5000,
+                120000
         );
 
         DocumentChatRequest request = new DocumentChatRequest();
@@ -70,7 +72,9 @@ class DocumentChatServiceTest {
                 true,
                 true,
                 "http://localhost:65530",
-                "llama3.1:8b"
+                "llama3.1:8b",
+                500,
+                500
         );
 
         DocumentChatRequest request = new DocumentChatRequest();
