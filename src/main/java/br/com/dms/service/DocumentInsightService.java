@@ -258,8 +258,9 @@ public class DocumentInsightService {
                 ? 0.0d
                 : chunks.stream().mapToDouble(RagContextChunkResponse::getScore).average().orElse(0.0d);
         long latencyMs = Math.max(0L, Duration.between(startedAt, Instant.now()).toMillis());
+        String qualityBand = resolveRagQualityBand(status, chunkCount, averageScore);
 
-        incrementRagCounter(tenantId, status, category, chunkCount, averageScore);
+        incrementRagCounter(tenantId, status, category, chunkCount, averageScore, qualityBand);
         Timer.builder("dms.ai.document.rag.latency")
                 .description("RAG context latency by tenant/status/category")
                 .tag("tenant", sanitizeTenantTag(tenantId))
@@ -278,11 +279,12 @@ public class DocumentInsightService {
                 .chunkCount(chunkCount)
                 .averageScore(averageScore)
                 .latencyMs(latencyMs)
+                .qualityBand(qualityBand)
                 .chunks(chunks)
                 .build();
     }
 
-    private void incrementRagCounter(String tenantId, String status, String category, int chunkCount, double averageScore) {
+    private void incrementRagCounter(String tenantId, String status, String category, int chunkCount, double averageScore, String qualityBand) {
         Counter.builder("dms.ai.document.rag.requests")
                 .description("RAG context requests by tenant/status/category/chunk volume")
                 .tag("tenant", sanitizeTenantTag(tenantId))
@@ -290,6 +292,7 @@ public class DocumentInsightService {
                 .tag("category", sanitizeMetricTag(category, "unknown"))
                 .tag("chunk_bucket", resolveChunkBucket(chunkCount))
                 .tag("score_bucket", resolveScoreBucket(averageScore))
+                .tag("quality_band", sanitizeMetricTag(qualityBand, "unknown"))
                 .register(meterRegistry)
                 .increment();
     }
@@ -318,6 +321,19 @@ public class DocumentInsightService {
             return "0.50-0.74";
         }
         return "0.75+";
+    }
+
+    private String resolveRagQualityBand(String status, int chunkCount, double averageScore) {
+        if (!"READY".equalsIgnoreCase(StringUtils.defaultString(status))) {
+            return "BLOCKED";
+        }
+        if (chunkCount <= 0 || averageScore < 0.35d) {
+            return "LOW";
+        }
+        if (averageScore < 0.70d || chunkCount <= 2) {
+            return "MEDIUM";
+        }
+        return "HIGH";
     }
 
     private String sanitizeTenantTag(String tenantId) {

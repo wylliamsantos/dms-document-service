@@ -88,6 +88,7 @@ class DocumentInsightServiceTest {
         assertEquals("unknown", response.getCategory());
         assertTrue(response.getAverageScore() >= 0.0d);
         assertTrue(response.getLatencyMs() >= 0L);
+        assertEquals("BLOCKED", response.getQualityBand());
         assertTrue(response.getChunks().isEmpty());
     }
 
@@ -110,6 +111,7 @@ class DocumentInsightServiceTest {
         assertFalse(response.isEnabled());
         assertEquals("TENANT_DISABLED", response.getStatus());
         assertEquals("unknown", response.getCategory());
+        assertEquals("BLOCKED", response.getQualityBand());
         assertTrue(response.getChunks().isEmpty());
     }
 
@@ -144,6 +146,7 @@ class DocumentInsightServiceTest {
         assertFalse(response.isEnabled());
         assertEquals("CATEGORY_DISABLED", response.getStatus());
         assertEquals("CONTRATO", response.getCategory());
+        assertEquals("BLOCKED", response.getQualityBand());
         assertTrue(response.getChunks().isEmpty());
     }
 
@@ -180,6 +183,7 @@ class DocumentInsightServiceTest {
         assertEquals(response.getChunks().size(), response.getChunkCount());
         assertTrue(response.getAverageScore() > 0.0d);
         assertTrue(response.getLatencyMs() >= 0L);
+        assertNotNull(response.getQualityBand());
         assertEquals("ocr", response.getChunks().get(0).getSource());
         assertTrue(response.getChunks().get(0).getScore() > 0.0d);
         assertNotNull(response.getChunks().get(0).getExcerpt());
