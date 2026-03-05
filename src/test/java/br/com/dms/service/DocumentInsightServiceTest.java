@@ -46,7 +46,8 @@ class DocumentInsightServiceTest {
                 aiService,
                 tenantContextService,
                 repository,
-                false
+                false,
+                ""
         );
         var response = service.getInsight("doc-1", Optional.of("2"));
 
@@ -68,12 +69,63 @@ class DocumentInsightServiceTest {
                 mock(AiMetadataSuggestionService.class),
                 mock(TenantContextService.class),
                 mock(br.com.dms.repository.mongo.DmsDocumentRepository.class),
-                false
+                false,
+                ""
         );
 
         DocumentRagContextResponse response = service.getRagContextSkeleton("doc-2", Optional.empty());
         assertFalse(response.isEnabled());
         assertEquals("DISABLED", response.getStatus());
         assertTrue(response.getChunks().isEmpty());
+    }
+
+    @Test
+    void shouldReturnTenantDisabledWhenTenantNotInAllowlist() {
+        TenantContextService tenantContextService = mock(TenantContextService.class);
+        when(tenantContextService.requireTenantId()).thenReturn("tenant-blocked");
+
+        DocumentInsightService service = new DocumentInsightService(
+                mock(AiMetadataSuggestionService.class),
+                tenantContextService,
+                mock(DmsDocumentRepository.class),
+                true,
+                "tenant-1,tenant-2"
+        );
+
+        DocumentRagContextResponse response = service.getRagContextSkeleton("doc-2", Optional.empty());
+        assertFalse(response.isEnabled());
+        assertEquals("TENANT_DISABLED", response.getStatus());
+        assertTrue(response.getChunks().isEmpty());
+    }
+
+    @Test
+    void shouldExposeRankedRagChunksWithScoreAndSource() {
+        TenantContextService tenantContextService = mock(TenantContextService.class);
+        when(tenantContextService.requireTenantId()).thenReturn("tenant-1");
+
+        DmsDocumentRepository repository = mock(DmsDocumentRepository.class);
+        when(repository.findByIdAndTenantId("doc-rag", "tenant-1")).thenReturn(Optional.of(
+                DmsDocument.of()
+                        .id("doc-rag")
+                        .tenantId("tenant-1")
+                        .ocrText("Primeiro parágrafo com conteúdo relevante.\n\nSegundo parágrafo com mais contexto.")
+                        .build()
+        ));
+
+        DocumentInsightService service = new DocumentInsightService(
+                mock(AiMetadataSuggestionService.class),
+                tenantContextService,
+                repository,
+                true,
+                "tenant-1"
+        );
+
+        DocumentRagContextResponse response = service.getRagContextSkeleton("doc-rag", Optional.empty());
+        assertTrue(response.isEnabled());
+        assertEquals("READY", response.getStatus());
+        assertFalse(response.getChunks().isEmpty());
+        assertEquals("ocr", response.getChunks().get(0).getSource());
+        assertTrue(response.getChunks().get(0).getScore() > 0.0d);
+        assertNotNull(response.getChunks().get(0).getExcerpt());
     }
 }

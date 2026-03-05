@@ -4,6 +4,7 @@ import br.com.dms.controller.response.DocumentInsightResponse;
 import br.com.dms.controller.response.DocumentRagContextResponse;
 import br.com.dms.controller.response.InsightSignalResponse;
 import br.com.dms.controller.response.MetadataSuggestionResponse;
+import br.com.dms.controller.response.RagContextChunkResponse;
 import br.com.dms.domain.mongodb.DmsDocument;
 import br.com.dms.exception.DmsDocumentNotFoundException;
 import br.com.dms.exception.TypeException;
@@ -18,6 +19,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class DocumentInsightService {
@@ -26,15 +29,18 @@ public class DocumentInsightService {
     private final TenantContextService tenantContextService;
     private final DmsDocumentRepository dmsDocumentRepository;
     private final boolean ragEnabled;
+    private final Set<String> ragEnabledTenants;
 
     public DocumentInsightService(AiMetadataSuggestionService aiMetadataSuggestionService,
                                   TenantContextService tenantContextService,
                                   DmsDocumentRepository dmsDocumentRepository,
-                                  @Value("${dms.ai.rag.document.enabled:false}") boolean ragEnabled) {
+                                  @Value("${dms.ai.rag.document.enabled:false}") boolean ragEnabled,
+                                  @Value("${dms.ai.rag.document.enabled-tenants:}") String ragEnabledTenants) {
         this.aiMetadataSuggestionService = aiMetadataSuggestionService;
         this.tenantContextService = tenantContextService;
         this.dmsDocumentRepository = dmsDocumentRepository;
         this.ragEnabled = ragEnabled;
+        this.ragEnabledTenants = parseEnabledTenants(ragEnabledTenants);
     }
 
     public DocumentInsightResponse getInsight(String documentId, Optional<String> version) {
@@ -125,6 +131,8 @@ public class DocumentInsightService {
     }
 
     public DocumentRagContextResponse getRagContextSkeleton(String documentId, Optional<String> version) {
+        String tenantId = tenantContextService.requireTenantId();
+
         if (!ragEnabled) {
             return DocumentRagContextResponse.builder()
                     .documentId(documentId)
@@ -136,11 +144,21 @@ public class DocumentInsightService {
                     .build();
         }
 
-        String tenantId = tenantContextService.requireTenantId();
+        if (!ragEnabledTenants.isEmpty() && !ragEnabledTenants.contains(tenantId)) {
+            return DocumentRagContextResponse.builder()
+                    .documentId(documentId)
+                    .version(version.orElse(null))
+                    .enabled(false)
+                    .status("TENANT_DISABLED")
+                    .message("RAG de documento desabilitado para o tenant atual (allowlist não inclui este tenant).")
+                    .chunks(List.of())
+                    .build();
+        }
+
         DmsDocument document = dmsDocumentRepository.findByIdAndTenantId(documentId, tenantId)
                 .orElseThrow(() -> new DmsDocumentNotFoundException("Document not found", TypeException.VALID));
 
-        List<String> chunks = buildChunks(document);
+        List<RagContextChunkResponse> chunks = buildChunks(document);
         return DocumentRagContextResponse.builder()
                 .documentId(documentId)
                 .version(version.orElse(null))
@@ -151,24 +169,41 @@ public class DocumentInsightService {
                 .build();
     }
 
-    private List<String> buildChunks(DmsDocument document) {
+    private List<RagContextChunkResponse> buildChunks(DmsDocument document) {
         String ocrText = StringUtils.trimToEmpty(document.getOcrText());
         if (StringUtils.isBlank(ocrText)) {
             return List.of();
         }
 
-        List<String> chunks = new ArrayList<>();
+        List<RagContextChunkResponse> chunks = new ArrayList<>();
         String[] paragraphs = ocrText.replace("\r", "\n").split("\\n\\s*\\n");
         for (String paragraph : paragraphs) {
             String clean = StringUtils.normalizeSpace(paragraph);
             if (StringUtils.isBlank(clean)) {
                 continue;
             }
-            chunks.add(clean.substring(0, Math.min(clean.length(), 400)));
+
+            String excerpt = clean.substring(0, Math.min(clean.length(), 400));
+            double score = Math.min(1.0d, excerpt.length() / 400.0d);
+            chunks.add(RagContextChunkResponse.builder()
+                    .source("ocr")
+                    .score(score)
+                    .excerpt(excerpt)
+                    .build());
+
             if (chunks.size() >= 5) {
                 break;
             }
         }
         return chunks;
+    }
+
+    private Set<String> parseEnabledTenants(String raw) {
+        return StringUtils.isBlank(raw)
+                ? Set.of()
+                : List.of(raw.split(",")).stream()
+                .map(StringUtils::trim)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toSet());
     }
 }
