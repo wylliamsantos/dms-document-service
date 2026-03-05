@@ -13,5 +13,9 @@ public class DocumentRagContextResponse {
     boolean enabled;
     String status;
     String message;
+    String category;
+    Integer chunkCount;
+    Double averageScore;
+    Long latencyMs;
     List<RagContextChunkResponse> chunks;
 }
