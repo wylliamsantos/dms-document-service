@@ -16,6 +16,7 @@ import br.com.dms.service.workflow.pojo.DmsDocumentSearchResponse;
 import br.com.dms.service.workflow.pojo.DmsEntry;
 import br.com.dms.service.workflow.pojo.DmsVersions;
 import br.com.dms.service.workflow.pojo.ZipFileResponse;
+import br.com.dms.controller.response.DocumentVersionDiffResponse;
 import br.com.dms.service.workflow.pojo.mapper.DmsEntryMapper;
 import br.com.dms.service.workflow.pojo.mapper.DmsVersionsMapper;
 import br.com.dms.exception.DmsBusinessException;
@@ -199,6 +200,59 @@ public class DocumentQueryService {
         //ordena de forma natural as versoes
         Collections.sort(listVersions, Collections.reverseOrder(new DmsEntryComparator()));
         return ResponseEntity.ok(DmsVersionsMapper.of(listVersions));
+    }
+
+    public ResponseEntity<DocumentVersionDiffResponse> getMetadataDiffBetweenVersions(String documentId, String baseVersion, String targetVersion) {
+        Optional<DmsDocumentVersion> baseVersionEntityOpt = dmsDocumentVersionRepository.findByDmsDocumentIdAndVersionNumber(documentId, baseVersion)
+                .filter(this::isCompletedUpload);
+        Optional<DmsDocumentVersion> targetVersionEntityOpt = dmsDocumentVersionRepository.findByDmsDocumentIdAndVersionNumber(documentId, targetVersion)
+                .filter(this::isCompletedUpload);
+
+        if (baseVersionEntityOpt.isEmpty() || targetVersionEntityOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Map<String, Object> baseMetadata = Optional.ofNullable(baseVersionEntityOpt.get().getMetadata()).orElse(Collections.emptyMap());
+        Map<String, Object> targetMetadata = Optional.ofNullable(targetVersionEntityOpt.get().getMetadata()).orElse(Collections.emptyMap());
+
+        Set<String> allKeys = new TreeSet<>();
+        allKeys.addAll(baseMetadata.keySet());
+        allKeys.addAll(targetMetadata.keySet());
+
+        List<DocumentVersionDiffResponse.MetadataChange> changes = new ArrayList<>();
+        for (String key : allKeys) {
+            boolean inBase = baseMetadata.containsKey(key);
+            boolean inTarget = targetMetadata.containsKey(key);
+            Object before = baseMetadata.get(key);
+            Object after = targetMetadata.get(key);
+
+            DocumentVersionDiffResponse.ChangeType changeType;
+            if (!inBase && inTarget) {
+                changeType = DocumentVersionDiffResponse.ChangeType.ADDED;
+            } else if (inBase && !inTarget) {
+                changeType = DocumentVersionDiffResponse.ChangeType.REMOVED;
+            } else if (!Objects.equals(before, after)) {
+                changeType = DocumentVersionDiffResponse.ChangeType.CHANGED;
+            } else {
+                continue;
+            }
+
+            changes.add(new DocumentVersionDiffResponse.MetadataChange(
+                    key,
+                    before == null ? null : String.valueOf(before),
+                    after == null ? null : String.valueOf(after),
+                    changeType
+            ));
+        }
+
+        DocumentVersionDiffResponse response = new DocumentVersionDiffResponse(
+                documentId,
+                baseVersion,
+                targetVersion,
+                changes
+        );
+
+        return ResponseEntity.ok(response);
     }
 
     public byte[] zipDocuments(List<DocumentInformationRequest> documentsInformation, String transactionId) throws IOException  {
