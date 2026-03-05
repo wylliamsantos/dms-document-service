@@ -1,6 +1,7 @@
 package br.com.dms.controller;
 
 import br.com.dms.controller.request.*;
+import br.com.dms.controller.response.DocumentVersionDiffResponse;
 import br.com.dms.controller.response.MetadataSuggestionResponse;
 import br.com.dms.controller.response.UrlPresignedResponse;
 import br.com.dms.domain.core.DocumentId;
@@ -146,6 +147,22 @@ public class DocumentController {
 
         log.info("DMS version {} - TransactionId: {} - Get document versions - documentId: {}", API_VERSION, transactionId, documentId);
         return documentQueryService.getDocumentVersions(documentId);
+    }
+
+    @GetMapping(path = "/{documentId}/versions/diff", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Ok", content = {@Content(schema = @Schema(implementation = DocumentVersionDiffResponse.class))}),
+            @ApiResponse(responseCode = "404", description = "document or version not found"),
+            @ApiResponse(responseCode = "500", description = "Server Error", content = {@Content(schema = @Schema(implementation = DefaultError.class))})
+    })
+    public ResponseEntity<DocumentVersionDiffResponse> getVersionMetadataDiff(@RequestHeader(name = "TransactionId") String transactionId,
+                                                                               @RequestHeader(name = "Authorization") String authorization,
+                                                                               @PathVariable(value = "documentId") String documentId,
+                                                                               @RequestParam("baseVersion") String baseVersion,
+                                                                               @RequestParam("targetVersion") String targetVersion) {
+        log.info("DMS version {} - TransactionId: {} - Compare metadata diff - documentId: {} - baseVersion: {} - targetVersion: {}",
+                API_VERSION, transactionId, documentId, baseVersion, targetVersion);
+        return documentQueryService.getMetadataDiffBetweenVersions(documentId, baseVersion, targetVersion);
     }
 
     @GetMapping(path = {"/{documentId}/information", "/{documentId}/{version}/information"}, produces = MediaType.APPLICATION_JSON_VALUE)
