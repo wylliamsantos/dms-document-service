@@ -2,6 +2,8 @@ package br.com.dms.service;
 
 import br.com.dms.controller.response.DocumentRagContextResponse;
 import br.com.dms.controller.response.MetadataSuggestionResponse;
+import br.com.dms.domain.mongodb.DmsDocument;
+import br.com.dms.repository.mongo.DmsDocumentRepository;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -28,10 +30,22 @@ class DocumentInsightServiceTest {
                         .build()
         );
 
+        TenantContextService tenantContextService = mock(TenantContextService.class);
+        when(tenantContextService.requireTenantId()).thenReturn("tenant-1");
+        DmsDocumentRepository repository = mock(DmsDocumentRepository.class);
+        when(repository.findByIdAndTenantId("doc-1", "tenant-1")).thenReturn(Optional.of(
+                DmsDocument.of()
+                        .id("doc-1")
+                        .tenantId("tenant-1")
+                        .ocrText("linha 1\n\nlinha 2")
+                        .metadata(Map.of("numero", "123", "valor", 42))
+                        .build()
+        ));
+
         DocumentInsightService service = new DocumentInsightService(
                 aiService,
-                mock(TenantContextService.class),
-                mock(br.com.dms.repository.mongo.DmsDocumentRepository.class),
+                tenantContextService,
+                repository,
                 false
         );
         var response = service.getInsight("doc-1", Optional.of("2"));
@@ -44,6 +58,8 @@ class DocumentInsightServiceTest {
         assertNotNull(response.getGeneratedAt());
         assertTrue(response.getSignals().stream().anyMatch(signal -> "ocr".equals(signal.getSignal()) && signal.isActive()));
         assertTrue(response.getSignals().stream().anyMatch(signal -> "heuristics".equals(signal.getSignal()) && signal.isActive()));
+        assertEquals(4, response.getOcrStats().get("words"));
+        assertEquals("123", response.getPersistedMetadataPreview().get("numero"));
     }
 
     @Test
