@@ -39,6 +39,7 @@ public class CategoryService {
         }
 
         validateBusinessKeyConfig(request);
+        validateRetentionPolicy(request);
 
         Category category = modelMapper.map(request, Category.class);
         category.setTenantId(tenantId);
@@ -62,6 +63,7 @@ public class CategoryService {
         }
 
         validateBusinessKeyConfig(request);
+        validateRetentionPolicy(request);
 
         Boolean requestedActive = request.getActive();
         modelMapper.map(request, categoryFromDB);
@@ -133,6 +135,23 @@ public class CategoryService {
         Object requiredObj = schema != null ? schema.get("required") : null;
         if (!(requiredObj instanceof List<?> requiredFields) || requiredFields.stream().noneMatch(field -> businessKeyField.equalsIgnoreCase(String.valueOf(field)))) {
             throw new DmsBusinessException("businessKeyField deve estar na lista required do schema", TypeException.VALID);
+        }
+    }
+
+    private void validateRetentionPolicy(CategoryRequest request) {
+        Long retentionDays = request.getRetentionDays();
+        Long archiveAfterDays = request.getArchiveAfterDays();
+
+        if (retentionDays != null && retentionDays <= 0) {
+            throw new DmsBusinessException("retentionDays deve ser maior que zero", TypeException.VALID);
+        }
+
+        if (archiveAfterDays != null && archiveAfterDays <= 0) {
+            throw new DmsBusinessException("archiveAfterDays deve ser maior que zero", TypeException.VALID);
+        }
+
+        if (retentionDays != null && archiveAfterDays != null && archiveAfterDays > retentionDays) {
+            throw new DmsBusinessException("archiveAfterDays não pode ser maior que retentionDays", TypeException.VALID);
         }
     }
 

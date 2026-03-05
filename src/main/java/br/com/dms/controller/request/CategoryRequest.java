@@ -28,6 +28,8 @@ public class CategoryRequest {
     @NotNull
     @NotBlank
     private String businessKeyField;
+    private Long retentionDays;
+    private Long archiveAfterDays;
     private Boolean active;
     @NotNull
     private Map<Object, Object> schema;

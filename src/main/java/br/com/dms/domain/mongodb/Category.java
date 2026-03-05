@@ -34,6 +34,10 @@ public class Category {
     private String uniqueAttributes;
     @Field("business_key_field")
     private String businessKeyField;
+    @Field("retention_days")
+    private Long retentionDays;
+    @Field("archive_after_days")
+    private Long archiveAfterDays;
     private Map<Object, Object> schema;
     private List<CategoryType> types;
     private Boolean active;

@@ -21,6 +21,8 @@ public interface DmsDocumentRepository extends MongoRepository<DmsDocument, Stri
 
     List<DmsDocument> findByTenantIdAndWorkflowStatusAndCategory(String tenantId, DocumentWorkflowStatus workflowStatus, String category);
 
+    List<DmsDocument> findByTenantIdAndCategory(String tenantId, String category);
+
     // legacy methods kept temporarily during tenant migration
     Optional<DmsDocument> findByCpfAndFilename(String cpf, String filename);
 

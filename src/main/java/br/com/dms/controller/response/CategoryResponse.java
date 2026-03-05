@@ -23,6 +23,8 @@ public class CategoryResponse {
     private Long validityInDays;
     private String uniqueAttributes;
     private String businessKeyField;
+    private Long retentionDays;
+    private Long archiveAfterDays;
     private Map<Object, Object> schema;
     private List<CategoryTypeResponse> types;
     private Boolean active;

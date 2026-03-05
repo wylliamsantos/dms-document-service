@@ -6,6 +6,7 @@ import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.time.Instant;
 import java.util.Map;
 
 @Document
@@ -36,6 +37,12 @@ public class DmsDocument {
     private String ocrText;
 
     private DocumentWorkflowStatus workflowStatus;
+
+    private Boolean archived;
+
+    private Instant archivedAt;
+
+    private Instant expiredAt;
 
     public DmsDocument() {
     }
@@ -137,6 +144,30 @@ public class DmsDocument {
         this.workflowStatus = workflowStatus;
     }
 
+    public Boolean getArchived() {
+        return archived;
+    }
+
+    public void setArchived(Boolean archived) {
+        this.archived = archived;
+    }
+
+    public Instant getArchivedAt() {
+        return archivedAt;
+    }
+
+    public void setArchivedAt(Instant archivedAt) {
+        this.archivedAt = archivedAt;
+    }
+
+    public Instant getExpiredAt() {
+        return expiredAt;
+    }
+
+    public void setExpiredAt(Instant expiredAt) {
+        this.expiredAt = expiredAt;
+    }
+
     public static DmsDocument.Builder of() {
         return new DmsDocument.Builder();
     }
@@ -201,6 +232,21 @@ public class DmsDocument {
 
         public Builder workflowStatus(DocumentWorkflowStatus workflowStatus) {
             dmsDocument.setWorkflowStatus(workflowStatus);
+            return this;
+        }
+
+        public Builder archived(Boolean archived) {
+            dmsDocument.setArchived(archived);
+            return this;
+        }
+
+        public Builder archivedAt(Instant archivedAt) {
+            dmsDocument.setArchivedAt(archivedAt);
+            return this;
+        }
+
+        public Builder expiredAt(Instant expiredAt) {
+            dmsDocument.setExpiredAt(expiredAt);
             return this;
         }
 
