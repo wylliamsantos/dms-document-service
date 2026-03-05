@@ -15,5 +15,7 @@ public class DocumentInsightResponse {
     Map<String, Object> keyMetadata;
     List<String> warnings;
     double confidence;
+    String confidenceBand;
     String source;
+    List<InsightSignalResponse> signals;
 }

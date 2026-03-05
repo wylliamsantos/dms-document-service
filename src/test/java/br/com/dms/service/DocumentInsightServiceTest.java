@@ -40,6 +40,9 @@ class DocumentInsightServiceTest {
         assertEquals("Resumo", response.getSummary());
         assertEquals("123", response.getKeyMetadata().get("cpf"));
         assertEquals(1, response.getWarnings().size());
+        assertEquals("MEDIUM", response.getConfidenceBand());
+        assertTrue(response.getSignals().stream().anyMatch(signal -> "ocr".equals(signal.getSignal()) && signal.isActive()));
+        assertTrue(response.getSignals().stream().anyMatch(signal -> "heuristics".equals(signal.getSignal()) && signal.isActive()));
     }
 
     @Test
