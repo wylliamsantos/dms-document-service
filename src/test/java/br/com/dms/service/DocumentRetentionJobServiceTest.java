@@ -80,6 +80,57 @@ class DocumentRetentionJobServiceTest {
         verify(dmsDocumentRepository, never()).deleteAll(anyList());
     }
 
+    @Test
+    void shouldApplyInclusiveThresholdsAtBoundaryDays() {
+        Category category = Category.builder()
+            .tenantId("tenant-a")
+            .name("CONTRATO")
+            .archiveAfterDays(30L)
+            .retentionDays(60L)
+            .build();
+
+        DmsDocument archiveBoundary = documentWithAgeInDays(30);
+        DmsDocument deleteBoundary = documentWithAgeInDays(60);
+
+        when(categoryRepository.findAll()).thenReturn(List.of(category));
+        when(dmsDocumentRepository.findByTenantIdAndCategory("tenant-a", "CONTRATO"))
+            .thenReturn(List.of(archiveBoundary, deleteBoundary));
+
+        service.execute();
+
+        ArgumentCaptor<List<DmsDocument>> saveCaptor = ArgumentCaptor.forClass(List.class);
+        verify(dmsDocumentRepository).saveAll(saveCaptor.capture());
+        assertThat(saveCaptor.getValue()).hasSize(1);
+        assertThat(saveCaptor.getValue().get(0).getId()).isEqualTo(archiveBoundary.getId());
+
+        ArgumentCaptor<List<DmsDocument>> deleteCaptor = ArgumentCaptor.forClass(List.class);
+        verify(dmsDocumentRepository).deleteAll(deleteCaptor.capture());
+        assertThat(deleteCaptor.getValue()).hasSize(1);
+        assertThat(deleteCaptor.getValue().get(0).getId()).isEqualTo(deleteBoundary.getId());
+    }
+
+    @Test
+    void shouldNotArchiveAlreadyArchivedDocumentAgain() {
+        Category category = Category.builder()
+            .tenantId("tenant-a")
+            .name("CONTRATO")
+            .archiveAfterDays(30L)
+            .build();
+
+        DmsDocument alreadyArchived = documentWithAgeInDays(45);
+        alreadyArchived.setArchived(Boolean.TRUE);
+        alreadyArchived.setArchivedAt(Instant.now().minus(5, ChronoUnit.DAYS));
+
+        when(categoryRepository.findAll()).thenReturn(List.of(category));
+        when(dmsDocumentRepository.findByTenantIdAndCategory("tenant-a", "CONTRATO"))
+            .thenReturn(List.of(alreadyArchived));
+
+        service.execute();
+
+        verify(dmsDocumentRepository, never()).saveAll(anyList());
+        verify(dmsDocumentRepository, never()).deleteAll(anyList());
+    }
+
     private DmsDocument documentWithAgeInDays(long days) {
         Instant createdAt = Instant.now().minus(days, ChronoUnit.DAYS);
         return DmsDocument.of()
