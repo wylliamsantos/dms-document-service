@@ -31,7 +31,7 @@ public class OcrPipelineService {
     @Value("${dms.ocr.enabled:true}")
     private boolean enabled;
 
-    @Value("${dms.ocr.base-url:http://ocr-service:8000}")
+    @Value("${dms.ocr.base-url:http://localhost:8093}")
     private String ocrBaseUrl;
 
     @Value("${dms.ocr.max-attempts:3}")

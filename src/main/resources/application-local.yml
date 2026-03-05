@@ -36,6 +36,12 @@ dms:
     enabled: true
     exchange: audit.events
     routing-key: audit.#
+  ocr:
+    enabled: true
+    base-url: ${DMS_OCR_BASE_URL:http://localhost:8093}
+    max-attempts: 3
+    retry-delay-ms: 1500
+    max-pages: 3
   s3:
     region: us-east-1
     bucket-name: dms-local
