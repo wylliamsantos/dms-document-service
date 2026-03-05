@@ -18,6 +18,7 @@ public class DmsEntry {
     private DmsContent content;
     private Map<String, Object> properties;
     private String ocrSummary;
+    private String ocrText;
     private Map<String, Object> importantExtractedMetadata;
 
     public String getCreatedAt() {
@@ -107,6 +108,14 @@ public class DmsEntry {
 
     public void setOcrSummary(String ocrSummary) {
         this.ocrSummary = ocrSummary;
+    }
+
+    public String getOcrText() {
+        return ocrText;
+    }
+
+    public void setOcrText(String ocrText) {
+        this.ocrText = ocrText;
     }
 
     public Map<String, Object> getImportantExtractedMetadata() {

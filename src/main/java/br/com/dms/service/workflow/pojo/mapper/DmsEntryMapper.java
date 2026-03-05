@@ -40,6 +40,7 @@ public class DmsEntryMapper {
         entry.setVersionType(versionType);
         entry.setWorkflowStatus(workflowStatus);
         entry.setOcrSummary(buildOcrSummary(ocrText));
+        entry.setOcrText(ocrText);
         entry.setImportantExtractedMetadata(extractImportantMetadata(properties));
 
         var content = new DmsContent();
