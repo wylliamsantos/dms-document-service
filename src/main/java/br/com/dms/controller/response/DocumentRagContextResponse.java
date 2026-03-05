@@ -17,5 +17,6 @@ public class DocumentRagContextResponse {
     Integer chunkCount;
     Double averageScore;
     Long latencyMs;
+    String qualityBand;
     List<RagContextChunkResponse> chunks;
 }
