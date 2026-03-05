@@ -2,6 +2,7 @@ package br.com.dms.controller;
 
 import br.com.dms.controller.request.WorkflowReviewRequest;
 import br.com.dms.controller.response.PendingDocumentResponse;
+import br.com.dms.controller.response.WorkflowDashboardResponse;
 import br.com.dms.controller.response.WorkflowReviewResponse;
 import br.com.dms.controller.response.WorkflowTransitionResponse;
 import br.com.dms.service.DmsService;
@@ -37,6 +38,14 @@ public class WorkflowController {
     public WorkflowController(WorkflowQueryService workflowQueryService, DmsService dmsService) {
         this.workflowQueryService = workflowQueryService;
         this.dmsService = dmsService;
+    }
+
+    @GetMapping(path = "/dashboard", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<WorkflowDashboardResponse> getDashboardMetrics(
+        @RequestHeader(name = "TransactionId") String transactionId,
+        @RequestHeader(name = "Authorization") String authorization) {
+
+        return ResponseEntity.ok(workflowQueryService.getDashboardMetrics());
     }
 
     @GetMapping(path = "/documents/{documentId}/history", produces = MediaType.APPLICATION_JSON_VALUE)
