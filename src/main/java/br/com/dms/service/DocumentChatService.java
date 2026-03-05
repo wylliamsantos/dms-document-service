@@ -8,6 +8,9 @@ import br.com.dms.exception.DmsDocumentNotFoundException;
 import br.com.dms.exception.TypeException;
 import br.com.dms.repository.mongo.DmsDocumentRepository;
 import br.com.dms.repository.mongo.DmsDocumentVersionRepository;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -37,6 +41,7 @@ public class DocumentChatService {
     private final TenantContextService tenantContextService;
     private final DmsDocumentRepository dmsDocumentRepository;
     private final DmsDocumentVersionRepository dmsDocumentVersionRepository;
+    private final MeterRegistry meterRegistry;
     private final RestTemplate restTemplate;
     private final boolean ragEnabled;
     private final boolean chatEnabled;
@@ -47,6 +52,7 @@ public class DocumentChatService {
     public DocumentChatService(TenantContextService tenantContextService,
                                DmsDocumentRepository dmsDocumentRepository,
                                DmsDocumentVersionRepository dmsDocumentVersionRepository,
+                               MeterRegistry meterRegistry,
                                @Value("${dms.ai.rag.document.enabled:false}") boolean ragEnabled,
                                @Value("${dms.ai.chat.document.enabled:false}") boolean chatEnabled,
                                @Value("${dms.ai.provider.local.enabled:true}") boolean localProviderEnabled,
@@ -57,6 +63,7 @@ public class DocumentChatService {
         this.tenantContextService = tenantContextService;
         this.dmsDocumentRepository = dmsDocumentRepository;
         this.dmsDocumentVersionRepository = dmsDocumentVersionRepository;
+        this.meterRegistry = meterRegistry;
         this.ragEnabled = ragEnabled;
         this.chatEnabled = chatEnabled;
         this.localProviderEnabled = localProviderEnabled;
@@ -70,15 +77,22 @@ public class DocumentChatService {
     }
 
     public DocumentChatResponse chat(String documentId, DocumentChatRequest request) {
+        long startedAt = System.nanoTime();
+
         if (!ragEnabled || !chatEnabled) {
-            return DocumentChatResponse.builder()
-                    .documentId(documentId)
-                    .version(request.getVersion())
-                    .enabled(false)
-                    .status("DISABLED")
-                    .message("Chat/RAG desabilitado por feature flags (dms.ai.rag.document.enabled e/ou dms.ai.chat.document.enabled).")
-                    .contextChunks(List.of())
-                    .build();
+            return buildResponseWithMetrics(
+                    "unknown",
+                    "DISABLED",
+                    null,
+                    startedAt,
+                    DocumentChatResponse.builder()
+                            .documentId(documentId)
+                            .version(request.getVersion())
+                            .enabled(false)
+                            .status("DISABLED")
+                            .message("Chat/RAG desabilitado por feature flags (dms.ai.rag.document.enabled e/ou dms.ai.chat.document.enabled).")
+                            .contextChunks(List.of())
+            );
         }
 
         String tenantId = tenantContextService.requireTenantId();
@@ -97,38 +111,53 @@ public class DocumentChatService {
         String prompt = buildPrompt(document, contextChunks, request.getMessage());
 
         if (!localProviderEnabled) {
-            return DocumentChatResponse.builder()
-                    .documentId(documentId)
-                    .version(resolvedVersion)
-                    .enabled(true)
-                    .status("PROVIDER_DISABLED")
-                    .message("Provedor local de IA desabilitado (dms.ai.provider.local.enabled=false).")
-                    .contextChunks(contextChunks)
-                    .build();
+            return buildResponseWithMetrics(
+                    tenantId,
+                    "PROVIDER_DISABLED",
+                    null,
+                    startedAt,
+                    DocumentChatResponse.builder()
+                            .documentId(documentId)
+                            .version(resolvedVersion)
+                            .enabled(true)
+                            .status("PROVIDER_DISABLED")
+                            .message("Provedor local de IA desabilitado (dms.ai.provider.local.enabled=false).")
+                            .contextChunks(contextChunks)
+            );
         }
 
         try {
             ChatResult result = queryLocalProvider(prompt);
-            return DocumentChatResponse.builder()
-                    .documentId(documentId)
-                    .version(resolvedVersion)
-                    .enabled(true)
-                    .status("OK")
-                    .message("Resposta gerada com contexto do documento.")
-                    .answer(result.answer())
-                    .model(result.model())
-                    .contextChunks(contextChunks)
-                    .build();
+            return buildResponseWithMetrics(
+                    tenantId,
+                    "OK",
+                    result.model(),
+                    startedAt,
+                    DocumentChatResponse.builder()
+                            .documentId(documentId)
+                            .version(resolvedVersion)
+                            .enabled(true)
+                            .status("OK")
+                            .message("Resposta gerada com contexto do documento.")
+                            .answer(result.answer())
+                            .model(result.model())
+                            .contextChunks(contextChunks)
+            );
         } catch (Exception ex) {
             log.warn("Falha ao consultar provedor local de IA (baseUrl={}, model={}): {}", localProviderBaseUrl, localProviderModel, ex.getMessage());
-            return DocumentChatResponse.builder()
-                    .documentId(documentId)
-                    .version(resolvedVersion)
-                    .enabled(true)
-                    .status("PROVIDER_UNAVAILABLE")
-                    .message("Serviço local de IA indisponível. Clique em 'Tentar novamente'.")
-                    .contextChunks(contextChunks)
-                    .build();
+            return buildResponseWithMetrics(
+                    tenantId,
+                    "PROVIDER_UNAVAILABLE",
+                    localProviderModel,
+                    startedAt,
+                    DocumentChatResponse.builder()
+                            .documentId(documentId)
+                            .version(resolvedVersion)
+                            .enabled(true)
+                            .status("PROVIDER_UNAVAILABLE")
+                            .message("Serviço local de IA indisponível. Clique em 'Tentar novamente'.")
+                            .contextChunks(contextChunks)
+            );
         }
     }
 
@@ -245,6 +274,56 @@ public class DocumentChatService {
         }
 
         return chunks;
+    }
+
+    private DocumentChatResponse buildResponseWithMetrics(String tenantId,
+                                                          String status,
+                                                          String model,
+                                                          long startedAt,
+                                                          DocumentChatResponse.DocumentChatResponseBuilder builder) {
+        long latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt);
+        incrementChatRequestCounter(tenantId, status, model);
+        recordChatLatency(tenantId, status, latencyMs);
+        if (!"OK".equals(status)) {
+            incrementChatErrorCounter(tenantId, status);
+        }
+        return builder.latencyMs(latencyMs).build();
+    }
+
+    private void incrementChatRequestCounter(String tenantId, String status, String model) {
+        Counter.builder("dms.ai.document.chat.requests")
+                .description("Chat requests by tenant/status/model")
+                .tag("tenant", sanitizeMetricTag(tenantId, "unknown"))
+                .tag("status", sanitizeMetricTag(status, "unknown"))
+                .tag("model", sanitizeMetricTag(model, "unknown"))
+                .register(meterRegistry)
+                .increment();
+    }
+
+    private void incrementChatErrorCounter(String tenantId, String status) {
+        Counter.builder("dms.ai.document.chat.errors")
+                .description("Chat errors by tenant/status")
+                .tag("tenant", sanitizeMetricTag(tenantId, "unknown"))
+                .tag("status", sanitizeMetricTag(status, "unknown"))
+                .register(meterRegistry)
+                .increment();
+    }
+
+    private void recordChatLatency(String tenantId, String status, long latencyMs) {
+        Timer.builder("dms.ai.document.chat.latency")
+                .description("Chat latency by tenant/status")
+                .tag("tenant", sanitizeMetricTag(tenantId, "unknown"))
+                .tag("status", sanitizeMetricTag(status, "unknown"))
+                .register(meterRegistry)
+                .record(latencyMs, TimeUnit.MILLISECONDS);
+    }
+
+    private String sanitizeMetricTag(String value, String fallback) {
+        String normalized = StringUtils.lowerCase(StringUtils.trimToEmpty(value));
+        if (StringUtils.isBlank(normalized)) {
+            return fallback;
+        }
+        return normalized.replaceAll("[^a-z0-9._-]", "_");
     }
 
     private record ChatResult(String model, String answer) {}

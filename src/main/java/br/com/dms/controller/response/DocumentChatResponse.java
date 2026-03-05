@@ -15,5 +15,6 @@ public class DocumentChatResponse {
     String message;
     String answer;
     String model;
+    Long latencyMs;
     List<String> contextChunks;
 }
