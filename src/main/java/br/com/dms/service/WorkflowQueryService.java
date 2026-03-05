@@ -1,6 +1,9 @@
 package br.com.dms.service;
 
 import br.com.dms.controller.response.PendingDocumentResponse;
+import br.com.dms.controller.response.WorkflowCategoryStatusCountResponse;
+import br.com.dms.controller.response.WorkflowDashboardResponse;
+import br.com.dms.controller.response.WorkflowStatusCountResponse;
 import br.com.dms.controller.response.WorkflowTransitionResponse;
 import br.com.dms.domain.core.DocumentWorkflowStatus;
 import br.com.dms.domain.mongodb.DmsDocument;
@@ -19,6 +22,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -38,6 +42,41 @@ public class WorkflowQueryService {
         this.dmsDocumentVersionRepository = dmsDocumentVersionRepository;
         this.workflowTransitionRepository = workflowTransitionRepository;
         this.tenantContextService = tenantContextService;
+    }
+
+    public WorkflowDashboardResponse getDashboardMetrics() {
+        String tenantId = tenantContextService.requireTenantId();
+        List<DmsDocument> documents = dmsDocumentRepository.findByTenantId(tenantId);
+
+        Map<DocumentWorkflowStatus, Long> statusCounter = documents.stream()
+            .collect(Collectors.groupingBy(
+                document -> document.getWorkflowStatus() == null ? DocumentWorkflowStatus.DRAFT : document.getWorkflowStatus(),
+                Collectors.counting()));
+
+        List<WorkflowStatusCountResponse> statusCounts = statusCounter.entrySet().stream()
+            .map(entry -> new WorkflowStatusCountResponse(entry.getKey(), entry.getValue()))
+            .sorted(Comparator.comparing(item -> item.getStatus().name()))
+            .collect(Collectors.toList());
+
+        Map<String, Map<DocumentWorkflowStatus, Long>> categoryCounter = documents.stream()
+            .collect(Collectors.groupingBy(
+                document -> StringUtils.defaultIfBlank(document.getCategory(), "SEM_CATEGORIA"),
+                Collectors.groupingBy(
+                    document -> document.getWorkflowStatus() == null ? DocumentWorkflowStatus.DRAFT : document.getWorkflowStatus(),
+                    Collectors.counting())));
+
+        List<WorkflowCategoryStatusCountResponse> categoryStatusCounts = categoryCounter.entrySet().stream()
+            .flatMap(categoryEntry -> categoryEntry.getValue().entrySet().stream()
+                .map(statusEntry -> new WorkflowCategoryStatusCountResponse(categoryEntry.getKey(), statusEntry.getKey(), statusEntry.getValue())))
+            .sorted(Comparator.comparing(WorkflowCategoryStatusCountResponse::getCategory)
+                .thenComparing(item -> item.getStatus().name()))
+            .collect(Collectors.toList());
+
+        WorkflowDashboardResponse response = new WorkflowDashboardResponse();
+        response.setTotalDocuments(documents.size());
+        response.setStatusCounts(statusCounts);
+        response.setCategoryStatusCounts(categoryStatusCounts);
+        return response;
     }
 
     public List<WorkflowTransitionResponse> listDocumentHistory(String documentId) {
