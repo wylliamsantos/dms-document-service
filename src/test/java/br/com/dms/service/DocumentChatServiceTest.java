@@ -5,6 +5,7 @@ import br.com.dms.controller.response.DocumentChatResponse;
 import br.com.dms.domain.mongodb.DmsDocument;
 import br.com.dms.repository.mongo.DmsDocumentRepository;
 import br.com.dms.repository.mongo.DmsDocumentVersionRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -12,6 +13,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -28,6 +30,7 @@ class DocumentChatServiceTest {
                 tenantContextService,
                 docRepo,
                 versionRepo,
+                new SimpleMeterRegistry(),
                 false,
                 false,
                 true,
@@ -44,6 +47,7 @@ class DocumentChatServiceTest {
 
         assertFalse(response.isEnabled());
         assertEquals("DISABLED", response.getStatus());
+        assertNotNull(response.getLatencyMs());
     }
 
     @Test
@@ -68,6 +72,7 @@ class DocumentChatServiceTest {
                 tenantContextService,
                 docRepo,
                 versionRepo,
+                new SimpleMeterRegistry(),
                 true,
                 true,
                 true,
@@ -85,5 +90,6 @@ class DocumentChatServiceTest {
         assertTrue(response.isEnabled());
         assertEquals("PROVIDER_UNAVAILABLE", response.getStatus());
         assertFalse(response.getContextChunks().isEmpty());
+        assertNotNull(response.getLatencyMs());
     }
 }
