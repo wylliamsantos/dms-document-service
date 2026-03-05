@@ -11,10 +11,12 @@ import br.com.dms.exception.TypeException;
 import br.com.dms.repository.mongo.DmsDocumentRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -182,60 +184,35 @@ public class DocumentInsightService {
 
     public DocumentRagContextResponse getRagContextSkeleton(String documentId, Optional<String> version) {
         String tenantId = tenantContextService.requireTenantId();
+        Instant startedAt = Instant.now();
 
         if (!ragEnabled) {
-            incrementRagCounter(tenantId, "DISABLED", 0);
-            return DocumentRagContextResponse.builder()
-                    .documentId(documentId)
-                    .version(version.orElse(null))
-                    .enabled(false)
-                    .status("DISABLED")
-                    .message("RAG de documento desabilitado por feature flag (dms.ai.rag.document.enabled=false).")
-                    .chunks(List.of())
-                    .build();
+            return buildRagResponse(documentId, version, tenantId, "", false, "DISABLED",
+                    "RAG de documento desabilitado por feature flag (dms.ai.rag.document.enabled=false).", List.of(), startedAt);
         }
 
         if (!ragEnabledTenants.isEmpty() && !ragEnabledTenants.contains(tenantId)) {
-            incrementRagCounter(tenantId, "TENANT_DISABLED", 0);
-            return DocumentRagContextResponse.builder()
-                    .documentId(documentId)
-                    .version(version.orElse(null))
-                    .enabled(false)
-                    .status("TENANT_DISABLED")
-                    .message("RAG de documento desabilitado para o tenant atual (allowlist não inclui este tenant).")
-                    .chunks(List.of())
-                    .build();
+            return buildRagResponse(documentId, version, tenantId, "", false, "TENANT_DISABLED",
+                    "RAG de documento desabilitado para o tenant atual (allowlist não inclui este tenant).", List.of(), startedAt);
         }
 
         DmsDocument document = dmsDocumentRepository.findByIdAndTenantId(documentId, tenantId)
                 .orElseThrow(() -> new DmsDocumentNotFoundException("Document not found", TypeException.VALID));
+        String category = StringUtils.trimToEmpty(document.getCategory());
 
         if (!ragEnabledCategories.isEmpty()) {
-            String category = StringUtils.trimToEmpty(document.getCategory());
             boolean allowedCategory = ragEnabledCategories.contains(StringUtils.lowerCase(category));
             if (!allowedCategory) {
-                incrementRagCounter(tenantId, "CATEGORY_DISABLED", 0);
-                return DocumentRagContextResponse.builder()
-                        .documentId(documentId)
-                        .version(version.orElse(null))
-                        .enabled(false)
-                        .status("CATEGORY_DISABLED")
-                        .message("RAG de documento desabilitado para a categoria atual (allowlist por categoria).")
-                        .chunks(List.of())
-                        .build();
+                return buildRagResponse(documentId, version, tenantId, category, false, "CATEGORY_DISABLED",
+                        "RAG de documento desabilitado para a categoria atual (allowlist por categoria).", List.of(), startedAt);
             }
         }
 
         List<RagContextChunkResponse> chunks = buildChunks(document);
-        incrementRagCounter(tenantId, "READY", chunks.size());
-        return DocumentRagContextResponse.builder()
-                .documentId(documentId)
-                .version(version.orElse(null))
-                .enabled(true)
-                .status("READY")
-                .message(chunks.isEmpty() ? "Sem chunks de OCR disponíveis para este documento." : "Contexto RAG local carregado.")
-                .chunks(chunks)
-                .build();
+        return buildRagResponse(documentId, version, tenantId, category, true, "READY",
+                chunks.isEmpty() ? "Sem chunks de OCR disponíveis para este documento." : "Contexto RAG local carregado.",
+                chunks,
+                startedAt);
     }
 
     private List<RagContextChunkResponse> buildChunks(DmsDocument document) {
@@ -267,12 +244,52 @@ public class DocumentInsightService {
         return chunks;
     }
 
-    private void incrementRagCounter(String tenantId, String status, int chunkCount) {
-        Counter.builder("dms.ai.document.rag.requests")
-                .description("RAG context requests by tenant/status/chunk volume")
+    private DocumentRagContextResponse buildRagResponse(String documentId,
+                                                        Optional<String> version,
+                                                        String tenantId,
+                                                        String category,
+                                                        boolean enabled,
+                                                        String status,
+                                                        String message,
+                                                        List<RagContextChunkResponse> chunks,
+                                                        Instant startedAt) {
+        int chunkCount = chunks.size();
+        double averageScore = chunks.isEmpty()
+                ? 0.0d
+                : chunks.stream().mapToDouble(RagContextChunkResponse::getScore).average().orElse(0.0d);
+        long latencyMs = Math.max(0L, Duration.between(startedAt, Instant.now()).toMillis());
+
+        incrementRagCounter(tenantId, status, category, chunkCount, averageScore);
+        Timer.builder("dms.ai.document.rag.latency")
+                .description("RAG context latency by tenant/status/category")
                 .tag("tenant", sanitizeTenantTag(tenantId))
                 .tag("status", sanitizeMetricTag(status, "unknown"))
+                .tag("category", sanitizeMetricTag(category, "unknown"))
+                .register(meterRegistry)
+                .record(Duration.ofMillis(latencyMs));
+
+        return DocumentRagContextResponse.builder()
+                .documentId(documentId)
+                .version(version.orElse(null))
+                .enabled(enabled)
+                .status(status)
+                .message(message)
+                .category(StringUtils.defaultIfBlank(category, "unknown"))
+                .chunkCount(chunkCount)
+                .averageScore(averageScore)
+                .latencyMs(latencyMs)
+                .chunks(chunks)
+                .build();
+    }
+
+    private void incrementRagCounter(String tenantId, String status, String category, int chunkCount, double averageScore) {
+        Counter.builder("dms.ai.document.rag.requests")
+                .description("RAG context requests by tenant/status/category/chunk volume")
+                .tag("tenant", sanitizeTenantTag(tenantId))
+                .tag("status", sanitizeMetricTag(status, "unknown"))
+                .tag("category", sanitizeMetricTag(category, "unknown"))
                 .tag("chunk_bucket", resolveChunkBucket(chunkCount))
+                .tag("score_bucket", resolveScoreBucket(averageScore))
                 .register(meterRegistry)
                 .increment();
     }
@@ -288,6 +305,19 @@ public class DocumentInsightService {
             return "3-5";
         }
         return "6+";
+    }
+
+    private String resolveScoreBucket(double averageScore) {
+        if (averageScore <= 0.0d) {
+            return "0";
+        }
+        if (averageScore < 0.50d) {
+            return "0-0.49";
+        }
+        if (averageScore < 0.75d) {
+            return "0.50-0.74";
+        }
+        return "0.75+";
     }
 
     private String sanitizeTenantTag(String tenantId) {

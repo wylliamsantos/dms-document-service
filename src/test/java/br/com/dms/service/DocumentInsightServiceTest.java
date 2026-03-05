@@ -4,6 +4,7 @@ import br.com.dms.controller.response.DocumentRagContextResponse;
 import br.com.dms.controller.response.MetadataSuggestionResponse;
 import br.com.dms.domain.mongodb.DmsDocument;
 import br.com.dms.repository.mongo.DmsDocumentRepository;
+import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 
@@ -83,6 +84,10 @@ class DocumentInsightServiceTest {
         DocumentRagContextResponse response = service.getRagContextSkeleton("doc-2", Optional.empty());
         assertFalse(response.isEnabled());
         assertEquals("DISABLED", response.getStatus());
+        assertEquals(0, response.getChunkCount());
+        assertEquals("unknown", response.getCategory());
+        assertTrue(response.getAverageScore() >= 0.0d);
+        assertTrue(response.getLatencyMs() >= 0L);
         assertTrue(response.getChunks().isEmpty());
     }
 
@@ -104,6 +109,7 @@ class DocumentInsightServiceTest {
         DocumentRagContextResponse response = service.getRagContextSkeleton("doc-2", Optional.empty());
         assertFalse(response.isEnabled());
         assertEquals("TENANT_DISABLED", response.getStatus());
+        assertEquals("unknown", response.getCategory());
         assertTrue(response.getChunks().isEmpty());
     }
 
@@ -137,6 +143,7 @@ class DocumentInsightServiceTest {
         DocumentRagContextResponse response = service.getRagContextSkeleton("doc-rag", Optional.empty());
         assertFalse(response.isEnabled());
         assertEquals("CATEGORY_DISABLED", response.getStatus());
+        assertEquals("CONTRATO", response.getCategory());
         assertTrue(response.getChunks().isEmpty());
     }
 
@@ -154,11 +161,12 @@ class DocumentInsightServiceTest {
                         .build()
         ));
 
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
         DocumentInsightService service = new DocumentInsightService(
                 mock(AiMetadataSuggestionService.class),
                 tenantContextService,
                 repository,
-                new SimpleMeterRegistry(),
+                meterRegistry,
                 true,
                 "tenant-1",
                 ""
@@ -167,9 +175,17 @@ class DocumentInsightServiceTest {
         DocumentRagContextResponse response = service.getRagContextSkeleton("doc-rag", Optional.empty());
         assertTrue(response.isEnabled());
         assertEquals("READY", response.getStatus());
+        assertEquals("unknown", response.getCategory());
         assertFalse(response.getChunks().isEmpty());
+        assertEquals(response.getChunks().size(), response.getChunkCount());
+        assertTrue(response.getAverageScore() > 0.0d);
+        assertTrue(response.getLatencyMs() >= 0L);
         assertEquals("ocr", response.getChunks().get(0).getSource());
         assertTrue(response.getChunks().get(0).getScore() > 0.0d);
         assertNotNull(response.getChunks().get(0).getExcerpt());
+
+        Timer timer = meterRegistry.find("dms.ai.document.rag.latency").timer();
+        assertNotNull(timer);
+        assertEquals(1, timer.count());
     }
 }
