@@ -4,6 +4,7 @@ import br.com.dms.controller.response.DocumentRagContextResponse;
 import br.com.dms.controller.response.MetadataSuggestionResponse;
 import br.com.dms.domain.mongodb.DmsDocument;
 import br.com.dms.repository.mongo.DmsDocumentRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -46,6 +47,7 @@ class DocumentInsightServiceTest {
                 aiService,
                 tenantContextService,
                 repository,
+                new SimpleMeterRegistry(),
                 false,
                 ""
         );
@@ -69,6 +71,7 @@ class DocumentInsightServiceTest {
                 mock(AiMetadataSuggestionService.class),
                 mock(TenantContextService.class),
                 mock(br.com.dms.repository.mongo.DmsDocumentRepository.class),
+                new SimpleMeterRegistry(),
                 false,
                 ""
         );
@@ -88,6 +91,7 @@ class DocumentInsightServiceTest {
                 mock(AiMetadataSuggestionService.class),
                 tenantContextService,
                 mock(DmsDocumentRepository.class),
+                new SimpleMeterRegistry(),
                 true,
                 "tenant-1,tenant-2"
         );
@@ -116,6 +120,7 @@ class DocumentInsightServiceTest {
                 mock(AiMetadataSuggestionService.class),
                 tenantContextService,
                 repository,
+                new SimpleMeterRegistry(),
                 true,
                 "tenant-1"
         );
