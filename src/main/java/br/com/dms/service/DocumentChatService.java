@@ -108,36 +108,54 @@ public class DocumentChatService {
         }
 
         try {
-            String answer = queryLocalProvider(prompt);
+            ChatResult result = queryLocalProvider(prompt);
             return DocumentChatResponse.builder()
                     .documentId(documentId)
                     .version(resolvedVersion)
                     .enabled(true)
                     .status("OK")
                     .message("Resposta gerada com contexto do documento.")
-                    .answer(answer)
-                    .model(localProviderModel)
+                    .answer(result.answer())
+                    .model(result.model())
                     .contextChunks(contextChunks)
                     .build();
         } catch (Exception ex) {
-            log.warn("Falha ao consultar provedor local de IA: {}", ex.getMessage());
+            log.warn("Falha ao consultar provedor local de IA (baseUrl={}, model={}): {}", localProviderBaseUrl, localProviderModel, ex.getMessage());
             return DocumentChatResponse.builder()
                     .documentId(documentId)
                     .version(resolvedVersion)
                     .enabled(true)
                     .status("PROVIDER_UNAVAILABLE")
-                    .message("Serviço local de IA indisponível. Clique em 'Tentar novamente'. Se for a primeira execução, inicie o Ollama e baixe o modelo padrão ('" + localProviderModel + "').")
+                    .message("Serviço local de IA indisponível. Clique em 'Tentar novamente'.")
                     .contextChunks(contextChunks)
                     .build();
         }
     }
 
-    private String queryLocalProvider(String prompt) {
+    private ChatResult queryLocalProvider(String prompt) {
+        List<String> candidates = resolveModelCandidates();
+        log.info("Chat IA local - baseUrl={} modeloConfigurado={} candidatos={}", localProviderBaseUrl, localProviderModel, candidates);
+
+        Exception lastError = null;
+        for (String candidate : candidates) {
+            try {
+                String answer = queryLocalProviderWithModel(prompt, candidate);
+                return new ChatResult(candidate, answer);
+            } catch (Exception ex) {
+                lastError = ex;
+                log.warn("Falha no modelo '{}' (baseUrl={}): {}", candidate, localProviderBaseUrl, ex.getMessage());
+            }
+        }
+
+        throw new RuntimeException("Todos os modelos candidatos falharam", lastError);
+    }
+
+    private String queryLocalProviderWithModel(String prompt, String model) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("model", localProviderModel);
+        payload.put("model", model);
         payload.put("prompt", prompt);
         payload.put("stream", false);
 
@@ -161,6 +179,37 @@ public class DocumentChatService {
             throw new RuntimeException("Resposta vazia do provedor local");
         }
         return answer.toString();
+    }
+
+    private List<String> resolveModelCandidates() {
+        List<String> candidates = new ArrayList<>();
+        if (StringUtils.isNotBlank(localProviderModel)) {
+            candidates.add(localProviderModel.trim());
+        }
+
+        try {
+            ResponseEntity<Map> tags = restTemplate.getForEntity(localProviderBaseUrl + "/api/tags", Map.class);
+            if (tags.getStatusCode().is2xxSuccessful() && tags.getBody() != null) {
+                Object modelsObj = tags.getBody().get("models");
+                if (modelsObj instanceof List<?> models) {
+                    for (Object item : models) {
+                        if (item instanceof Map<?, ?> modelMap) {
+                            Object name = modelMap.get("name");
+                            if (name != null) {
+                                String modelName = String.valueOf(name).trim();
+                                if (StringUtils.isNotBlank(modelName) && !candidates.contains(modelName)) {
+                                    candidates.add(modelName);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("Não foi possível consultar /api/tags em {}: {}", localProviderBaseUrl, ex.getMessage());
+        }
+
+        return candidates;
     }
 
     private List<String> buildContextChunks(DmsDocument document) {
@@ -197,6 +246,8 @@ public class DocumentChatService {
 
         return chunks;
     }
+
+    private record ChatResult(String model, String answer) {}
 
     private String buildPrompt(DmsDocument document, List<String> contextChunks, String question) {
         StringBuilder builder = new StringBuilder();
