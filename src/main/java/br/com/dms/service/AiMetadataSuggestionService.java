@@ -15,9 +15,14 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Service
 public class AiMetadataSuggestionService {
+
+    private static final Set<String> STOPWORDS = Set.of(
+        "de", "da", "do", "das", "dos", "e", "a", "o", "as", "os", "em", "para", "com", "sem"
+    );
 
     private final DmsDocumentRepository dmsDocumentRepository;
     private final DmsDocumentVersionRepository dmsDocumentVersionRepository;
@@ -59,16 +64,89 @@ public class AiMetadataSuggestionService {
             suggestions.put(document.getBusinessKeyType(), document.getBusinessKeyValue());
         }
 
+        String suggestedCategory = suggestCategoryName(tenantId, textBase).orElse(document.getCategory());
         double confidence = suggestions.isEmpty() ? 0.0 : Math.min(0.95d, 0.45d + (suggestions.size() * 0.1d));
 
         return MetadataSuggestionResponse.builder()
             .documentId(documentId)
             .version(documentVersion.getVersionNumber() == null ? null : documentVersion.getVersionNumber().toPlainString())
             .category(document.getCategory())
+            .suggestedCategory(suggestedCategory)
             .suggestedMetadata(suggestions)
             .confidence(confidence)
             .source("ocr+heuristics")
             .build();
+    }
+
+    private Optional<String> suggestCategoryName(String tenantId, String textBase) {
+        List<Category> categories = categoryRepository.findAllByTenantId(tenantId);
+        if (categories.isEmpty() || StringUtils.isBlank(textBase)) {
+            return Optional.empty();
+        }
+
+        Set<String> documentTokens = tokenize(textBase);
+        if (documentTokens.isEmpty()) {
+            return Optional.empty();
+        }
+
+        String bestCategory = null;
+        double bestScore = 0.0;
+
+        for (Category category : categories) {
+            Set<String> categoryTokens = tokensFromCategory(category);
+            if (categoryTokens.isEmpty()) {
+                continue;
+            }
+
+            long overlap = categoryTokens.stream().filter(documentTokens::contains).count();
+            if (overlap == 0) {
+                continue;
+            }
+
+            double score = (double) overlap / (double) categoryTokens.size();
+            if (score > bestScore) {
+                bestScore = score;
+                bestCategory = category.getName();
+            }
+        }
+
+        return bestScore >= 0.20d ? Optional.ofNullable(bestCategory) : Optional.empty();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Set<String> tokensFromCategory(Category category) {
+        Set<String> tokens = new LinkedHashSet<>();
+
+        tokens.addAll(tokenize(category.getName()));
+        tokens.addAll(tokenize(category.getTitle()));
+        tokens.addAll(tokenize(category.getDescription()));
+
+        if (category.getSchema() != null) {
+            Object propertiesRaw = category.getSchema().get("properties");
+            if (propertiesRaw instanceof Map<?, ?> properties) {
+                for (Map.Entry<?, ?> property : properties.entrySet()) {
+                    tokens.addAll(tokenize(String.valueOf(property.getKey())));
+                    Object definition = property.getValue();
+                    if (definition instanceof Map<?, ?> definitionMap) {
+                        Object title = definitionMap.get("title");
+                        if (title != null) {
+                            tokens.addAll(tokenize(String.valueOf(title)));
+                        }
+                    }
+                }
+            }
+        }
+
+        return tokens;
+    }
+
+    private Set<String> tokenize(String value) {
+        return Arrays.stream(StringUtils.defaultString(value).toLowerCase(Locale.ROOT).split("[^\\p{L}\\p{N}]+"))
+            .map(StringUtils::trimToNull)
+            .filter(Objects::nonNull)
+            .filter(token -> token.length() > 2)
+            .filter(token -> !STOPWORDS.contains(token))
+            .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     @SuppressWarnings("unchecked")

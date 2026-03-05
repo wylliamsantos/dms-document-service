@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -70,11 +71,45 @@ class AiMetadataSuggestionServiceTest {
         when(dmsDocumentRepository.findByIdAndTenantId(documentId, tenantId)).thenReturn(Optional.of(document));
         when(dmsDocumentVersionRepository.findLastVersionByTenantIdAndDmsDocumentId(tenantId, documentId)).thenReturn(Optional.of(version));
         when(categoryRepository.findByTenantIdAndName(tenantId, "CONTRATO")).thenReturn(Optional.of(category));
+        when(categoryRepository.findAllByTenantId(tenantId)).thenReturn(List.of(category));
 
         MetadataSuggestionResponse response = service.suggest(documentId, Optional.empty());
 
         assertEquals("123.456.789-01", response.getSuggestedMetadata().get("cpf"));
         assertEquals("05/03/2026", response.getSuggestedMetadata().get("dataEmissao"));
+        assertEquals("CONTRATO", response.getSuggestedCategory());
         assertTrue(response.getConfidence() > 0);
+    }
+
+    @Test
+    void shouldSuggestCategoryFromOcrTextTokens() {
+        String tenantId = "t1";
+        String documentId = "doc-2";
+
+        DmsDocument document = DmsDocument.of()
+            .id(documentId)
+            .tenantId(tenantId)
+            .category("OUTROS")
+            .filename("nf-servico.pdf")
+            .ocrText("Nota fiscal de serviço emitida pela empresa ACME")
+            .build();
+
+        DmsDocumentVersion version = DmsDocumentVersion.of()
+            .dmsDocumentId(documentId)
+            .versionNumber(new BigDecimal("2.0"))
+            .build();
+
+        Category current = Category.builder().name("OUTROS").description("categoria geral").build();
+        Category notaFiscal = Category.builder().name("NOTA_FISCAL").description("nota fiscal serviço").build();
+
+        when(tenantContextService.requireTenantId()).thenReturn(tenantId);
+        when(dmsDocumentRepository.findByIdAndTenantId(documentId, tenantId)).thenReturn(Optional.of(document));
+        when(dmsDocumentVersionRepository.findLastVersionByTenantIdAndDmsDocumentId(tenantId, documentId)).thenReturn(Optional.of(version));
+        when(categoryRepository.findByTenantIdAndName(tenantId, "OUTROS")).thenReturn(Optional.of(current));
+        when(categoryRepository.findAllByTenantId(tenantId)).thenReturn(List.of(current, notaFiscal));
+
+        MetadataSuggestionResponse response = service.suggest(documentId, Optional.empty());
+
+        assertEquals("NOTA_FISCAL", response.getSuggestedCategory());
     }
 }

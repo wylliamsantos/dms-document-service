@@ -11,6 +11,7 @@ public class MetadataSuggestionResponse {
     String documentId;
     String version;
     String category;
+    String suggestedCategory;
     Map<String, Object> suggestedMetadata;
     double confidence;
     String source;
