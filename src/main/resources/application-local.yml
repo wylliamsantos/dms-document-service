@@ -53,7 +53,7 @@ dms:
       local:
         enabled: ${DMS_AI_PROVIDER_LOCAL_ENABLED:true}
         base-url: ${DMS_AI_PROVIDER_LOCAL_BASE_URL:http://localhost:11434}
-        model: ${DMS_AI_PROVIDER_LOCAL_MODEL:llama3.1:8b}
+        model: ${DMS_AI_PROVIDER_LOCAL_MODEL:llama3.2:1b}
         connect-timeout-ms: ${DMS_AI_PROVIDER_LOCAL_CONNECT_TIMEOUT_MS:5000}
         read-timeout-ms: ${DMS_AI_PROVIDER_LOCAL_READ_TIMEOUT_MS:120000}
   s3:
