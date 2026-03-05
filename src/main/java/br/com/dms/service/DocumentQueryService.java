@@ -36,6 +36,7 @@ import org.springframework.stereotype.Service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
 import java.time.Instant;
 import java.util.*;
@@ -245,14 +246,76 @@ public class DocumentQueryService {
             ));
         }
 
+        DocumentVersionDiffResponse.ContentComparison contentComparison = compareTextualContent(baseVersionEntityOpt.get(), targetVersionEntityOpt.get());
+
         DocumentVersionDiffResponse response = new DocumentVersionDiffResponse(
                 documentId,
                 baseVersion,
                 targetVersion,
-                changes
+                changes,
+                contentComparison
         );
 
         return ResponseEntity.ok(response);
+    }
+
+    private DocumentVersionDiffResponse.ContentComparison compareTextualContent(DmsDocumentVersion baseVersion, DmsDocumentVersion targetVersion) {
+        String mimeType = Optional.ofNullable(targetVersion.getMimeType())
+                .or(() -> Optional.ofNullable(baseVersion.getMimeType()))
+                .orElse("");
+
+        if (!isTextComparableMimeType(mimeType)) {
+            return new DocumentVersionDiffResponse.ContentComparison(false, "UNSUPPORTED_MIME_TYPE", null, null);
+        }
+
+        try {
+            Optional<DmsDocument> baseDocumentOpt = dmsDocumentRepository.findById(baseVersion.getDmsDocumentId());
+            Optional<DmsDocument> targetDocumentOpt = dmsDocumentRepository.findById(targetVersion.getDmsDocumentId());
+            if (baseDocumentOpt.isEmpty() || targetDocumentOpt.isEmpty()) {
+                return new DocumentVersionDiffResponse.ContentComparison(false, "DOCUMENT_NOT_FOUND", null, null);
+            }
+
+            byte[] baseBytes = loadDocumentContent(baseDocumentOpt.get(), baseVersion);
+            byte[] targetBytes = loadDocumentContent(targetDocumentOpt.get(), targetVersion);
+
+            String baseText = normalizeTextContent(new String(baseBytes, StandardCharsets.UTF_8));
+            String targetText = normalizeTextContent(new String(targetBytes, StandardCharsets.UTF_8));
+
+            if (Objects.equals(baseText, targetText)) {
+                return new DocumentVersionDiffResponse.ContentComparison(true, "UNCHANGED", snippet(baseText), snippet(targetText));
+            }
+
+            return new DocumentVersionDiffResponse.ContentComparison(true, "CHANGED", snippet(baseText), snippet(targetText));
+        } catch (Exception exception) {
+            logger.warn("Erro ao comparar conteúdo textual entre versões {} e {}: {}",
+                    baseVersion.getVersionNumber(), targetVersion.getVersionNumber(), exception.getMessage());
+            return new DocumentVersionDiffResponse.ContentComparison(false, "ERROR", null, null);
+        }
+    }
+
+    private boolean isTextComparableMimeType(String mimeType) {
+        String normalized = mimeType.toLowerCase(Locale.ROOT);
+        return normalized.startsWith("text/")
+                || normalized.equals("application/json")
+                || normalized.equals("application/xml")
+                || normalized.equals("application/csv")
+                || normalized.equals("application/javascript");
+    }
+
+    private String normalizeTextContent(String content) {
+        return Optional.ofNullable(content)
+                .orElse("")
+                .replace("\r\n", "\n")
+                .replace('\r', '\n')
+                .replaceAll("\\s+", " ")
+                .trim();
+    }
+
+    private String snippet(String content) {
+        if (content == null || content.isBlank()) {
+            return null;
+        }
+        return content.length() > 240 ? content.substring(0, 240) + "..." : content;
     }
 
     public byte[] zipDocuments(List<DocumentInformationRequest> documentsInformation, String transactionId) throws IOException  {
