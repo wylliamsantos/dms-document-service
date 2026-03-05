@@ -2,6 +2,7 @@ package br.com.dms.service;
 
 import br.com.dms.controller.response.DocumentInsightResponse;
 import br.com.dms.controller.response.DocumentRagContextResponse;
+import br.com.dms.controller.response.InsightSignalResponse;
 import br.com.dms.controller.response.MetadataSuggestionResponse;
 import br.com.dms.domain.mongodb.DmsDocument;
 import br.com.dms.exception.DmsDocumentNotFoundException;
@@ -42,8 +43,30 @@ public class DocumentInsightService {
                 .keyMetadata(suggestion.getSuggestedMetadata())
                 .warnings(suggestion.getConsistencyWarnings())
                 .confidence(suggestion.getConfidence())
+                .confidenceBand(resolveConfidenceBand(suggestion.getConfidence()))
                 .source(suggestion.getSource())
+                .signals(resolveSignals(suggestion))
                 .build();
+    }
+
+    private String resolveConfidenceBand(double confidence) {
+        if (confidence >= 0.85d) {
+            return "HIGH";
+        }
+        if (confidence >= 0.60d) {
+            return "MEDIUM";
+        }
+        return "LOW";
+    }
+
+    private List<InsightSignalResponse> resolveSignals(MetadataSuggestionResponse suggestion) {
+        String source = StringUtils.lowerCase(StringUtils.defaultString(suggestion.getSource()));
+        return List.of(
+                InsightSignalResponse.builder().signal("ocr").description("Trechos OCR usados na inferência").active(source.contains("ocr")).build(),
+                InsightSignalResponse.builder().signal("metadata").description("Metadados estruturados usados").active(source.contains("metadata")).build(),
+                InsightSignalResponse.builder().signal("heuristics").description("Regras heurísticas aplicadas").active(source.contains("heuristic")).build(),
+                InsightSignalResponse.builder().signal("filename").description("Nome do arquivo usado como sinal").active(source.contains("filename") || source.contains("name")).build()
+        );
     }
 
     public DocumentRagContextResponse getRagContextSkeleton(String documentId, Optional<String> version) {
