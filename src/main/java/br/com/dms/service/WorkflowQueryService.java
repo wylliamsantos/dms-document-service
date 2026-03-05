@@ -20,6 +20,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -36,15 +37,25 @@ public class WorkflowQueryService {
     private final DmsDocumentVersionRepository dmsDocumentVersionRepository;
     private final DocumentWorkflowTransitionRepository workflowTransitionRepository;
     private final TenantContextService tenantContextService;
+    private final Clock clock;
 
     public WorkflowQueryService(DmsDocumentRepository dmsDocumentRepository,
                                 DmsDocumentVersionRepository dmsDocumentVersionRepository,
                                 DocumentWorkflowTransitionRepository workflowTransitionRepository,
                                 TenantContextService tenantContextService) {
+        this(dmsDocumentRepository, dmsDocumentVersionRepository, workflowTransitionRepository, tenantContextService, Clock.systemUTC());
+    }
+
+    WorkflowQueryService(DmsDocumentRepository dmsDocumentRepository,
+                         DmsDocumentVersionRepository dmsDocumentVersionRepository,
+                         DocumentWorkflowTransitionRepository workflowTransitionRepository,
+                         TenantContextService tenantContextService,
+                         Clock clock) {
         this.dmsDocumentRepository = dmsDocumentRepository;
         this.dmsDocumentVersionRepository = dmsDocumentVersionRepository;
         this.workflowTransitionRepository = workflowTransitionRepository;
         this.tenantContextService = tenantContextService;
+        this.clock = clock;
     }
 
     public WorkflowDashboardResponse getDashboardMetrics() {
@@ -94,7 +105,7 @@ public class WorkflowQueryService {
     private WorkflowSlaReviewResponse buildSlaReview(List<DmsDocument> documents,
                                                      Map<String, List<DocumentWorkflowTransition>> transitionsByDocument) {
         final int targetHours = 24;
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
 
         long withinSla = 0;
         long outsideSla = 0;
