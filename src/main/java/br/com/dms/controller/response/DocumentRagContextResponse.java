@@ -13,5 +13,5 @@ public class DocumentRagContextResponse {
     boolean enabled;
     String status;
     String message;
-    List<String> chunks;
+    List<RagContextChunkResponse> chunks;
 }
