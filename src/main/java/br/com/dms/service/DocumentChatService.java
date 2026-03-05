@@ -9,11 +9,14 @@ import br.com.dms.exception.TypeException;
 import br.com.dms.repository.mongo.DmsDocumentRepository;
 import br.com.dms.repository.mongo.DmsDocumentVersionRepository;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -27,13 +30,14 @@ import java.util.stream.Collectors;
 @Service
 public class DocumentChatService {
 
+    private static final Logger log = LoggerFactory.getLogger(DocumentChatService.class);
     private static final int MAX_CONTEXT_CHUNKS = 4;
     private static final int MAX_CHUNK_SIZE = 450;
 
     private final TenantContextService tenantContextService;
     private final DmsDocumentRepository dmsDocumentRepository;
     private final DmsDocumentVersionRepository dmsDocumentVersionRepository;
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final boolean ragEnabled;
     private final boolean chatEnabled;
     private final boolean localProviderEnabled;
@@ -47,7 +51,9 @@ public class DocumentChatService {
                                @Value("${dms.ai.chat.document.enabled:false}") boolean chatEnabled,
                                @Value("${dms.ai.provider.local.enabled:true}") boolean localProviderEnabled,
                                @Value("${dms.ai.provider.local.base-url:http://localhost:11434}") String localProviderBaseUrl,
-                               @Value("${dms.ai.provider.local.model:llama3.1:8b}") String localProviderModel) {
+                               @Value("${dms.ai.provider.local.model:llama3.1:8b}") String localProviderModel,
+                               @Value("${dms.ai.provider.local.connect-timeout-ms:5000}") int connectTimeoutMs,
+                               @Value("${dms.ai.provider.local.read-timeout-ms:120000}") int readTimeoutMs) {
         this.tenantContextService = tenantContextService;
         this.dmsDocumentRepository = dmsDocumentRepository;
         this.dmsDocumentVersionRepository = dmsDocumentVersionRepository;
@@ -56,6 +62,11 @@ public class DocumentChatService {
         this.localProviderEnabled = localProviderEnabled;
         this.localProviderBaseUrl = localProviderBaseUrl;
         this.localProviderModel = localProviderModel;
+
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(connectTimeoutMs);
+        requestFactory.setReadTimeout(readTimeoutMs);
+        this.restTemplate = new RestTemplate(requestFactory);
     }
 
     public DocumentChatResponse chat(String documentId, DocumentChatRequest request) {
@@ -109,12 +120,13 @@ public class DocumentChatService {
                     .contextChunks(contextChunks)
                     .build();
         } catch (Exception ex) {
+            log.warn("Falha ao consultar provedor local de IA: {}", ex.getMessage());
             return DocumentChatResponse.builder()
                     .documentId(documentId)
                     .version(resolvedVersion)
                     .enabled(true)
                     .status("PROVIDER_UNAVAILABLE")
-                    .message("Serviço local de IA indisponível. Verifique Ollama e tente novamente.")
+                    .message("Serviço local de IA indisponível. Clique em 'Tentar novamente'. Se for a primeira execução, inicie o Ollama e baixe o modelo padrão ('" + localProviderModel + "').")
                     .contextChunks(contextChunks)
                     .build();
         }
@@ -139,8 +151,13 @@ public class DocumentChatService {
             throw new RuntimeException("Erro ao consultar provedor local");
         }
 
+        Object providerError = response.getBody().get("error");
+        if (providerError != null) {
+            throw new RuntimeException("Erro do provedor local: " + providerError);
+        }
+
         Object answer = response.getBody().get("response");
-        if (answer == null) {
+        if (answer == null || StringUtils.isBlank(answer.toString())) {
             throw new RuntimeException("Resposta vazia do provedor local");
         }
         return answer.toString();
