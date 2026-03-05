@@ -24,8 +24,20 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static java.util.Map.entry;
+
 @Service
 public class DocumentInsightService {
+
+    private static final Map<String, String> IMPORTANT_METADATA_KEYS = Map.ofEntries(
+            entry("cpf", "cpf"),
+            entry("cnpj", "cnpj"),
+            entry("numero", "numero"),
+            entry("valor", "valor"),
+            entry("vencimento", "vencimento"),
+            entry("data_emissao", "data_emissao"),
+            entry("nome", "nome")
+    );
 
     private final AiMetadataSuggestionService aiMetadataSuggestionService;
     private final TenantContextService tenantContextService;
@@ -57,6 +69,7 @@ public class DocumentInsightService {
         DmsDocument document = resolveDocument(documentId, tenantId);
 
         Map<String, Object> persistedMetadataPreview = extractMetadataPreview(document);
+        Map<String, Object> importantPersistedMetadata = extractImportantPersistedMetadata(document);
         Map<String, Object> resolvedMetadata = new LinkedHashMap<>();
         if (suggestion.getSuggestedMetadata() != null) {
             resolvedMetadata.putAll(suggestion.getSuggestedMetadata());
@@ -86,6 +99,7 @@ public class DocumentInsightService {
                 .generatedAt(Instant.now().toString())
                 .signals(resolveSignals(suggestion))
                 .persistedMetadataPreview(persistedMetadataPreview)
+                .importantPersistedMetadata(importantPersistedMetadata)
                 .ocrStats(resolveOcrStats(document))
                 .build();
     }
@@ -129,6 +143,25 @@ public class DocumentInsightService {
             }
         });
         return preview;
+    }
+
+    private Map<String, Object> extractImportantPersistedMetadata(DmsDocument document) {
+        if (document == null || document.getMetadata() == null || document.getMetadata().isEmpty()) {
+            return Map.of();
+        }
+
+        LinkedHashMap<String, Object> important = new LinkedHashMap<>();
+        document.getMetadata().forEach((key, value) -> {
+            String normalizedKey = StringUtils.lowerCase(StringUtils.trimToEmpty(key));
+            if (value == null || !IMPORTANT_METADATA_KEYS.containsKey(normalizedKey)) {
+                return;
+            }
+            if (value instanceof String || value instanceof Number || value instanceof Boolean) {
+                important.put(IMPORTANT_METADATA_KEYS.get(normalizedKey), value);
+            }
+        });
+
+        return important;
     }
 
     private Map<String, Object> resolveOcrStats(DmsDocument document) {
