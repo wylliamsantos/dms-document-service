@@ -1,9 +1,11 @@
 package br.com.dms.controller;
 
 import br.com.dms.controller.request.*;
+import br.com.dms.controller.response.MetadataSuggestionResponse;
 import br.com.dms.controller.response.UrlPresignedResponse;
 import br.com.dms.domain.core.DocumentId;
 import br.com.dms.exception.DefaultError;
+import br.com.dms.service.AiMetadataSuggestionService;
 import br.com.dms.service.DocumentDeleteService;
 import br.com.dms.service.DocumentQueryService;
 import br.com.dms.service.dto.DocumentContent;
@@ -44,13 +46,16 @@ public class DocumentController {
     private final DocumentDeleteService documentDeleteService;
     private final DocumentQueryService documentQueryService;
     private final DmsService dmsService;
+    private final AiMetadataSuggestionService aiMetadataSuggestionService;
 
     public DocumentController(DocumentDeleteService documentDeleteService,
                               DocumentQueryService documentQueryService,
-                              DmsService dmsService) {
+                              DmsService dmsService,
+                              AiMetadataSuggestionService aiMetadataSuggestionService) {
         this.documentDeleteService = documentDeleteService;
         this.documentQueryService = documentQueryService;
         this.dmsService = dmsService;
+        this.aiMetadataSuggestionService = aiMetadataSuggestionService;
     }
 
     @DeleteMapping(value = "/{documentId}", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -155,6 +160,20 @@ public class DocumentController {
                                                     @PathVariable(name = "version", required = false) Optional<String> version) {
         log.info("DMS version {} - TransactionId: {} - document information - documentId: {}, version: {}", API_VERSION, transactionId, documentId, version);
         return documentQueryService.getDocumentInformation(documentId, version);
+    }
+
+    @GetMapping(path = {"/{documentId}/metadata/suggestions", "/{documentId}/{version}/metadata/suggestions"}, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Ok"),
+            @ApiResponse(responseCode = "404", description = "documentId not found"),
+            @ApiResponse(responseCode = "500", description = "Server Error", content = {@Content(schema = @Schema(implementation = DefaultError.class))})
+    })
+    public ResponseEntity<MetadataSuggestionResponse> getMetadataSuggestions(@RequestHeader(name = "TransactionId") String transactionId,
+                                                                              @RequestHeader(name = "Authorization") String authorization,
+                                                                              @PathVariable(value = "documentId") String documentId,
+                                                                              @PathVariable(name = "version", required = false) Optional<String> version) {
+        log.info("DMS version {} - TransactionId: {} - metadata suggestions - documentId: {}, version: {}", API_VERSION, transactionId, documentId, version);
+        return ResponseEntity.ok(aiMetadataSuggestionService.suggest(documentId, version));
     }
 
     @PostMapping(path = "/multipart", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
