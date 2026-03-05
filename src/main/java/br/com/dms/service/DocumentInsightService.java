@@ -3,9 +3,15 @@ package br.com.dms.service;
 import br.com.dms.controller.response.DocumentInsightResponse;
 import br.com.dms.controller.response.DocumentRagContextResponse;
 import br.com.dms.controller.response.MetadataSuggestionResponse;
+import br.com.dms.domain.mongodb.DmsDocument;
+import br.com.dms.exception.DmsDocumentNotFoundException;
+import br.com.dms.exception.TypeException;
+import br.com.dms.repository.mongo.DmsDocumentRepository;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -13,11 +19,17 @@ import java.util.Optional;
 public class DocumentInsightService {
 
     private final AiMetadataSuggestionService aiMetadataSuggestionService;
+    private final TenantContextService tenantContextService;
+    private final DmsDocumentRepository dmsDocumentRepository;
     private final boolean ragEnabled;
 
     public DocumentInsightService(AiMetadataSuggestionService aiMetadataSuggestionService,
+                                  TenantContextService tenantContextService,
+                                  DmsDocumentRepository dmsDocumentRepository,
                                   @Value("${dms.ai.rag.document.enabled:false}") boolean ragEnabled) {
         this.aiMetadataSuggestionService = aiMetadataSuggestionService;
+        this.tenantContextService = tenantContextService;
+        this.dmsDocumentRepository = dmsDocumentRepository;
         this.ragEnabled = ragEnabled;
     }
 
@@ -46,13 +58,39 @@ public class DocumentInsightService {
                     .build();
         }
 
+        String tenantId = tenantContextService.requireTenantId();
+        DmsDocument document = dmsDocumentRepository.findByIdAndTenantId(documentId, tenantId)
+                .orElseThrow(() -> new DmsDocumentNotFoundException("Document not found", TypeException.VALID));
+
+        List<String> chunks = buildChunks(document);
         return DocumentRagContextResponse.builder()
                 .documentId(documentId)
                 .version(version.orElse(null))
                 .enabled(true)
-                .status("SKELETON")
-                .message("MVP de RAG em modo skeleton: endpoint pronto, chunking/indexação ainda não implementados.")
-                .chunks(List.of())
+                .status("READY")
+                .message(chunks.isEmpty() ? "Sem chunks de OCR disponíveis para este documento." : "Contexto RAG local carregado.")
+                .chunks(chunks)
                 .build();
+    }
+
+    private List<String> buildChunks(DmsDocument document) {
+        String ocrText = StringUtils.trimToEmpty(document.getOcrText());
+        if (StringUtils.isBlank(ocrText)) {
+            return List.of();
+        }
+
+        List<String> chunks = new ArrayList<>();
+        String[] paragraphs = ocrText.replace("\r", "\n").split("\\n\\s*\\n");
+        for (String paragraph : paragraphs) {
+            String clean = StringUtils.normalizeSpace(paragraph);
+            if (StringUtils.isBlank(clean)) {
+                continue;
+            }
+            chunks.add(clean.substring(0, Math.min(clean.length(), 400)));
+            if (chunks.size() >= 5) {
+                break;
+            }
+        }
+        return chunks;
     }
 }

@@ -28,7 +28,12 @@ class DocumentInsightServiceTest {
                         .build()
         );
 
-        DocumentInsightService service = new DocumentInsightService(aiService, false);
+        DocumentInsightService service = new DocumentInsightService(
+                aiService,
+                mock(TenantContextService.class),
+                mock(br.com.dms.repository.mongo.DmsDocumentRepository.class),
+                false
+        );
         var response = service.getInsight("doc-1", Optional.of("2"));
 
         assertEquals("doc-1", response.getDocumentId());
@@ -39,7 +44,12 @@ class DocumentInsightServiceTest {
 
     @Test
     void shouldReturnDisabledRagSkeletonWhenFeatureFlagOff() {
-        DocumentInsightService service = new DocumentInsightService(mock(AiMetadataSuggestionService.class), false);
+        DocumentInsightService service = new DocumentInsightService(
+                mock(AiMetadataSuggestionService.class),
+                mock(TenantContextService.class),
+                mock(br.com.dms.repository.mongo.DmsDocumentRepository.class),
+                false
+        );
 
         DocumentRagContextResponse response = service.getRagContextSkeleton("doc-2", Optional.empty());
         assertFalse(response.isEnabled());
