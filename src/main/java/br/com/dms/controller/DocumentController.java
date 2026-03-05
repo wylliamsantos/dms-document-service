@@ -1,6 +1,7 @@
 package br.com.dms.controller;
 
 import br.com.dms.controller.request.*;
+import br.com.dms.controller.response.DocumentChatResponse;
 import br.com.dms.controller.response.DocumentInsightResponse;
 import br.com.dms.controller.response.DocumentRagContextResponse;
 import br.com.dms.controller.response.DocumentVersionDiffResponse;
@@ -10,6 +11,7 @@ import br.com.dms.domain.core.DocumentId;
 import br.com.dms.exception.DefaultError;
 import br.com.dms.service.AiMetadataSuggestionService;
 import br.com.dms.service.DocumentDeleteService;
+import br.com.dms.service.DocumentChatService;
 import br.com.dms.service.DocumentInsightService;
 import br.com.dms.service.DocumentQueryService;
 import br.com.dms.service.dto.DocumentContent;
@@ -52,17 +54,20 @@ public class DocumentController {
     private final DmsService dmsService;
     private final AiMetadataSuggestionService aiMetadataSuggestionService;
     private final DocumentInsightService documentInsightService;
+    private final DocumentChatService documentChatService;
 
     public DocumentController(DocumentDeleteService documentDeleteService,
                               DocumentQueryService documentQueryService,
                               DmsService dmsService,
                               AiMetadataSuggestionService aiMetadataSuggestionService,
-                              DocumentInsightService documentInsightService) {
+                              DocumentInsightService documentInsightService,
+                              DocumentChatService documentChatService) {
         this.documentDeleteService = documentDeleteService;
         this.documentQueryService = documentQueryService;
         this.dmsService = dmsService;
         this.aiMetadataSuggestionService = aiMetadataSuggestionService;
         this.documentInsightService = documentInsightService;
+        this.documentChatService = documentChatService;
     }
 
     @DeleteMapping(value = "/{documentId}", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -213,8 +218,17 @@ public class DocumentController {
                                                                             @RequestHeader(name = "Authorization") String authorization,
                                                                             @PathVariable(value = "documentId") String documentId,
                                                                             @PathVariable(name = "version", required = false) Optional<String> version) {
-        log.info("DMS version {} - TransactionId: {} - rag context skeleton - documentId: {}, version: {}", API_VERSION, transactionId, documentId, version);
+        log.info("DMS version {} - TransactionId: {} - rag context - documentId: {}, version: {}", API_VERSION, transactionId, documentId, version);
         return ResponseEntity.ok(documentInsightService.getRagContextSkeleton(documentId, version));
+    }
+
+    @PostMapping(path = "/{documentId}/chat", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<DocumentChatResponse> chatByDocument(@RequestHeader(name = "TransactionId") String transactionId,
+                                                               @RequestHeader(name = "Authorization") String authorization,
+                                                               @PathVariable(value = "documentId") String documentId,
+                                                               @RequestBody @Valid DocumentChatRequest request) {
+        log.info("DMS version {} - TransactionId: {} - document chat - documentId: {}", API_VERSION, transactionId, documentId);
+        return ResponseEntity.ok(documentChatService.chat(documentId, request));
     }
 
     @PostMapping(path = "/multipart", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)

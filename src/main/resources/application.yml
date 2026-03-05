@@ -98,3 +98,15 @@ dms:
     enabled: ${DMS_RETENTION_ENABLED:true}
     cron: ${DMS_RETENTION_CRON:0 */30 * * * *}
     batch-size: ${DMS_RETENTION_BATCH_SIZE:500}
+  ai:
+    rag:
+      document:
+        enabled: ${DMS_AI_RAG_DOCUMENT_ENABLED:false}
+    chat:
+      document:
+        enabled: ${DMS_AI_CHAT_DOCUMENT_ENABLED:false}
+    provider:
+      local:
+        enabled: ${DMS_AI_PROVIDER_LOCAL_ENABLED:true}
+        base-url: ${DMS_AI_PROVIDER_LOCAL_BASE_URL:http://localhost:11434}
+        model: ${DMS_AI_PROVIDER_LOCAL_MODEL:llama3.1:8b}
