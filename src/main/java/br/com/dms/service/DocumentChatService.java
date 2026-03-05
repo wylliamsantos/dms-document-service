@@ -51,7 +51,7 @@ public class DocumentChatService {
                                @Value("${dms.ai.chat.document.enabled:false}") boolean chatEnabled,
                                @Value("${dms.ai.provider.local.enabled:true}") boolean localProviderEnabled,
                                @Value("${dms.ai.provider.local.base-url:http://localhost:11434}") String localProviderBaseUrl,
-                               @Value("${dms.ai.provider.local.model:llama3.1:8b}") String localProviderModel,
+                               @Value("${dms.ai.provider.local.model:llama3.2:1b}") String localProviderModel,
                                @Value("${dms.ai.provider.local.connect-timeout-ms:5000}") int connectTimeoutMs,
                                @Value("${dms.ai.provider.local.read-timeout-ms:120000}") int readTimeoutMs) {
         this.tenantContextService = tenantContextService;
