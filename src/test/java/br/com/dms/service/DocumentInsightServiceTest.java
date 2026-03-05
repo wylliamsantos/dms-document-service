@@ -49,6 +49,7 @@ class DocumentInsightServiceTest {
                 repository,
                 new SimpleMeterRegistry(),
                 false,
+                "",
                 ""
         );
         var response = service.getInsight("doc-1", Optional.of("2"));
@@ -73,6 +74,7 @@ class DocumentInsightServiceTest {
                 mock(br.com.dms.repository.mongo.DmsDocumentRepository.class),
                 new SimpleMeterRegistry(),
                 false,
+                "",
                 ""
         );
 
@@ -93,12 +95,46 @@ class DocumentInsightServiceTest {
                 mock(DmsDocumentRepository.class),
                 new SimpleMeterRegistry(),
                 true,
-                "tenant-1,tenant-2"
+                "tenant-1,tenant-2",
+                ""
         );
 
         DocumentRagContextResponse response = service.getRagContextSkeleton("doc-2", Optional.empty());
         assertFalse(response.isEnabled());
         assertEquals("TENANT_DISABLED", response.getStatus());
+        assertTrue(response.getChunks().isEmpty());
+    }
+
+
+
+    @Test
+    void shouldReturnCategoryDisabledWhenCategoryNotInAllowlist() {
+        TenantContextService tenantContextService = mock(TenantContextService.class);
+        when(tenantContextService.requireTenantId()).thenReturn("tenant-1");
+
+        DmsDocumentRepository repository = mock(DmsDocumentRepository.class);
+        when(repository.findByIdAndTenantId("doc-rag", "tenant-1")).thenReturn(Optional.of(
+                DmsDocument.of()
+                        .id("doc-rag")
+                        .tenantId("tenant-1")
+                        .category("CONTRATO")
+                        .ocrText("Texto")
+                        .build()
+        ));
+
+        DocumentInsightService service = new DocumentInsightService(
+                mock(AiMetadataSuggestionService.class),
+                tenantContextService,
+                repository,
+                new SimpleMeterRegistry(),
+                true,
+                "tenant-1",
+                "nota_fiscal"
+        );
+
+        DocumentRagContextResponse response = service.getRagContextSkeleton("doc-rag", Optional.empty());
+        assertFalse(response.isEnabled());
+        assertEquals("CATEGORY_DISABLED", response.getStatus());
         assertTrue(response.getChunks().isEmpty());
     }
 
@@ -122,7 +158,8 @@ class DocumentInsightServiceTest {
                 repository,
                 new SimpleMeterRegistry(),
                 true,
-                "tenant-1"
+                "tenant-1",
+                ""
         );
 
         DocumentRagContextResponse response = service.getRagContextSkeleton("doc-rag", Optional.empty());

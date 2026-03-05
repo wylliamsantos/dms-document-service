@@ -33,19 +33,22 @@ public class DocumentInsightService {
     private final MeterRegistry meterRegistry;
     private final boolean ragEnabled;
     private final Set<String> ragEnabledTenants;
+    private final Set<String> ragEnabledCategories;
 
     public DocumentInsightService(AiMetadataSuggestionService aiMetadataSuggestionService,
                                   TenantContextService tenantContextService,
                                   DmsDocumentRepository dmsDocumentRepository,
                                   MeterRegistry meterRegistry,
                                   @Value("${dms.ai.rag.document.enabled:false}") boolean ragEnabled,
-                                  @Value("${dms.ai.rag.document.enabled-tenants:}") String ragEnabledTenants) {
+                                  @Value("${dms.ai.rag.document.enabled-tenants:}") String ragEnabledTenants,
+                                  @Value("${dms.ai.rag.document.enabled-categories:}") String ragEnabledCategories) {
         this.aiMetadataSuggestionService = aiMetadataSuggestionService;
         this.tenantContextService = tenantContextService;
         this.dmsDocumentRepository = dmsDocumentRepository;
         this.meterRegistry = meterRegistry;
         this.ragEnabled = ragEnabled;
         this.ragEnabledTenants = parseEnabledTenants(ragEnabledTenants);
+        this.ragEnabledCategories = parseEnabledCategories(ragEnabledCategories);
     }
 
     public DocumentInsightResponse getInsight(String documentId, Optional<String> version) {
@@ -174,6 +177,22 @@ public class DocumentInsightService {
         DmsDocument document = dmsDocumentRepository.findByIdAndTenantId(documentId, tenantId)
                 .orElseThrow(() -> new DmsDocumentNotFoundException("Document not found", TypeException.VALID));
 
+        if (!ragEnabledCategories.isEmpty()) {
+            String category = StringUtils.trimToEmpty(document.getCategory());
+            boolean allowedCategory = ragEnabledCategories.contains(StringUtils.lowerCase(category));
+            if (!allowedCategory) {
+                incrementRagCounter(tenantId, "CATEGORY_DISABLED", 0);
+                return DocumentRagContextResponse.builder()
+                        .documentId(documentId)
+                        .version(version.orElse(null))
+                        .enabled(false)
+                        .status("CATEGORY_DISABLED")
+                        .message("RAG de documento desabilitado para a categoria atual (allowlist por categoria).")
+                        .chunks(List.of())
+                        .build();
+            }
+        }
+
         List<RagContextChunkResponse> chunks = buildChunks(document);
         incrementRagCounter(tenantId, "READY", chunks.size());
         return DocumentRagContextResponse.builder()
@@ -256,6 +275,16 @@ public class DocumentInsightService {
                 : List.of(raw.split(",")).stream()
                 .map(StringUtils::trim)
                 .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toSet());
+    }
+
+    private Set<String> parseEnabledCategories(String raw) {
+        return StringUtils.isBlank(raw)
+                ? Set.of()
+                : List.of(raw.split(",")).stream()
+                .map(StringUtils::trim)
+                .filter(StringUtils::isNotBlank)
+                .map(StringUtils::lowerCase)
                 .collect(Collectors.toSet());
     }
 }
