@@ -1,6 +1,8 @@
 package br.com.dms.controller;
 
 import br.com.dms.controller.request.*;
+import br.com.dms.controller.response.DocumentInsightResponse;
+import br.com.dms.controller.response.DocumentRagContextResponse;
 import br.com.dms.controller.response.DocumentVersionDiffResponse;
 import br.com.dms.controller.response.MetadataSuggestionResponse;
 import br.com.dms.controller.response.UrlPresignedResponse;
@@ -8,6 +10,7 @@ import br.com.dms.domain.core.DocumentId;
 import br.com.dms.exception.DefaultError;
 import br.com.dms.service.AiMetadataSuggestionService;
 import br.com.dms.service.DocumentDeleteService;
+import br.com.dms.service.DocumentInsightService;
 import br.com.dms.service.DocumentQueryService;
 import br.com.dms.service.dto.DocumentContent;
 import br.com.dms.service.DmsService;
@@ -48,15 +51,18 @@ public class DocumentController {
     private final DocumentQueryService documentQueryService;
     private final DmsService dmsService;
     private final AiMetadataSuggestionService aiMetadataSuggestionService;
+    private final DocumentInsightService documentInsightService;
 
     public DocumentController(DocumentDeleteService documentDeleteService,
                               DocumentQueryService documentQueryService,
                               DmsService dmsService,
-                              AiMetadataSuggestionService aiMetadataSuggestionService) {
+                              AiMetadataSuggestionService aiMetadataSuggestionService,
+                              DocumentInsightService documentInsightService) {
         this.documentDeleteService = documentDeleteService;
         this.documentQueryService = documentQueryService;
         this.dmsService = dmsService;
         this.aiMetadataSuggestionService = aiMetadataSuggestionService;
+        this.documentInsightService = documentInsightService;
     }
 
     @DeleteMapping(value = "/{documentId}", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -191,6 +197,24 @@ public class DocumentController {
                                                                               @PathVariable(name = "version", required = false) Optional<String> version) {
         log.info("DMS version {} - TransactionId: {} - metadata suggestions - documentId: {}, version: {}", API_VERSION, transactionId, documentId, version);
         return ResponseEntity.ok(aiMetadataSuggestionService.suggest(documentId, version));
+    }
+
+    @GetMapping(path = {"/{documentId}/insights", "/{documentId}/{version}/insights"}, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<DocumentInsightResponse> getDocumentInsights(@RequestHeader(name = "TransactionId") String transactionId,
+                                                                       @RequestHeader(name = "Authorization") String authorization,
+                                                                       @PathVariable(value = "documentId") String documentId,
+                                                                       @PathVariable(name = "version", required = false) Optional<String> version) {
+        log.info("DMS version {} - TransactionId: {} - document insights - documentId: {}, version: {}", API_VERSION, transactionId, documentId, version);
+        return ResponseEntity.ok(documentInsightService.getInsight(documentId, version));
+    }
+
+    @GetMapping(path = {"/{documentId}/rag/context", "/{documentId}/{version}/rag/context"}, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<DocumentRagContextResponse> getDocumentRagContext(@RequestHeader(name = "TransactionId") String transactionId,
+                                                                            @RequestHeader(name = "Authorization") String authorization,
+                                                                            @PathVariable(value = "documentId") String documentId,
+                                                                            @PathVariable(name = "version", required = false) Optional<String> version) {
+        log.info("DMS version {} - TransactionId: {} - rag context skeleton - documentId: {}, version: {}", API_VERSION, transactionId, documentId, version);
+        return ResponseEntity.ok(documentInsightService.getRagContextSkeleton(documentId, version));
     }
 
     @PostMapping(path = "/multipart", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)

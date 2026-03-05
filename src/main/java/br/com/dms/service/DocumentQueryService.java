@@ -148,7 +148,7 @@ public class DocumentQueryService {
                     var dmsVersion = optVersion.get();
                     Map<String, Object> metadados = dmsVersion.getMetadata();
                     var mimeType = Objects.nonNull(dmsVersion.getMimeType()) ? dmsVersion.getMimeType() : entity.getMimeType();
-                    var dmsEntry = DmsEntryMapper.of(entity.getId(), dmsVersion.getCreationDate(), dmsVersion.getModifiedAt(), entity.getFilename(), entity.getCategory(), mimeType, dmsVersion.getFileSize(), metadados, dmsVersion.getVersionNumber().toPlainString(), dmsVersion.getVersionType().name(), entity.getWorkflowStatus() != null ? entity.getWorkflowStatus().name() : null);
+                    var dmsEntry = DmsEntryMapper.of(entity.getId(), dmsVersion.getCreationDate(), dmsVersion.getModifiedAt(), entity.getFilename(), entity.getCategory(), mimeType, dmsVersion.getFileSize(), metadados, dmsVersion.getVersionNumber().toPlainString(), dmsVersion.getVersionType().name(), entity.getWorkflowStatus() != null ? entity.getWorkflowStatus().name() : null, entity.getOcrText());
                     response.setEntry(dmsEntry);
                 }
             } else {
@@ -156,7 +156,7 @@ public class DocumentQueryService {
                 if (lastVersion != null) {
                     Map<String, Object> metadados = lastVersion.getMetadata();
                     var mimeType = Objects.nonNull(lastVersion.getMimeType()) ? lastVersion.getMimeType() : entity.getMimeType();
-                    var dmsEntry = DmsEntryMapper.of(entity.getId(), lastVersion.getCreationDate(), lastVersion.getModifiedAt(), entity.getFilename(), entity.getCategory(), mimeType, lastVersion.getFileSize(), metadados, lastVersion.getVersionNumber().toPlainString(), lastVersion.getVersionType().name(), entity.getWorkflowStatus() != null ? entity.getWorkflowStatus().name() : null);
+                    var dmsEntry = DmsEntryMapper.of(entity.getId(), lastVersion.getCreationDate(), lastVersion.getModifiedAt(), entity.getFilename(), entity.getCategory(), mimeType, lastVersion.getFileSize(), metadados, lastVersion.getVersionNumber().toPlainString(), lastVersion.getVersionType().name(), entity.getWorkflowStatus() != null ? entity.getWorkflowStatus().name() : null, entity.getOcrText());
                     response.setEntry(dmsEntry);
                 }
             }
@@ -192,7 +192,7 @@ public class DocumentQueryService {
                 var mimeType = Objects.nonNull(dmsDocumentVersion.getMimeType()) ? dmsDocumentVersion.getMimeType() : entity.getMimeType();
                 Map<String, Object> metadados = dmsDocumentVersion.getMetadata();
                 DmsEntry dmsEntry = DmsEntryMapper.of(String.valueOf(dmsDocumentVersion.getVersionNumber()), dmsDocumentVersion.getCreationDate(), dmsDocumentVersion.getModifiedAt(),
-                        entity.getFilename(), entity.getCategory(), mimeType, dmsDocumentVersion.getFileSize(), metadados, dmsDocumentVersion.getVersionNumber().toPlainString(), dmsDocumentVersion.getVersionType().name(), entity.getWorkflowStatus() != null ? entity.getWorkflowStatus().name() : null);
+                        entity.getFilename(), entity.getCategory(), mimeType, dmsDocumentVersion.getFileSize(), metadados, dmsDocumentVersion.getVersionNumber().toPlainString(), dmsDocumentVersion.getVersionType().name(), entity.getWorkflowStatus() != null ? entity.getWorkflowStatus().name() : null, entity.getOcrText());
 
                 listVersions.add(dmsEntry);
             }

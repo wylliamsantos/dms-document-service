@@ -17,6 +17,8 @@ public class DmsEntry {
     private String workflowStatus;
     private DmsContent content;
     private Map<String, Object> properties;
+    private String ocrSummary;
+    private Map<String, Object> importantExtractedMetadata;
 
     public String getCreatedAt() {
         return createdAt;
@@ -97,5 +99,21 @@ public class DmsEntry {
 
     public void setWorkflowStatus(String workflowStatus) {
         this.workflowStatus = workflowStatus;
+    }
+
+    public String getOcrSummary() {
+        return ocrSummary;
+    }
+
+    public void setOcrSummary(String ocrSummary) {
+        this.ocrSummary = ocrSummary;
+    }
+
+    public Map<String, Object> getImportantExtractedMetadata() {
+        return importantExtractedMetadata;
+    }
+
+    public void setImportantExtractedMetadata(Map<String, Object> importantExtractedMetadata) {
+        this.importantExtractedMetadata = importantExtractedMetadata;
     }
 }
