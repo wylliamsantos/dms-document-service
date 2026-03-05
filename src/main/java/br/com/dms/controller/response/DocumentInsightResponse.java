@@ -20,5 +20,6 @@ public class DocumentInsightResponse {
     String generatedAt;
     List<InsightSignalResponse> signals;
     Map<String, Object> persistedMetadataPreview;
+    Map<String, Object> importantPersistedMetadata;
     Map<String, Object> ocrStats;
 }

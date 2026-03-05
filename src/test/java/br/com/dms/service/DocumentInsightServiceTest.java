@@ -39,7 +39,7 @@ class DocumentInsightServiceTest {
                         .id("doc-1")
                         .tenantId("tenant-1")
                         .ocrText("linha 1\n\nlinha 2")
-                        .metadata(Map.of("numero", "123", "valor", 42))
+                        .metadata(Map.of("numero", "123", "valor", 42, "observacao", "ignorar"))
                         .build()
         ));
 
@@ -64,6 +64,8 @@ class DocumentInsightServiceTest {
         assertTrue(response.getSignals().stream().anyMatch(signal -> "heuristics".equals(signal.getSignal()) && signal.isActive()));
         assertEquals(4, response.getOcrStats().get("words"));
         assertEquals("123", response.getPersistedMetadataPreview().get("numero"));
+        assertEquals(42, response.getImportantPersistedMetadata().get("valor"));
+        assertFalse(response.getImportantPersistedMetadata().containsKey("observacao"));
     }
 
     @Test
