@@ -228,7 +228,16 @@ public class DocumentController {
                                                                @PathVariable(value = "documentId") String documentId,
                                                                @RequestBody @Valid DocumentChatRequest request) {
         log.info("DMS version {} - TransactionId: {} - document chat - documentId: {}", API_VERSION, transactionId, documentId);
-        return ResponseEntity.ok(documentChatService.chat(documentId, request));
+        DocumentChatResponse response = documentChatService.chat(documentId, request);
+
+        if ("PROVIDER_UNAVAILABLE".equals(response.getStatus())) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
+        }
+        if ("DISABLED".equals(response.getStatus()) || "PROVIDER_DISABLED".equals(response.getStatus())) {
+            return ResponseEntity.status(HttpStatus.PRECONDITION_FAILED).body(response);
+        }
+
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping(path = "/multipart", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
