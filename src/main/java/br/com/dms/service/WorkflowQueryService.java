@@ -4,10 +4,12 @@ import br.com.dms.controller.response.PendingDocumentResponse;
 import br.com.dms.controller.response.WorkflowCategoryStatusCountResponse;
 import br.com.dms.controller.response.WorkflowDashboardResponse;
 import br.com.dms.controller.response.WorkflowStatusCountResponse;
+import br.com.dms.controller.response.WorkflowSlaReviewResponse;
 import br.com.dms.controller.response.WorkflowTransitionResponse;
 import br.com.dms.domain.core.DocumentWorkflowStatus;
 import br.com.dms.domain.mongodb.DmsDocument;
 import br.com.dms.domain.mongodb.DmsDocumentVersion;
+import br.com.dms.domain.mongodb.DocumentWorkflowTransition;
 import br.com.dms.repository.mongo.DmsDocumentRepository;
 import br.com.dms.repository.mongo.DmsDocumentVersionRepository;
 import br.com.dms.repository.mongo.DocumentWorkflowTransitionRepository;
@@ -18,6 +20,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -72,11 +75,101 @@ public class WorkflowQueryService {
                 .thenComparing(item -> item.getStatus().name()))
             .collect(Collectors.toList());
 
+        List<DocumentWorkflowTransition> transitions = workflowTransitionRepository.findByTenantIdOrderByChangedAtDesc(tenantId);
+        Map<String, List<DocumentWorkflowTransition>> transitionsByDocument = transitions.stream()
+            .collect(Collectors.groupingBy(DocumentWorkflowTransition::getDocumentId));
+
+        WorkflowSlaReviewResponse slaReview = buildSlaReview(documents, transitionsByDocument);
+        Double averageProcessingTimeHours = calculateAverageProcessingTimeHours(transitionsByDocument);
+
         WorkflowDashboardResponse response = new WorkflowDashboardResponse();
         response.setTotalDocuments(documents.size());
         response.setStatusCounts(statusCounts);
         response.setCategoryStatusCounts(categoryStatusCounts);
+        response.setSlaReview(slaReview);
+        response.setAverageProcessingTimeHours(averageProcessingTimeHours);
         return response;
+    }
+
+    private WorkflowSlaReviewResponse buildSlaReview(List<DmsDocument> documents,
+                                                     Map<String, List<DocumentWorkflowTransition>> transitionsByDocument) {
+        final int targetHours = 24;
+        LocalDateTime now = LocalDateTime.now();
+
+        long withinSla = 0;
+        long outsideSla = 0;
+
+        for (DmsDocument document : documents) {
+            if (document.getWorkflowStatus() != DocumentWorkflowStatus.PENDING_REVIEW) {
+                continue;
+            }
+
+            LocalDateTime pendingSince = transitionsByDocument
+                .getOrDefault(document.getId(), List.of())
+                .stream()
+                .filter(transition -> transition.getToStatus() == DocumentWorkflowStatus.PENDING_REVIEW)
+                .map(DocumentWorkflowTransition::getChangedAt)
+                .filter(java.util.Objects::nonNull)
+                .max(LocalDateTime::compareTo)
+                .orElse(null);
+
+            if (pendingSince == null) {
+                outsideSla++;
+                continue;
+            }
+
+            long elapsedHours = Duration.between(pendingSince, now).toHours();
+            if (elapsedHours <= targetHours) {
+                withinSla++;
+            } else {
+                outsideSla++;
+            }
+        }
+
+        return new WorkflowSlaReviewResponse(targetHours, withinSla, outsideSla);
+    }
+
+    private Double calculateAverageProcessingTimeHours(Map<String, List<DocumentWorkflowTransition>> transitionsByDocument) {
+        List<Long> processingTimesHours = transitionsByDocument.values().stream()
+            .map(this::calculateProcessingHours)
+            .filter(java.util.Objects::nonNull)
+            .collect(Collectors.toList());
+
+        if (processingTimesHours.isEmpty()) {
+            return null;
+        }
+
+        return processingTimesHours.stream()
+            .mapToLong(Long::longValue)
+            .average()
+            .orElse(0.0);
+    }
+
+    private Long calculateProcessingHours(List<DocumentWorkflowTransition> transitions) {
+        List<DocumentWorkflowTransition> sorted = transitions.stream()
+            .sorted(Comparator.comparing(DocumentWorkflowTransition::getChangedAt, Comparator.nullsLast(Comparator.naturalOrder())))
+            .collect(Collectors.toList());
+
+        LocalDateTime startedAt = sorted.stream()
+            .filter(transition -> transition.getToStatus() == DocumentWorkflowStatus.PENDING_REVIEW)
+            .map(DocumentWorkflowTransition::getChangedAt)
+            .filter(java.util.Objects::nonNull)
+            .findFirst()
+            .orElse(null);
+
+        LocalDateTime finishedAt = sorted.stream()
+            .filter(transition -> transition.getToStatus() == DocumentWorkflowStatus.APPROVED
+                || transition.getToStatus() == DocumentWorkflowStatus.REJECTED)
+            .map(DocumentWorkflowTransition::getChangedAt)
+            .filter(java.util.Objects::nonNull)
+            .findFirst()
+            .orElse(null);
+
+        if (startedAt == null || finishedAt == null || finishedAt.isBefore(startedAt)) {
+            return null;
+        }
+
+        return Duration.between(startedAt, finishedAt).toHours();
     }
 
     public List<WorkflowTransitionResponse> listDocumentHistory(String documentId) {

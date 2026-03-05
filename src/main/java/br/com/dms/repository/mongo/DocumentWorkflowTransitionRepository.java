@@ -11,6 +11,8 @@ public interface DocumentWorkflowTransitionRepository extends MongoRepository<Do
 
     List<DocumentWorkflowTransition> findByTenantIdAndDocumentIdOrderByChangedAtDesc(String tenantId, String documentId);
 
+    List<DocumentWorkflowTransition> findByTenantIdOrderByChangedAtDesc(String tenantId);
+
     // legacy methods kept temporarily during tenant migration
     List<DocumentWorkflowTransition> findByDocumentIdOrderByChangedAtDesc(String documentId);
 }

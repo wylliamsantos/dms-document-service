@@ -10,6 +10,10 @@ public class WorkflowDashboardResponse {
 
     private List<WorkflowCategoryStatusCountResponse> categoryStatusCounts;
 
+    private WorkflowSlaReviewResponse slaReview;
+
+    private Double averageProcessingTimeHours;
+
     public long getTotalDocuments() {
         return totalDocuments;
     }
@@ -32,5 +36,21 @@ public class WorkflowDashboardResponse {
 
     public void setCategoryStatusCounts(List<WorkflowCategoryStatusCountResponse> categoryStatusCounts) {
         this.categoryStatusCounts = categoryStatusCounts;
+    }
+
+    public WorkflowSlaReviewResponse getSlaReview() {
+        return slaReview;
+    }
+
+    public void setSlaReview(WorkflowSlaReviewResponse slaReview) {
+        this.slaReview = slaReview;
+    }
+
+    public Double getAverageProcessingTimeHours() {
+        return averageProcessingTimeHours;
+    }
+
+    public void setAverageProcessingTimeHours(Double averageProcessingTimeHours) {
+        this.averageProcessingTimeHours = averageProcessingTimeHours;
     }
 }
