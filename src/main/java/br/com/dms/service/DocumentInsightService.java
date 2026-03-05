@@ -14,7 +14,9 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -37,17 +39,30 @@ public class DocumentInsightService {
 
     public DocumentInsightResponse getInsight(String documentId, Optional<String> version) {
         MetadataSuggestionResponse suggestion = aiMetadataSuggestionService.suggest(documentId, version);
+        DmsDocument document = resolveDocument(documentId);
+
+        Map<String, Object> persistedMetadataPreview = extractMetadataPreview(document);
+        Map<String, Object> resolvedMetadata = new LinkedHashMap<>();
+        if (suggestion.getSuggestedMetadata() != null) {
+            resolvedMetadata.putAll(suggestion.getSuggestedMetadata());
+        }
+        if (resolvedMetadata.isEmpty()) {
+            resolvedMetadata.putAll(persistedMetadataPreview);
+        }
+
         return DocumentInsightResponse.builder()
                 .documentId(suggestion.getDocumentId())
                 .version(suggestion.getVersion())
                 .summary(suggestion.getSummary())
-                .keyMetadata(suggestion.getSuggestedMetadata())
+                .keyMetadata(resolvedMetadata)
                 .warnings(suggestion.getConsistencyWarnings())
                 .confidence(suggestion.getConfidence())
                 .confidenceBand(resolveConfidenceBand(suggestion.getConfidence()))
                 .source(suggestion.getSource())
                 .generatedAt(Instant.now().toString())
                 .signals(resolveSignals(suggestion))
+                .persistedMetadataPreview(persistedMetadataPreview)
+                .ocrStats(resolveOcrStats(document))
                 .build();
     }
 
@@ -69,6 +84,44 @@ public class DocumentInsightService {
                 InsightSignalResponse.builder().signal("heuristics").description("Regras heurísticas aplicadas").active(source.contains("heuristic")).build(),
                 InsightSignalResponse.builder().signal("filename").description("Nome do arquivo usado como sinal").active(source.contains("filename") || source.contains("name")).build()
         );
+    }
+
+    private DmsDocument resolveDocument(String documentId) {
+        String tenantId = tenantContextService.requireTenantId();
+        return dmsDocumentRepository.findByIdAndTenantId(documentId, tenantId).orElse(null);
+    }
+
+    private Map<String, Object> extractMetadataPreview(DmsDocument document) {
+        if (document == null || document.getMetadata() == null || document.getMetadata().isEmpty()) {
+            return Map.of();
+        }
+
+        LinkedHashMap<String, Object> preview = new LinkedHashMap<>();
+        document.getMetadata().forEach((key, value) -> {
+            if (preview.size() >= 6 || value == null) {
+                return;
+            }
+            if (value instanceof String || value instanceof Number || value instanceof Boolean) {
+                preview.put(key, value);
+            }
+        });
+        return preview;
+    }
+
+    private Map<String, Object> resolveOcrStats(DmsDocument document) {
+        String ocrText = document == null ? "" : StringUtils.trimToEmpty(document.getOcrText());
+        if (StringUtils.isBlank(ocrText)) {
+            return Map.of();
+        }
+
+        int lines = (int) ocrText.lines().map(StringUtils::trim).filter(StringUtils::isNotBlank).count();
+        int words = ocrText.trim().split("\\s+").length;
+
+        LinkedHashMap<String, Object> stats = new LinkedHashMap<>();
+        stats.put("chars", ocrText.length());
+        stats.put("lines", lines);
+        stats.put("words", words);
+        return stats;
     }
 
     public DocumentRagContextResponse getRagContextSkeleton(String documentId, Optional<String> version) {
