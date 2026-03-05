@@ -267,6 +267,8 @@ VITE_KEYCLOAK_CLIENT_ID=dms-frontend
 VITE_KEYCLOAK_REDIRECT_URI=http://localhost:5173
 VITE_IDP_REDIRECT_URI=http://localhost:5173
 VITE_IDP_POST_LOGOUT_REDIRECT_URI=http://localhost:5173
+VITE_FEATURE_RAG_LOCAL_MVP=true
+VITE_FEATURE_DOCUMENT_CHAT=true
 ENV
 
 start_or_restart() {
@@ -294,7 +296,7 @@ prebuild_backend "$WORKDIR/dms-audit-service" "$PREBUILD_MODE"
 echo "[8/9] Subindo serviços da aplicação..."
 CORS_ORIGINS="${DMS_CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}"
 
-start_or_restart "dms-document-service.*bootRun" "cd '$WORKDIR/dms-document-service' && export JAVA_HOME='$JAVA_HOME' && export PATH='$JAVA_HOME/bin:$PATH' && export DMS_CORS_ALLOWED_ORIGINS='$CORS_ORIGINS' && SPRING_PROFILES_ACTIVE=local ./gradlew bootRun" "$LOG_DIR/document.log"
+start_or_restart "dms-document-service.*bootRun" "cd '$WORKDIR/dms-document-service' && export JAVA_HOME='$JAVA_HOME' && export PATH='$JAVA_HOME/bin:$PATH' && export DMS_CORS_ALLOWED_ORIGINS='$CORS_ORIGINS' && export DMS_AI_RAG_DOCUMENT_ENABLED='true' && export DMS_AI_CHAT_DOCUMENT_ENABLED='true' && export DMS_AI_PROVIDER_LOCAL_ENABLED='true' && SPRING_PROFILES_ACTIVE=local ./gradlew bootRun" "$LOG_DIR/document.log"
 start_or_restart "dms-search-service.*bootRun" "cd '$WORKDIR/dms-search-service' && export JAVA_HOME='$JAVA_HOME' && export PATH='$JAVA_HOME/bin:$PATH' && export DMS_CORS_ALLOWED_ORIGINS='$CORS_ORIGINS' && SPRING_PROFILES_ACTIVE=local ./gradlew bootRun" "$LOG_DIR/search.log"
 start_or_restart "dms-watch-service.*bootRun" "cd '$WORKDIR/dms-watch-service' && export JAVA_HOME='$JAVA_HOME' && export PATH='$JAVA_HOME/bin:$PATH' && export DMS_CORS_ALLOWED_ORIGINS='$CORS_ORIGINS' && SPRING_PROFILES_ACTIVE=local ./gradlew bootRun" "$LOG_DIR/watch.log"
 start_or_restart "dms-audit-service.*bootRun" "cd '$WORKDIR/dms-audit-service' && export JAVA_HOME='$JAVA_HOME' && export PATH='$JAVA_HOME/bin:$PATH' && export DMS_CORS_ALLOWED_ORIGINS='$CORS_ORIGINS' && SPRING_PROFILES_ACTIVE=local ./gradlew bootRun" "$LOG_DIR/audit.log"
