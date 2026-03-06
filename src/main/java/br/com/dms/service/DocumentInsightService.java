@@ -82,6 +82,7 @@ public class DocumentInsightService {
         boolean hasPersistedOcrText = StringUtils.isNotBlank(document == null ? null : document.getOcrText());
         List<String> expectedRequiredMetadata = resolveExpectedRequiredMetadata(tenantId, document);
         List<String> missingRequiredMetadata = resolveMissingRequiredMetadata(document, expectedRequiredMetadata);
+        int requiredMetadataCoveragePercent = resolveRequiredMetadataCoveragePercent(expectedRequiredMetadata, missingRequiredMetadata);
         List<MetadataActionHintResponse> metadataActionHints = resolveMetadataActionHints(document, missingRequiredMetadata);
         Map<String, Object> resolvedMetadata = new LinkedHashMap<>();
         if (suggestion.getSuggestedMetadata() != null) {
@@ -117,6 +118,7 @@ public class DocumentInsightService {
                 .hasPersistedOcrText(hasPersistedOcrText)
                 .expectedRequiredMetadata(expectedRequiredMetadata)
                 .missingRequiredMetadata(missingRequiredMetadata)
+                .requiredMetadataCoveragePercent(requiredMetadataCoveragePercent)
                 .metadataActionHints(metadataActionHints)
                 .ocrStats(resolveOcrStats(document))
                 .build();
@@ -168,6 +170,16 @@ public class DocumentInsightService {
         return expectedRequiredMetadata.stream()
                 .filter(field -> !availableKeys.contains(StringUtils.lowerCase(field)))
                 .toList();
+    }
+
+    private int resolveRequiredMetadataCoveragePercent(List<String> expectedRequiredMetadata, List<String> missingRequiredMetadata) {
+        if (expectedRequiredMetadata == null || expectedRequiredMetadata.isEmpty()) {
+            return 100;
+        }
+
+        int missing = missingRequiredMetadata == null ? 0 : missingRequiredMetadata.size();
+        int covered = Math.max(0, expectedRequiredMetadata.size() - missing);
+        return (int) Math.round((covered * 100.0d) / expectedRequiredMetadata.size());
     }
 
     private List<MetadataActionHintResponse> resolveMetadataActionHints(DmsDocument document, List<String> missingRequiredMetadata) {

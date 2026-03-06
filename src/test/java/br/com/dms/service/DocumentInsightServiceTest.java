@@ -71,6 +71,7 @@ class DocumentInsightServiceTest {
         assertEquals(42, response.getImportantPersistedMetadata().get("valor"));
         assertEquals(3, response.getPersistedMetadataCount());
         assertTrue(response.getHasPersistedOcrText());
+        assertEquals(100, response.getRequiredMetadataCoveragePercent());
         assertTrue(response.getMetadataActionHints().isEmpty());
         assertFalse(response.getImportantPersistedMetadata().containsKey("observacao"));
     }
@@ -122,6 +123,7 @@ class DocumentInsightServiceTest {
         var response = service.getInsight("doc-2", Optional.empty());
         assertEquals(List.of("cpf", "valor", "data_emissao"), response.getExpectedRequiredMetadata());
         assertEquals(List.of("valor", "data_emissao"), response.getMissingRequiredMetadata());
+        assertEquals(33, response.getRequiredMetadataCoveragePercent());
         assertEquals(2, response.getMetadataActionHints().size());
         assertEquals("valor", response.getMetadataActionHints().get(0).getField());
         assertEquals("REQUEST_OCR_PROCESSING", response.getMetadataActionHints().get(0).getAction());
