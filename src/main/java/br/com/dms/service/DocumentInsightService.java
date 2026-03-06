@@ -6,6 +6,7 @@ import br.com.dms.controller.response.InsightSignalResponse;
 import br.com.dms.controller.response.MetadataActionHintResponse;
 import br.com.dms.controller.response.MetadataSuggestionResponse;
 import br.com.dms.controller.response.MetadataUpdateHistoryBucketResponse;
+import br.com.dms.controller.response.MetadataUpdateHistoryCategorySummaryResponse;
 import br.com.dms.controller.response.MetadataUpdateHistoryEntryResponse;
 import br.com.dms.controller.response.MetadataUpdateHistoryPageResponse;
 import br.com.dms.controller.response.MetadataUpdateHistorySummaryResponse;
@@ -177,6 +178,52 @@ public class DocumentInsightService {
         List<MetadataUpdateHistoryEntryResponse> filteredEntries = filterMetadataUpdateHistory(document, source, field, updatedFrom, updatedTo);
 
         return MetadataUpdateHistorySummaryResponse.builder()
+                .totalEntries(allEntries.size())
+                .filteredEntries(filteredEntries.size())
+                .latestUpdatedAt(filteredEntries.stream().map(MetadataUpdateHistoryEntryResponse::getUpdatedAt).findFirst().orElse(null))
+                .bySource(buildHistoryBuckets(filteredEntries, MetadataUpdateHistoryEntryResponse::getSource))
+                .byField(buildHistoryBuckets(filteredEntries, MetadataUpdateHistoryEntryResponse::getField))
+                .build();
+    }
+
+    public MetadataUpdateHistoryCategorySummaryResponse getMetadataUpdateHistoryCategorySummary(String documentId,
+                                                                                                Optional<String> version,
+                                                                                                Optional<String> source,
+                                                                                                Optional<String> field,
+                                                                                                Optional<Instant> updatedFrom,
+                                                                                                Optional<Instant> updatedTo) {
+        String tenantId = tenantContextService.requireTenantId();
+        DmsDocument referenceDocument = resolveDocument(documentId, tenantId);
+
+        if (referenceDocument == null) {
+            throw new DmsDocumentNotFoundException("Document not found", TypeException.VALID);
+        }
+
+        String category = StringUtils.trimToEmpty(referenceDocument.getCategory());
+        List<DmsDocument> categoryDocuments = StringUtils.isBlank(category)
+                ? List.of(referenceDocument)
+                : dmsDocumentRepository.findByTenantIdAndCategory(tenantId, category);
+
+        List<MetadataUpdateHistoryEntryResponse> allEntries = categoryDocuments.stream()
+                .flatMap(doc -> toMetadataUpdateHistory(doc).stream())
+                .sorted((left, right) -> StringUtils.defaultString(right.getUpdatedAt()).compareTo(StringUtils.defaultString(left.getUpdatedAt())))
+                .toList();
+
+        List<MetadataUpdateHistoryEntryResponse> filteredEntries = allEntries.stream()
+                .filter(entry -> matchesSource(entry, source))
+                .filter(entry -> matchesField(entry, field))
+                .filter(entry -> matchesUpdatedFrom(entry, updatedFrom))
+                .filter(entry -> matchesUpdatedTo(entry, updatedTo))
+                .toList();
+
+        int docsWithUpdates = (int) categoryDocuments.stream()
+                .filter(doc -> doc.getMetadataUpdateHistory() != null && !doc.getMetadataUpdateHistory().isEmpty())
+                .count();
+
+        return MetadataUpdateHistoryCategorySummaryResponse.builder()
+                .category(category)
+                .totalDocumentsInCategory(categoryDocuments.size())
+                .totalDocumentsWithUpdates(docsWithUpdates)
                 .totalEntries(allEntries.size())
                 .filteredEntries(filteredEntries.size())
                 .latestUpdatedAt(filteredEntries.stream().map(MetadataUpdateHistoryEntryResponse::getUpdatedAt).findFirst().orElse(null))
