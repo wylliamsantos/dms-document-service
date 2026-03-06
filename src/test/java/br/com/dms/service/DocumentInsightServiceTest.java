@@ -11,6 +11,7 @@ import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -87,6 +88,65 @@ class DocumentInsightServiceTest {
         assertEquals(1, response.getMetadataUpdateHistory().size());
         assertEquals("OCR_HINT", response.getMetadataUpdateHistory().get(0).getSource());
         assertFalse(response.getImportantPersistedMetadata().containsKey("observacao"));
+    }
+
+    @Test
+    void shouldFilterMetadataHistoryBySourceFieldAndPeriod() {
+        AiMetadataSuggestionService aiService = mock(AiMetadataSuggestionService.class);
+        TenantContextService tenantContextService = mock(TenantContextService.class);
+        when(tenantContextService.requireTenantId()).thenReturn("tenant-1");
+
+        DmsDocumentRepository repository = mock(DmsDocumentRepository.class);
+        when(repository.findByIdAndTenantId("doc-history", "tenant-1")).thenReturn(Optional.of(
+                DmsDocument.of()
+                        .id("doc-history")
+                        .tenantId("tenant-1")
+                        .metadataUpdateHistory(List.of(
+                                MetadataUpdateHistoryEntry.builder()
+                                        .field("valor")
+                                        .previousValue("100")
+                                        .newValue("120")
+                                        .source("OCR_HINT")
+                                        .updatedAt("2026-03-06T08:00:00Z")
+                                        .updatedBy("ocr-bot")
+                                        .build(),
+                                MetadataUpdateHistoryEntry.builder()
+                                        .field("cpf")
+                                        .previousValue("111")
+                                        .newValue("222")
+                                        .source("MANUAL")
+                                        .updatedAt("2026-03-06T07:00:00Z")
+                                        .updatedBy("user-a")
+                                        .build()
+                        ))
+                        .build()
+        ));
+
+        DocumentInsightService service = new DocumentInsightService(
+                aiService,
+                tenantContextService,
+                repository,
+                mock(CategoryRepository.class),
+                new SimpleMeterRegistry(),
+                false,
+                "",
+                ""
+        );
+
+        var page = service.getMetadataUpdateHistory(
+                "doc-history",
+                Optional.empty(),
+                0,
+                10,
+                Optional.of("OCR_HINT"),
+                Optional.of("valor"),
+                Optional.of(Instant.parse("2026-03-06T07:59:00Z")),
+                Optional.of(Instant.parse("2026-03-06T08:01:00Z"))
+        );
+
+        assertEquals(1, page.getTotalElements());
+        assertEquals("valor", page.getContent().get(0).getField());
+        assertEquals("OCR_HINT", page.getContent().get(0).getSource());
     }
 
     @Test

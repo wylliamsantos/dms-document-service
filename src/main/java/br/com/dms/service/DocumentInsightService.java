@@ -129,7 +129,14 @@ public class DocumentInsightService {
                 .build();
     }
 
-    public MetadataUpdateHistoryPageResponse getMetadataUpdateHistory(String documentId, Optional<String> version, int page, int size) {
+    public MetadataUpdateHistoryPageResponse getMetadataUpdateHistory(String documentId,
+                                                                      Optional<String> version,
+                                                                      int page,
+                                                                      int size,
+                                                                      Optional<String> source,
+                                                                      Optional<String> field,
+                                                                      Optional<Instant> updatedFrom,
+                                                                      Optional<Instant> updatedTo) {
         String tenantId = tenantContextService.requireTenantId();
         DmsDocument document = resolveDocument(documentId, tenantId);
 
@@ -137,7 +144,12 @@ public class DocumentInsightService {
             throw new DmsDocumentNotFoundException("Document not found", TypeException.VALID);
         }
 
-        List<MetadataUpdateHistoryEntryResponse> ordered = toMetadataUpdateHistory(document);
+        List<MetadataUpdateHistoryEntryResponse> ordered = toMetadataUpdateHistory(document).stream()
+                .filter(entry -> matchesSource(entry, source))
+                .filter(entry -> matchesField(entry, field))
+                .filter(entry -> matchesUpdatedFrom(entry, updatedFrom))
+                .filter(entry -> matchesUpdatedTo(entry, updatedTo))
+                .toList();
         int safePage = Math.max(0, page);
         int safeSize = Math.max(1, Math.min(size, 100));
         int fromIndex = Math.min(safePage * safeSize, ordered.size());
@@ -149,6 +161,58 @@ public class DocumentInsightService {
                 .number(safePage)
                 .size(safeSize)
                 .build();
+    }
+
+    private boolean matchesSource(MetadataUpdateHistoryEntryResponse entry, Optional<String> source) {
+        if (source == null || source.isEmpty() || StringUtils.isBlank(source.get())) {
+            return true;
+        }
+
+        return StringUtils.equalsIgnoreCase(
+                StringUtils.trimToEmpty(entry.getSource()),
+                StringUtils.trimToEmpty(source.get())
+        );
+    }
+
+    private boolean matchesField(MetadataUpdateHistoryEntryResponse entry, Optional<String> field) {
+        if (field == null || field.isEmpty() || StringUtils.isBlank(field.get())) {
+            return true;
+        }
+
+        return StringUtils.equalsIgnoreCase(
+                StringUtils.trimToEmpty(entry.getField()),
+                StringUtils.trimToEmpty(field.get())
+        );
+    }
+
+    private boolean matchesUpdatedFrom(MetadataUpdateHistoryEntryResponse entry, Optional<Instant> updatedFrom) {
+        if (updatedFrom == null || updatedFrom.isEmpty()) {
+            return true;
+        }
+
+        Optional<Instant> updatedAt = parseInstant(entry.getUpdatedAt());
+        return updatedAt.map(instant -> !instant.isBefore(updatedFrom.get())).orElse(false);
+    }
+
+    private boolean matchesUpdatedTo(MetadataUpdateHistoryEntryResponse entry, Optional<Instant> updatedTo) {
+        if (updatedTo == null || updatedTo.isEmpty()) {
+            return true;
+        }
+
+        Optional<Instant> updatedAt = parseInstant(entry.getUpdatedAt());
+        return updatedAt.map(instant -> !instant.isAfter(updatedTo.get())).orElse(false);
+    }
+
+    private Optional<Instant> parseInstant(String value) {
+        if (StringUtils.isBlank(value)) {
+            return Optional.empty();
+        }
+
+        try {
+            return Optional.of(Instant.parse(StringUtils.trim(value)));
+        } catch (Exception ignored) {
+            return Optional.empty();
+        }
     }
 
     private List<String> resolveExpectedRequiredMetadata(String tenantId, DmsDocument document) {
