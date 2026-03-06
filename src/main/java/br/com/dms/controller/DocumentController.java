@@ -38,6 +38,7 @@ import static br.com.dms.config.AuthorizationRules.MANAGE;
 import static br.com.dms.config.AuthorizationRules.READ;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -220,10 +221,23 @@ public class DocumentController {
                                                                                        @PathVariable(value = "documentId") String documentId,
                                                                                        @PathVariable(name = "version", required = false) Optional<String> version,
                                                                                        @RequestParam(name = "page", defaultValue = "0") int page,
-                                                                                       @RequestParam(name = "size", defaultValue = "10") int size) {
-        log.info("DMS version {} - TransactionId: {} - metadata history - documentId: {}, version: {}, page: {}, size: {}",
-                API_VERSION, transactionId, documentId, version, page, size);
-        return ResponseEntity.ok(documentInsightService.getMetadataUpdateHistory(documentId, version, page, size));
+                                                                                       @RequestParam(name = "size", defaultValue = "10") int size,
+                                                                                       @RequestParam(name = "source", required = false) Optional<String> source,
+                                                                                       @RequestParam(name = "field", required = false) Optional<String> field,
+                                                                                       @RequestParam(name = "updatedFrom", required = false) Optional<String> updatedFrom,
+                                                                                       @RequestParam(name = "updatedTo", required = false) Optional<String> updatedTo) {
+        log.info("DMS version {} - TransactionId: {} - metadata history - documentId: {}, version: {}, page: {}, size: {}, source: {}, field: {}, updatedFrom: {}, updatedTo: {}",
+                API_VERSION, transactionId, documentId, version, page, size, source, field, updatedFrom, updatedTo);
+        return ResponseEntity.ok(documentInsightService.getMetadataUpdateHistory(
+                documentId,
+                version,
+                page,
+                size,
+                source,
+                field,
+                updatedFrom.flatMap(this::parseOptionalInstant),
+                updatedTo.flatMap(this::parseOptionalInstant)
+        ));
     }
 
     @GetMapping(path = {"/{documentId}/rag/context", "/{documentId}/{version}/rag/context"}, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -346,6 +360,18 @@ public class DocumentController {
         ResponseEntity<?> result = dmsService.reprove(transactionId, documentId, documentVersion);
         log.info("DMS version v1 - TransactionId: {} - Reprove result {}", transactionId, result.getStatusCode());
         return result;
+    }
+
+    private Optional<Instant> parseOptionalInstant(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return Optional.empty();
+        }
+
+        try {
+            return Optional.of(Instant.parse(value.trim()));
+        } catch (Exception ignored) {
+            return Optional.empty();
+        }
     }
 
     @PutMapping(value = "/{documentId}/metadata", produces = MediaType.APPLICATION_JSON_VALUE)
