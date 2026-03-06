@@ -71,6 +71,7 @@ class DocumentInsightServiceTest {
         assertEquals(42, response.getImportantPersistedMetadata().get("valor"));
         assertEquals(3, response.getPersistedMetadataCount());
         assertTrue(response.getHasPersistedOcrText());
+        assertTrue(response.getMetadataActionHints().isEmpty());
         assertFalse(response.getImportantPersistedMetadata().containsKey("observacao"));
     }
 
@@ -121,6 +122,9 @@ class DocumentInsightServiceTest {
         var response = service.getInsight("doc-2", Optional.empty());
         assertEquals(List.of("cpf", "valor", "data_emissao"), response.getExpectedRequiredMetadata());
         assertEquals(List.of("valor", "data_emissao"), response.getMissingRequiredMetadata());
+        assertEquals(2, response.getMetadataActionHints().size());
+        assertEquals("valor", response.getMetadataActionHints().get(0).getField());
+        assertEquals("REQUEST_OCR_PROCESSING", response.getMetadataActionHints().get(0).getAction());
     }
 
     @Test
@@ -231,8 +235,18 @@ class DocumentInsightServiceTest {
                         .build()
         ));
 
+        AiMetadataSuggestionService aiService = mock(AiMetadataSuggestionService.class);
+        when(aiService.suggest(eq("doc-rag"), eq(Optional.empty()))).thenReturn(
+                MetadataSuggestionResponse.builder()
+                        .documentId("doc-rag")
+                        .summary("Resumo")
+                        .confidence(0.7)
+                        .source("ocr")
+                        .build()
+        );
+
         DocumentInsightService service = new DocumentInsightService(
-                mock(AiMetadataSuggestionService.class),
+                aiService,
                 tenantContextService,
                 repository,
                 categoryRepository,
@@ -247,6 +261,8 @@ class DocumentInsightServiceTest {
         assertEquals("QUALITY_GATED", response.getStatus());
         assertEquals("BLOCKED", response.getQualityBand());
         assertEquals(List.of("valor"), response.getMissingRequiredMetadata());
+        var insight = service.getInsight("doc-rag", Optional.empty());
+        assertEquals("EXTRACT_FROM_OCR", insight.getMetadataActionHints().get(0).getAction());
         assertTrue(response.getMessage().contains("metadados obrigatórios"));
         assertTrue(response.getChunks().isEmpty());
     }
