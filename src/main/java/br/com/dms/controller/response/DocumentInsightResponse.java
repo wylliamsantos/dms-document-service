@@ -23,5 +23,7 @@ public class DocumentInsightResponse {
     Map<String, Object> importantPersistedMetadata;
     Integer persistedMetadataCount;
     Boolean hasPersistedOcrText;
+    List<String> expectedRequiredMetadata;
+    List<String> missingRequiredMetadata;
     Map<String, Object> ocrStats;
 }
