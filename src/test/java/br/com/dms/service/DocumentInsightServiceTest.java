@@ -208,6 +208,49 @@ class DocumentInsightServiceTest {
     }
 
     @Test
+    void shouldReturnQualityGatedWhenRequiredMetadataIsMissing() {
+        TenantContextService tenantContextService = mock(TenantContextService.class);
+        when(tenantContextService.requireTenantId()).thenReturn("tenant-1");
+
+        DmsDocumentRepository repository = mock(DmsDocumentRepository.class);
+        when(repository.findByIdAndTenantId("doc-rag", "tenant-1")).thenReturn(Optional.of(
+                DmsDocument.of()
+                        .id("doc-rag")
+                        .tenantId("tenant-1")
+                        .category("CONTRATO")
+                        .metadata(Map.of("cpf", "123"))
+                        .ocrText("Parágrafo OCR válido")
+                        .build()
+        ));
+
+        CategoryRepository categoryRepository = mock(CategoryRepository.class);
+        when(categoryRepository.findByTenantIdAndName("tenant-1", "CONTRATO")).thenReturn(Optional.of(
+                Category.builder()
+                        .name("CONTRATO")
+                        .schema(Map.of("required", List.of("cpf", "valor")))
+                        .build()
+        ));
+
+        DocumentInsightService service = new DocumentInsightService(
+                mock(AiMetadataSuggestionService.class),
+                tenantContextService,
+                repository,
+                categoryRepository,
+                new SimpleMeterRegistry(),
+                true,
+                "tenant-1",
+                "contrato"
+        );
+
+        DocumentRagContextResponse response = service.getRagContextSkeleton("doc-rag", Optional.empty());
+        assertFalse(response.isEnabled());
+        assertEquals("QUALITY_GATED", response.getStatus());
+        assertEquals("BLOCKED", response.getQualityBand());
+        assertTrue(response.getMessage().contains("metadados obrigatórios"));
+        assertTrue(response.getChunks().isEmpty());
+    }
+
+    @Test
     void shouldExposeRankedRagChunksWithScoreAndSource() {
         TenantContextService tenantContextService = mock(TenantContextService.class);
         when(tenantContextService.requireTenantId()).thenReturn("tenant-1");

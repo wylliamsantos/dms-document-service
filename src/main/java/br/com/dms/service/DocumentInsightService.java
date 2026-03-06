@@ -279,6 +279,14 @@ public class DocumentInsightService {
             }
         }
 
+        List<String> missingRequiredMetadata = resolveMissingRequiredMetadata(document, resolveExpectedRequiredMetadata(tenantId, document));
+        if (!missingRequiredMetadata.isEmpty()) {
+            String missingPreview = missingRequiredMetadata.stream().limit(3).collect(Collectors.joining(", "));
+            String suffix = missingRequiredMetadata.size() > 3 ? "..." : "";
+            return buildRagResponse(documentId, version, tenantId, category, false, "QUALITY_GATED",
+                    "RAG aguardando qualidade mínima: preencha metadados obrigatórios faltantes (" + missingPreview + suffix + ").", List.of(), startedAt);
+        }
+
         List<RagContextChunkResponse> chunks = buildChunks(document);
         return buildRagResponse(documentId, version, tenantId, category, true, "READY",
                 chunks.isEmpty() ? "Sem chunks de OCR disponíveis para este documento." : "Contexto RAG local carregado.",
