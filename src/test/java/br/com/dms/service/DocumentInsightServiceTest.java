@@ -108,6 +108,7 @@ class DocumentInsightServiceTest {
                 .category("CONTRATO")
                 .metadataUpdateHistory(List.of(
                         MetadataUpdateHistoryEntry.builder().field("valor").source("OCR_HINT").updatedAt(now.minusSeconds(60).toString()).build(),
+                        MetadataUpdateHistoryEntry.builder().field("valor").source("OCR_HINT_CANCEL").updatedAt(now.minusSeconds(90).toString()).build(),
                         MetadataUpdateHistoryEntry.builder().field("numero").source("MANUAL").updatedAt(now.minusSeconds(120).toString()).build()
                 ))
                 .build();
@@ -122,6 +123,7 @@ class DocumentInsightServiceTest {
                         .category("CONTRATO")
                         .metadataUpdateHistory(List.of(
                                 MetadataUpdateHistoryEntry.builder().field("cpf").source("OCR_HINT").updatedAt(now.minusSeconds(3600).toString()).build(),
+                                MetadataUpdateHistoryEntry.builder().field("cpf").source("OCR_HINT_ERROR").updatedAt(now.minusSeconds(5400).toString()).build(),
                                 MetadataUpdateHistoryEntry.builder().field("cpf").source("MANUAL").updatedAt(now.minusSeconds(7200).toString()).build()
                         ))
                         .build()
@@ -141,10 +143,14 @@ class DocumentInsightServiceTest {
         var response = service.getInsight("doc-1", Optional.empty());
 
         assertNotNull(response.getOcrHintAdoption());
-        assertEquals(2, response.getOcrHintAdoption().getDocumentTotalUpdates());
+        assertEquals(3, response.getOcrHintAdoption().getDocumentTotalUpdates());
         assertEquals(1, response.getOcrHintAdoption().getDocumentOcrHintUpdates());
-        assertEquals(4, response.getOcrHintAdoption().getCategoryTotalUpdates());
+        assertEquals(1, response.getOcrHintAdoption().getDocumentOcrHintCancelUpdates());
+        assertEquals(0, response.getOcrHintAdoption().getDocumentOcrHintErrorUpdates());
+        assertEquals(6, response.getOcrHintAdoption().getCategoryTotalUpdates());
         assertEquals(2, response.getOcrHintAdoption().getCategoryOcrHintUpdates());
+        assertEquals(1, response.getOcrHintAdoption().getCategoryOcrHintCancelUpdates());
+        assertEquals(1, response.getOcrHintAdoption().getCategoryOcrHintErrorUpdates());
         assertEquals(30, response.getOcrHintAdoption().getLookbackDaysApplied());
         assertEquals(3, response.getOcrHintAdoption().getTrend().size());
     }
@@ -190,6 +196,8 @@ class DocumentInsightServiceTest {
         assertNotNull(response.getOcrHintAdoption());
         assertEquals(1, response.getOcrHintAdoption().getDocumentTotalUpdates());
         assertEquals(1, response.getOcrHintAdoption().getDocumentOcrHintUpdates());
+        assertEquals(0, response.getOcrHintAdoption().getDocumentOcrHintCancelUpdates());
+        assertEquals(0, response.getOcrHintAdoption().getDocumentOcrHintErrorUpdates());
         assertEquals(1, response.getOcrHintAdoption().getLookbackDaysApplied());
     }
 

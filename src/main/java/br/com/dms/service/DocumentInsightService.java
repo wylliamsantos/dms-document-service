@@ -643,10 +643,14 @@ public class DocumentInsightService {
         if (document == null) {
             return MetadataUpdateOcrHintAdoptionResponse.builder()
                     .documentTotalUpdates(0)
-                    .documentOcrHintUpdates(0)
+                     .documentOcrHintUpdates(0)
+                    .documentOcrHintCancelUpdates(0)
+                    .documentOcrHintErrorUpdates(0)
                     .documentOcrHintRate(0.0d)
                     .categoryTotalUpdates(0)
-                    .categoryOcrHintUpdates(0)
+                     .categoryOcrHintUpdates(0)
+                    .categoryOcrHintCancelUpdates(0)
+                    .categoryOcrHintErrorUpdates(0)
                     .categoryOcrHintRate(0.0d)
                     .lookbackDaysApplied(lookbackDays)
                     .trend(List.of())
@@ -668,15 +672,23 @@ public class DocumentInsightService {
 
         long documentTotal = filteredDocumentEntries.size();
         long documentOcrHint = countBySource(filteredDocumentEntries, "OCR_HINT");
+        long documentOcrHintCancel = countBySources(filteredDocumentEntries, List.of("OCR_HINT_CANCEL", "OCR_HINT_DISMISSED"));
+        long documentOcrHintError = countBySource(filteredDocumentEntries, "OCR_HINT_ERROR");
         long categoryTotal = filteredCategoryEntries.size();
         long categoryOcrHint = countBySource(filteredCategoryEntries, "OCR_HINT");
+        long categoryOcrHintCancel = countBySources(filteredCategoryEntries, List.of("OCR_HINT_CANCEL", "OCR_HINT_DISMISSED"));
+        long categoryOcrHintError = countBySource(filteredCategoryEntries, "OCR_HINT_ERROR");
 
         return MetadataUpdateOcrHintAdoptionResponse.builder()
                 .documentTotalUpdates(documentTotal)
-                .documentOcrHintUpdates(documentOcrHint)
+                 .documentOcrHintUpdates(documentOcrHint)
+                .documentOcrHintCancelUpdates(documentOcrHintCancel)
+                .documentOcrHintErrorUpdates(documentOcrHintError)
                 .documentOcrHintRate(resolveRatio(documentOcrHint, documentTotal))
                 .categoryTotalUpdates(categoryTotal)
-                .categoryOcrHintUpdates(categoryOcrHint)
+                 .categoryOcrHintUpdates(categoryOcrHint)
+                .categoryOcrHintCancelUpdates(categoryOcrHintCancel)
+                .categoryOcrHintErrorUpdates(categoryOcrHintError)
                 .categoryOcrHintRate(resolveRatio(categoryOcrHint, categoryTotal))
                 .lookbackDaysApplied(lookbackDays)
                 .trend(buildOcrHintTrend(filteredCategoryEntries))
@@ -732,10 +744,14 @@ public class DocumentInsightService {
 
             long total = bucket.size();
             long ocrHint = countBySource(bucket, "OCR_HINT");
+            long ocrHintCancel = countBySources(bucket, List.of("OCR_HINT_CANCEL", "OCR_HINT_DISMISSED"));
+            long ocrHintError = countBySource(bucket, "OCR_HINT_ERROR");
             trend.add(MetadataUpdateAdoptionTrendPointResponse.builder()
                     .label(from.toString().substring(0, 10))
                     .totalUpdates(total)
                     .ocrHintUpdates(ocrHint)
+                    .ocrHintCancelUpdates(ocrHintCancel)
+                    .ocrHintErrorUpdates(ocrHintError)
                     .ocrHintRate(resolveRatio(ocrHint, total))
                     .build());
         }
@@ -750,6 +766,16 @@ public class DocumentInsightService {
 
         return entries.stream()
                 .filter(entry -> StringUtils.equalsIgnoreCase(StringUtils.trimToEmpty(entry.getSource()), StringUtils.trimToEmpty(source)))
+                .count();
+    }
+
+    private long countBySources(List<MetadataUpdateHistoryEntryResponse> entries, List<String> sources) {
+        if (entries == null || entries.isEmpty() || sources == null || sources.isEmpty()) {
+            return 0L;
+        }
+
+        return entries.stream()
+                .filter(entry -> sources.stream().anyMatch(source -> StringUtils.equalsIgnoreCase(StringUtils.trimToEmpty(entry.getSource()), StringUtils.trimToEmpty(source))))
                 .count();
     }
 
