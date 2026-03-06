@@ -25,6 +25,7 @@ public class DocumentInsightResponse {
     Boolean hasPersistedOcrText;
     List<String> expectedRequiredMetadata;
     List<String> missingRequiredMetadata;
+    Integer requiredMetadataCoveragePercent;
     List<MetadataActionHintResponse> metadataActionHints;
     Map<String, Object> ocrStats;
 }
