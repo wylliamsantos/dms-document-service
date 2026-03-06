@@ -158,7 +158,7 @@ public class DocumentInsightService {
             throw new DmsDocumentNotFoundException("Document not found", TypeException.VALID);
         }
 
-        List<MetadataUpdateHistoryEntryResponse> ordered = filterMetadataUpdateHistory(document, source, field, updatedFrom, updatedTo);
+        List<MetadataUpdateHistoryEntryResponse> ordered = filterMetadataUpdateHistory(document, source, field, updatedFrom, updatedTo, Optional.empty());
         int safePage = Math.max(0, page);
         int safeSize = Math.max(1, Math.min(size, 100));
         int fromIndex = Math.min(safePage * safeSize, ordered.size());
@@ -177,7 +177,8 @@ public class DocumentInsightService {
                                                                                 Optional<String> source,
                                                                                 Optional<String> field,
                                                                                 Optional<Instant> updatedFrom,
-                                                                                Optional<Instant> updatedTo) {
+                                                                                Optional<Instant> updatedTo,
+                                                                                Optional<String> ocrHintAction) {
         String tenantId = tenantContextService.requireTenantId();
         DmsDocument document = resolveDocument(documentId, tenantId);
 
@@ -186,7 +187,7 @@ public class DocumentInsightService {
         }
 
         List<MetadataUpdateHistoryEntryResponse> allEntries = toMetadataUpdateHistory(document);
-        List<MetadataUpdateHistoryEntryResponse> filteredEntries = filterMetadataUpdateHistory(document, source, field, updatedFrom, updatedTo);
+        List<MetadataUpdateHistoryEntryResponse> filteredEntries = filterMetadataUpdateHistory(document, source, field, updatedFrom, updatedTo, ocrHintAction);
 
         return MetadataUpdateHistorySummaryResponse.builder()
                 .totalEntries(allEntries.size())
@@ -202,7 +203,8 @@ public class DocumentInsightService {
                                                                                                 Optional<String> source,
                                                                                                 Optional<String> field,
                                                                                                 Optional<Instant> updatedFrom,
-                                                                                                Optional<Instant> updatedTo) {
+                                                                                                Optional<Instant> updatedTo,
+                                                                                                Optional<String> ocrHintAction) {
         String tenantId = tenantContextService.requireTenantId();
         DmsDocument referenceDocument = resolveDocument(documentId, tenantId);
 
@@ -225,6 +227,7 @@ public class DocumentInsightService {
                 .filter(entry -> matchesField(entry, field))
                 .filter(entry -> matchesUpdatedFrom(entry, updatedFrom))
                 .filter(entry -> matchesUpdatedTo(entry, updatedTo))
+                .filter(entry -> matchesOcrHintAction(entry, ocrHintAction))
                 .toList();
 
         int docsWithUpdates = (int) categoryDocuments.stream()
@@ -247,12 +250,14 @@ public class DocumentInsightService {
                                                                           Optional<String> source,
                                                                           Optional<String> field,
                                                                           Optional<Instant> updatedFrom,
-                                                                          Optional<Instant> updatedTo) {
+                                                                          Optional<Instant> updatedTo,
+                                                                          Optional<String> ocrHintAction) {
         return toMetadataUpdateHistory(document).stream()
                 .filter(entry -> matchesSource(entry, source))
                 .filter(entry -> matchesField(entry, field))
                 .filter(entry -> matchesUpdatedFrom(entry, updatedFrom))
                 .filter(entry -> matchesUpdatedTo(entry, updatedTo))
+                .filter(entry -> matchesOcrHintAction(entry, ocrHintAction))
                 .toList();
     }
 
@@ -295,6 +300,23 @@ public class DocumentInsightService {
                 StringUtils.trimToEmpty(entry.getField()),
                 StringUtils.trimToEmpty(field.get())
         );
+    }
+
+    private boolean matchesOcrHintAction(MetadataUpdateHistoryEntryResponse entry, Optional<String> ocrHintAction) {
+        if (ocrHintAction == null || ocrHintAction.isEmpty() || StringUtils.isBlank(ocrHintAction.get())) {
+            return true;
+        }
+
+        String normalizedAction = StringUtils.upperCase(StringUtils.trimToEmpty(ocrHintAction.get()));
+        String normalizedSource = StringUtils.upperCase(StringUtils.trimToEmpty(entry.getSource()));
+
+        return switch (normalizedAction) {
+            case "APPLIED" -> "OCR_HINT".equals(normalizedSource);
+            case "CANCELLED", "CANCELED", "DISMISSED" -> List.of("OCR_HINT_CANCEL", "OCR_HINT_DISMISSED").contains(normalizedSource);
+            case "ERROR" -> "OCR_HINT_ERROR".equals(normalizedSource);
+            case "ALL" -> true;
+            default -> StringUtils.equalsIgnoreCase(normalizedSource, normalizedAction);
+        };
     }
 
     private boolean matchesUpdatedFrom(MetadataUpdateHistoryEntryResponse entry, Optional<Instant> updatedFrom) {

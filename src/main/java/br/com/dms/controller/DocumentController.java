@@ -252,16 +252,18 @@ public class DocumentController {
                                                                                                  @RequestParam(name = "source", required = false) Optional<String> source,
                                                                                                  @RequestParam(name = "field", required = false) Optional<String> field,
                                                                                                  @RequestParam(name = "updatedFrom", required = false) Optional<String> updatedFrom,
-                                                                                                 @RequestParam(name = "updatedTo", required = false) Optional<String> updatedTo) {
-        log.info("DMS version {} - TransactionId: {} - metadata history summary - documentId: {}, version: {}, source: {}, field: {}, updatedFrom: {}, updatedTo: {}",
-                API_VERSION, transactionId, documentId, version, source, field, updatedFrom, updatedTo);
+                                                                                                 @RequestParam(name = "updatedTo", required = false) Optional<String> updatedTo,
+                                                                                                 @RequestParam(name = "ocrHintAction", required = false) Optional<String> ocrHintAction) {
+        log.info("DMS version {} - TransactionId: {} - metadata history summary - documentId: {}, version: {}, source: {}, field: {}, updatedFrom: {}, updatedTo: {}, ocrHintAction: {}",
+                API_VERSION, transactionId, documentId, version, source, field, updatedFrom, updatedTo, ocrHintAction);
         return ResponseEntity.ok(documentInsightService.getMetadataUpdateHistorySummary(
                 documentId,
                 version,
                 source,
                 field,
                 updatedFrom.flatMap(this::parseOptionalInstant),
-                updatedTo.flatMap(this::parseOptionalInstant)
+                updatedTo.flatMap(this::parseOptionalInstant),
+                ocrHintAction
         ));
     }
 
@@ -273,16 +275,18 @@ public class DocumentController {
                                                                                                                  @RequestParam(name = "source", required = false) Optional<String> source,
                                                                                                                  @RequestParam(name = "field", required = false) Optional<String> field,
                                                                                                                  @RequestParam(name = "updatedFrom", required = false) Optional<String> updatedFrom,
-                                                                                                                 @RequestParam(name = "updatedTo", required = false) Optional<String> updatedTo) {
-        log.info("DMS version {} - TransactionId: {} - metadata history category summary - documentId: {}, version: {}, source: {}, field: {}, updatedFrom: {}, updatedTo: {}",
-                API_VERSION, transactionId, documentId, version, source, field, updatedFrom, updatedTo);
+                                                                                                                 @RequestParam(name = "updatedTo", required = false) Optional<String> updatedTo,
+                                                                                                                 @RequestParam(name = "ocrHintAction", required = false) Optional<String> ocrHintAction) {
+        log.info("DMS version {} - TransactionId: {} - metadata history category summary - documentId: {}, version: {}, source: {}, field: {}, updatedFrom: {}, updatedTo: {}, ocrHintAction: {}",
+                API_VERSION, transactionId, documentId, version, source, field, updatedFrom, updatedTo, ocrHintAction);
         return ResponseEntity.ok(documentInsightService.getMetadataUpdateHistoryCategorySummary(
                 documentId,
                 version,
                 source,
                 field,
                 updatedFrom.flatMap(this::parseOptionalInstant),
-                updatedTo.flatMap(this::parseOptionalInstant)
+                updatedTo.flatMap(this::parseOptionalInstant),
+                ocrHintAction
         ));
     }
 
