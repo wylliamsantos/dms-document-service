@@ -266,6 +266,68 @@ class DocumentInsightServiceTest {
     }
 
     @Test
+    void shouldExposeMetadataRegressionAlertsForOutlierFieldAndSource() {
+        AiMetadataSuggestionService aiService = mock(AiMetadataSuggestionService.class);
+        when(aiService.suggest(eq("doc-alert"), eq(Optional.empty()))).thenReturn(
+                MetadataSuggestionResponse.builder()
+                        .documentId("doc-alert")
+                        .summary("Resumo")
+                        .confidence(0.91)
+                        .source("ocr")
+                        .build()
+        );
+
+        TenantContextService tenantContextService = mock(TenantContextService.class);
+        when(tenantContextService.requireTenantId()).thenReturn("tenant-1");
+
+        DmsDocument highlightedDoc = DmsDocument.of()
+                .id("doc-alert")
+                .tenantId("tenant-1")
+                .category("CONTRATO")
+                .metadataUpdateHistory(List.of(
+                        MetadataUpdateHistoryEntry.builder().field("valor").source("OCR_HINT").updatedAt("2026-03-06T10:00:00Z").build(),
+                        MetadataUpdateHistoryEntry.builder().field("valor").source("OCR_HINT").updatedAt("2026-03-06T09:00:00Z").build(),
+                        MetadataUpdateHistoryEntry.builder().field("valor").source("OCR_HINT").updatedAt("2026-03-06T08:00:00Z").build(),
+                        MetadataUpdateHistoryEntry.builder().field("cpf").source("MANUAL").updatedAt("2026-03-06T07:00:00Z").build()
+                ))
+                .build();
+
+        DmsDocument baselineDoc = DmsDocument.of()
+                .id("doc-base")
+                .tenantId("tenant-1")
+                .category("CONTRATO")
+                .metadataUpdateHistory(List.of(
+                        MetadataUpdateHistoryEntry.builder().field("cpf").source("MANUAL").updatedAt("2026-03-06T06:00:00Z").build(),
+                        MetadataUpdateHistoryEntry.builder().field("cpf").source("MANUAL").updatedAt("2026-03-06T05:00:00Z").build(),
+                        MetadataUpdateHistoryEntry.builder().field("data_emissao").source("MANUAL").updatedAt("2026-03-06T04:00:00Z").build(),
+                        MetadataUpdateHistoryEntry.builder().field("numero").source("OCR_HINT").updatedAt("2026-03-06T03:00:00Z").build()
+                ))
+                .build();
+
+        DmsDocumentRepository repository = mock(DmsDocumentRepository.class);
+        when(repository.findByIdAndTenantId("doc-alert", "tenant-1")).thenReturn(Optional.of(highlightedDoc));
+        when(repository.findByTenantIdAndCategory("tenant-1", "CONTRATO")).thenReturn(List.of(highlightedDoc, baselineDoc));
+
+        DocumentInsightService service = new DocumentInsightService(
+                aiService,
+                tenantContextService,
+                repository,
+                mock(CategoryRepository.class),
+                new SimpleMeterRegistry(),
+                false,
+                "",
+                ""
+        );
+
+        var response = service.getInsight("doc-alert", Optional.empty());
+
+        assertNotNull(response.getMetadataRegressionAlerts());
+        assertFalse(response.getMetadataRegressionAlerts().isEmpty());
+        assertTrue(response.getMetadataRegressionAlerts().stream().anyMatch(alert -> "FIELD".equals(alert.getDimension()) && "valor".equals(alert.getKey())));
+        assertTrue(response.getMetadataRegressionAlerts().stream().anyMatch(alert -> "SOURCE".equals(alert.getDimension()) && "ocr_hint".equals(alert.getKey())));
+    }
+
+    @Test
     void shouldExposeMissingRequiredMetadataFromCategorySchema() {
         AiMetadataSuggestionService aiService = mock(AiMetadataSuggestionService.class);
         when(aiService.suggest(eq("doc-2"), eq(Optional.empty()))).thenReturn(
