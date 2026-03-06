@@ -8,6 +8,8 @@ import br.com.dms.controller.response.MetadataSuggestionResponse;
 import br.com.dms.controller.response.MetadataUpdateHistoryBucketResponse;
 import br.com.dms.controller.response.MetadataUpdateHistoryCategorySummaryResponse;
 import br.com.dms.controller.response.MetadataRegressionAlertResponse;
+import br.com.dms.controller.response.MetadataUpdateAdoptionTrendPointResponse;
+import br.com.dms.controller.response.MetadataUpdateOcrHintAdoptionResponse;
 import br.com.dms.controller.response.MetadataUpdateHistoryEntryResponse;
 import br.com.dms.controller.response.MetadataUpdateHistoryPageResponse;
 import br.com.dms.controller.response.MetadataUpdateHistorySummaryResponse;
@@ -93,6 +95,7 @@ public class DocumentInsightService {
         List<MetadataActionHintResponse> metadataActionHints = resolveMetadataActionHints(document, missingRequiredMetadata);
         List<MetadataUpdateHistoryEntryResponse> metadataUpdateHistory = resolveMetadataUpdateHistory(document);
         List<MetadataRegressionAlertResponse> metadataRegressionAlerts = resolveMetadataRegressionAlerts(tenantId, document);
+        MetadataUpdateOcrHintAdoptionResponse ocrHintAdoption = resolveOcrHintAdoption(tenantId, document);
         Map<String, Object> resolvedMetadata = new LinkedHashMap<>();
         if (suggestion.getSuggestedMetadata() != null) {
             resolvedMetadata.putAll(suggestion.getSuggestedMetadata());
@@ -131,6 +134,7 @@ public class DocumentInsightService {
                 .metadataActionHints(metadataActionHints)
                 .metadataUpdateHistory(metadataUpdateHistory)
                 .metadataRegressionAlerts(metadataRegressionAlerts)
+                .ocrHintAdoption(ocrHintAdoption)
                 .ocrStats(resolveOcrStats(document))
                 .build();
     }
@@ -626,6 +630,101 @@ public class DocumentInsightService {
                 .sorted((left, right) -> Double.compare(right.getDeltaRatio(), left.getDeltaRatio()))
                 .limit(3)
                 .toList();
+    }
+
+    private MetadataUpdateOcrHintAdoptionResponse resolveOcrHintAdoption(String tenantId, DmsDocument document) {
+        if (document == null) {
+            return MetadataUpdateOcrHintAdoptionResponse.builder()
+                    .documentTotalUpdates(0)
+                    .documentOcrHintUpdates(0)
+                    .documentOcrHintRate(0.0d)
+                    .categoryTotalUpdates(0)
+                    .categoryOcrHintUpdates(0)
+                    .categoryOcrHintRate(0.0d)
+                    .trend(List.of())
+                    .build();
+        }
+
+        List<MetadataUpdateHistoryEntryResponse> documentEntries = toMetadataUpdateHistory(document);
+        String category = StringUtils.trimToEmpty(document.getCategory());
+        List<DmsDocument> categoryDocuments = StringUtils.isBlank(category)
+                ? List.of(document)
+                : dmsDocumentRepository.findByTenantIdAndCategory(tenantId, category);
+        List<MetadataUpdateHistoryEntryResponse> categoryEntries = categoryDocuments.stream()
+                .flatMap(doc -> toMetadataUpdateHistory(doc).stream())
+                .toList();
+
+        long documentTotal = documentEntries.size();
+        long documentOcrHint = countBySource(documentEntries, "OCR_HINT");
+        long categoryTotal = categoryEntries.size();
+        long categoryOcrHint = countBySource(categoryEntries, "OCR_HINT");
+
+        return MetadataUpdateOcrHintAdoptionResponse.builder()
+                .documentTotalUpdates(documentTotal)
+                .documentOcrHintUpdates(documentOcrHint)
+                .documentOcrHintRate(resolveRatio(documentOcrHint, documentTotal))
+                .categoryTotalUpdates(categoryTotal)
+                .categoryOcrHintUpdates(categoryOcrHint)
+                .categoryOcrHintRate(resolveRatio(categoryOcrHint, categoryTotal))
+                .trend(buildOcrHintTrend(categoryEntries))
+                .build();
+    }
+
+    private List<MetadataUpdateAdoptionTrendPointResponse> buildOcrHintTrend(List<MetadataUpdateHistoryEntryResponse> entries) {
+        if (entries == null || entries.isEmpty()) {
+            return List.of();
+        }
+
+        List<Instant> instants = entries.stream()
+                .map(entry -> parseInstant(entry.getUpdatedAt()))
+                .flatMap(Optional::stream)
+                .sorted()
+                .toList();
+
+        if (instants.isEmpty()) {
+            return List.of();
+        }
+
+        Instant anchor = instants.get(instants.size() - 1);
+        List<MetadataUpdateAdoptionTrendPointResponse> trend = new ArrayList<>();
+        for (int dayOffset = 2; dayOffset >= 0; dayOffset--) {
+            Instant from = anchor.minus(Duration.ofDays(dayOffset)).truncatedTo(java.time.temporal.ChronoUnit.DAYS);
+            Instant to = from.plus(Duration.ofDays(1));
+
+            List<MetadataUpdateHistoryEntryResponse> bucket = entries.stream()
+                    .filter(entry -> parseInstant(entry.getUpdatedAt())
+                            .map(updatedAt -> !updatedAt.isBefore(from) && updatedAt.isBefore(to))
+                            .orElse(false))
+                    .toList();
+
+            long total = bucket.size();
+            long ocrHint = countBySource(bucket, "OCR_HINT");
+            trend.add(MetadataUpdateAdoptionTrendPointResponse.builder()
+                    .label(from.toString().substring(0, 10))
+                    .totalUpdates(total)
+                    .ocrHintUpdates(ocrHint)
+                    .ocrHintRate(resolveRatio(ocrHint, total))
+                    .build());
+        }
+
+        return trend;
+    }
+
+    private long countBySource(List<MetadataUpdateHistoryEntryResponse> entries, String source) {
+        if (entries == null || entries.isEmpty()) {
+            return 0L;
+        }
+
+        return entries.stream()
+                .filter(entry -> StringUtils.equalsIgnoreCase(StringUtils.trimToEmpty(entry.getSource()), StringUtils.trimToEmpty(source)))
+                .count();
+    }
+
+    private double resolveRatio(long part, long total) {
+        if (total <= 0L) {
+            return 0.0d;
+        }
+        return part / (double) total;
     }
 
     private Map<String, Object> resolveOcrStats(DmsDocument document) {

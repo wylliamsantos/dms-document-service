@@ -29,5 +29,6 @@ public class DocumentInsightResponse {
     List<MetadataActionHintResponse> metadataActionHints;
     List<MetadataUpdateHistoryEntryResponse> metadataUpdateHistory;
     List<MetadataRegressionAlertResponse> metadataRegressionAlerts;
+    MetadataUpdateOcrHintAdoptionResponse ocrHintAdoption;
     Map<String, Object> ocrStats;
 }
