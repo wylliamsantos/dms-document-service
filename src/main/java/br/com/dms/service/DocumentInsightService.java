@@ -72,6 +72,8 @@ public class DocumentInsightService {
 
         Map<String, Object> persistedMetadataPreview = extractMetadataPreview(document);
         Map<String, Object> importantPersistedMetadata = extractImportantPersistedMetadata(document);
+        int persistedMetadataCount = countPersistedMetadata(document);
+        boolean hasPersistedOcrText = StringUtils.isNotBlank(document == null ? null : document.getOcrText());
         Map<String, Object> resolvedMetadata = new LinkedHashMap<>();
         if (suggestion.getSuggestedMetadata() != null) {
             resolvedMetadata.putAll(suggestion.getSuggestedMetadata());
@@ -102,6 +104,8 @@ public class DocumentInsightService {
                 .signals(resolveSignals(suggestion))
                 .persistedMetadataPreview(persistedMetadataPreview)
                 .importantPersistedMetadata(importantPersistedMetadata)
+                .persistedMetadataCount(persistedMetadataCount)
+                .hasPersistedOcrText(hasPersistedOcrText)
                 .ocrStats(resolveOcrStats(document))
                 .build();
     }
@@ -128,6 +132,16 @@ public class DocumentInsightService {
 
     private DmsDocument resolveDocument(String documentId, String tenantId) {
         return dmsDocumentRepository.findByIdAndTenantId(documentId, tenantId).orElse(null);
+    }
+
+    private int countPersistedMetadata(DmsDocument document) {
+        if (document == null || document.getMetadata() == null || document.getMetadata().isEmpty()) {
+            return 0;
+        }
+
+        return (int) document.getMetadata().values().stream()
+                .filter(value -> value instanceof String || value instanceof Number || value instanceof Boolean)
+                .count();
     }
 
     private Map<String, Object> extractMetadataPreview(DmsDocument document) {

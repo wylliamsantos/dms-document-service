@@ -21,5 +21,7 @@ public class DocumentInsightResponse {
     List<InsightSignalResponse> signals;
     Map<String, Object> persistedMetadataPreview;
     Map<String, Object> importantPersistedMetadata;
+    Integer persistedMetadataCount;
+    Boolean hasPersistedOcrText;
     Map<String, Object> ocrStats;
 }
