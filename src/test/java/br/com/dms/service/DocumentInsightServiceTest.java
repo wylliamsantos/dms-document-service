@@ -4,6 +4,7 @@ import br.com.dms.controller.response.DocumentRagContextResponse;
 import br.com.dms.controller.response.MetadataSuggestionResponse;
 import br.com.dms.domain.mongodb.Category;
 import br.com.dms.domain.mongodb.DmsDocument;
+import br.com.dms.domain.mongodb.MetadataUpdateHistoryEntry;
 import br.com.dms.repository.mongo.CategoryRepository;
 import br.com.dms.repository.mongo.DmsDocumentRepository;
 import io.micrometer.core.instrument.Timer;
@@ -43,6 +44,16 @@ class DocumentInsightServiceTest {
                         .tenantId("tenant-1")
                         .ocrText("linha 1\n\nlinha 2")
                         .metadata(Map.of("numero", "123", "valor", 42, "observacao", "ignorar"))
+                        .metadataUpdateHistory(List.of(
+                                MetadataUpdateHistoryEntry.builder()
+                                        .field("valor")
+                                        .previousValue("41")
+                                        .newValue("42")
+                                        .source("OCR_HINT")
+                                        .updatedAt("2026-03-06T08:20:00Z")
+                                        .updatedBy("tester")
+                                        .build()
+                        ))
                         .build()
         ));
 
@@ -73,6 +84,8 @@ class DocumentInsightServiceTest {
         assertTrue(response.getHasPersistedOcrText());
         assertEquals(100, response.getRequiredMetadataCoveragePercent());
         assertTrue(response.getMetadataActionHints().isEmpty());
+        assertEquals(1, response.getMetadataUpdateHistory().size());
+        assertEquals("OCR_HINT", response.getMetadataUpdateHistory().get(0).getSource());
         assertFalse(response.getImportantPersistedMetadata().containsKey("observacao"));
     }
 

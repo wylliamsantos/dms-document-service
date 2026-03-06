@@ -27,5 +27,6 @@ public class DocumentInsightResponse {
     List<String> missingRequiredMetadata;
     Integer requiredMetadataCoveragePercent;
     List<MetadataActionHintResponse> metadataActionHints;
+    List<MetadataUpdateHistoryEntryResponse> metadataUpdateHistory;
     Map<String, Object> ocrStats;
 }

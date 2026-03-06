@@ -7,6 +7,7 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 @Document
@@ -33,6 +34,8 @@ public class DmsDocument {
     private String mimeType;
 
     private Map<String, Object> metadata;
+
+    private List<MetadataUpdateHistoryEntry> metadataUpdateHistory;
 
     private String ocrText;
 
@@ -110,6 +113,14 @@ public class DmsDocument {
 
     public void setMetadata(Map<String, Object> metadata) {
         this.metadata = metadata;
+    }
+
+    public List<MetadataUpdateHistoryEntry> getMetadataUpdateHistory() {
+        return metadataUpdateHistory;
+    }
+
+    public void setMetadataUpdateHistory(List<MetadataUpdateHistoryEntry> metadataUpdateHistory) {
+        this.metadataUpdateHistory = metadataUpdateHistory;
     }
 
     public String getBusinessKeyValue() {
@@ -212,6 +223,11 @@ public class DmsDocument {
 
         public Builder metadata(Map<String, Object> metadata) {
             dmsDocument.setMetadata(metadata);
+            return this;
+        }
+
+        public Builder metadataUpdateHistory(List<MetadataUpdateHistoryEntry> metadataUpdateHistory) {
+            dmsDocument.setMetadataUpdateHistory(metadataUpdateHistory);
             return this;
         }
 

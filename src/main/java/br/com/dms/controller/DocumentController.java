@@ -346,12 +346,13 @@ public class DocumentController {
     @PreAuthorize(MANAGE)
     public ResponseEntity<?> updateMetadata(@RequestHeader(name = "TransactionId") String transactionId,
                                             @RequestHeader(name = "Authorization") String authorization,
+                                            @RequestHeader(name = "X-Metadata-Update-Source", required = false) String metadataUpdateSource,
                                             @PathVariable(value = "documentId") String documentId,
                                             @RequestBody @Valid PayloadMetadata payloadMetadata) {
 
         log.info("DMS version v1 - TransactionId: {} - Update metadata - documentId: {} - data: {}", transactionId, documentId, payloadMetadata);
 
-        return dmsService.updateMetadata(transactionId, documentId, payloadMetadata.getProperties(), payloadMetadata.getFileName());
+        return dmsService.updateMetadata(transactionId, documentId, payloadMetadata.getProperties(), payloadMetadata.getFileName(), metadataUpdateSource);
     }
 
     @PostMapping(value = "/presigned/url", produces = MediaType.APPLICATION_JSON_VALUE)
