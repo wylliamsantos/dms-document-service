@@ -212,9 +212,11 @@ public class DocumentController {
     public ResponseEntity<DocumentInsightResponse> getDocumentInsights(@RequestHeader(name = "TransactionId") String transactionId,
                                                                        @RequestHeader(name = "Authorization") String authorization,
                                                                        @PathVariable(value = "documentId") String documentId,
-                                                                       @PathVariable(name = "version", required = false) Optional<String> version) {
-        log.info("DMS version {} - TransactionId: {} - document insights - documentId: {}, version: {}", API_VERSION, transactionId, documentId, version);
-        return ResponseEntity.ok(documentInsightService.getInsight(documentId, version));
+                                                                       @PathVariable(name = "version", required = false) Optional<String> version,
+                                                                       @RequestParam(name = "ocrHintLookbackDays", required = false) Optional<Integer> ocrHintLookbackDays) {
+        log.info("DMS version {} - TransactionId: {} - document insights - documentId: {}, version: {}, ocrHintLookbackDays: {}",
+                API_VERSION, transactionId, documentId, version, ocrHintLookbackDays);
+        return ResponseEntity.ok(documentInsightService.getInsight(documentId, version, ocrHintLookbackDays));
     }
 
     @GetMapping(path = {"/{documentId}/metadata/history", "/{documentId}/{version}/metadata/history"}, produces = MediaType.APPLICATION_JSON_VALUE)
