@@ -81,6 +81,10 @@ public class DocumentInsightService {
     }
 
     public DocumentInsightResponse getInsight(String documentId, Optional<String> version) {
+        return getInsight(documentId, version, Optional.empty());
+    }
+
+    public DocumentInsightResponse getInsight(String documentId, Optional<String> version, Optional<Integer> ocrHintLookbackDays) {
         String tenantId = tenantContextService.requireTenantId();
         MetadataSuggestionResponse suggestion = aiMetadataSuggestionService.suggest(documentId, version);
         DmsDocument document = resolveDocument(documentId, tenantId);
@@ -95,7 +99,7 @@ public class DocumentInsightService {
         List<MetadataActionHintResponse> metadataActionHints = resolveMetadataActionHints(document, missingRequiredMetadata);
         List<MetadataUpdateHistoryEntryResponse> metadataUpdateHistory = resolveMetadataUpdateHistory(document);
         List<MetadataRegressionAlertResponse> metadataRegressionAlerts = resolveMetadataRegressionAlerts(tenantId, document);
-        MetadataUpdateOcrHintAdoptionResponse ocrHintAdoption = resolveOcrHintAdoption(tenantId, document);
+        MetadataUpdateOcrHintAdoptionResponse ocrHintAdoption = resolveOcrHintAdoption(tenantId, document, ocrHintLookbackDays);
         Map<String, Object> resolvedMetadata = new LinkedHashMap<>();
         if (suggestion.getSuggestedMetadata() != null) {
             resolvedMetadata.putAll(suggestion.getSuggestedMetadata());
@@ -632,7 +636,10 @@ public class DocumentInsightService {
                 .toList();
     }
 
-    private MetadataUpdateOcrHintAdoptionResponse resolveOcrHintAdoption(String tenantId, DmsDocument document) {
+    private MetadataUpdateOcrHintAdoptionResponse resolveOcrHintAdoption(String tenantId,
+                                                                           DmsDocument document,
+                                                                           Optional<Integer> ocrHintLookbackDays) {
+        int lookbackDays = resolveLookbackDays(ocrHintLookbackDays);
         if (document == null) {
             return MetadataUpdateOcrHintAdoptionResponse.builder()
                     .documentTotalUpdates(0)
@@ -641,6 +648,7 @@ public class DocumentInsightService {
                     .categoryTotalUpdates(0)
                     .categoryOcrHintUpdates(0)
                     .categoryOcrHintRate(0.0d)
+                    .lookbackDaysApplied(lookbackDays)
                     .trend(List.of())
                     .build();
         }
@@ -654,10 +662,14 @@ public class DocumentInsightService {
                 .flatMap(doc -> toMetadataUpdateHistory(doc).stream())
                 .toList();
 
-        long documentTotal = documentEntries.size();
-        long documentOcrHint = countBySource(documentEntries, "OCR_HINT");
-        long categoryTotal = categoryEntries.size();
-        long categoryOcrHint = countBySource(categoryEntries, "OCR_HINT");
+        Instant threshold = Instant.now().minus(Duration.ofDays(lookbackDays));
+        List<MetadataUpdateHistoryEntryResponse> filteredDocumentEntries = filterByLookback(documentEntries, threshold);
+        List<MetadataUpdateHistoryEntryResponse> filteredCategoryEntries = filterByLookback(categoryEntries, threshold);
+
+        long documentTotal = filteredDocumentEntries.size();
+        long documentOcrHint = countBySource(filteredDocumentEntries, "OCR_HINT");
+        long categoryTotal = filteredCategoryEntries.size();
+        long categoryOcrHint = countBySource(filteredCategoryEntries, "OCR_HINT");
 
         return MetadataUpdateOcrHintAdoptionResponse.builder()
                 .documentTotalUpdates(documentTotal)
@@ -666,8 +678,29 @@ public class DocumentInsightService {
                 .categoryTotalUpdates(categoryTotal)
                 .categoryOcrHintUpdates(categoryOcrHint)
                 .categoryOcrHintRate(resolveRatio(categoryOcrHint, categoryTotal))
-                .trend(buildOcrHintTrend(categoryEntries))
+                .lookbackDaysApplied(lookbackDays)
+                .trend(buildOcrHintTrend(filteredCategoryEntries))
                 .build();
+    }
+
+    private int resolveLookbackDays(Optional<Integer> requestedLookbackDays) {
+        int value = requestedLookbackDays == null || requestedLookbackDays.isEmpty() ? 30 : requestedLookbackDays.get();
+        if (value < 1) {
+            return 1;
+        }
+        return Math.min(value, 365);
+    }
+
+    private List<MetadataUpdateHistoryEntryResponse> filterByLookback(List<MetadataUpdateHistoryEntryResponse> entries, Instant threshold) {
+        if (entries == null || entries.isEmpty()) {
+            return List.of();
+        }
+
+        return entries.stream()
+                .filter(entry -> parseInstant(entry.getUpdatedAt())
+                        .map(updatedAt -> !updatedAt.isBefore(threshold))
+                        .orElse(false))
+                .toList();
     }
 
     private List<MetadataUpdateAdoptionTrendPointResponse> buildOcrHintTrend(List<MetadataUpdateHistoryEntryResponse> entries) {

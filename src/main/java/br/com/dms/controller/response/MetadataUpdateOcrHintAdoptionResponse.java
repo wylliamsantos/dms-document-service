@@ -14,5 +14,6 @@ public class MetadataUpdateOcrHintAdoptionResponse {
     long categoryTotalUpdates;
     long categoryOcrHintUpdates;
     double categoryOcrHintRate;
+    int lookbackDaysApplied;
     List<MetadataUpdateAdoptionTrendPointResponse> trend;
 }
