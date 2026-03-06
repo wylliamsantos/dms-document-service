@@ -12,6 +12,7 @@ import br.com.dms.domain.core.DocumentWorkflowStatus;
 import br.com.dms.domain.mongodb.DmsDocument;
 import br.com.dms.domain.mongodb.DmsDocumentVersion;
 import br.com.dms.domain.mongodb.DocumentWorkflowTransition;
+import br.com.dms.domain.mongodb.MetadataUpdateHistoryEntry;
 import br.com.dms.domain.core.VersionType;
 import br.com.dms.domain.core.UploadStatus;
 import br.com.dms.exception.DmsBusinessException;
@@ -52,6 +53,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Objects;
 
 import static br.com.dms.domain.Messages.*;
 
@@ -132,16 +137,24 @@ public class DmsService {
     }
 
     public ResponseEntity<?> updateMetadata(String transactionId, String documentId, String metadata, String fileName) {
+        return updateMetadata(transactionId, documentId, metadata, fileName, null);
+    }
+
+    public ResponseEntity<?> updateMetadata(String transactionId, String documentId, String metadata, String fileName, String updateSource) {
         if (StringUtils.isBlank(metadata)) {
             throw new DmsBusinessException(environment.getProperty("dms.msg.metadataIsNull"), TypeException.VALID, transactionId);
         }
 
         Map<String, Object> jsonMetadata = dmsUtil.handleObject(transactionId, metadata);
-        updateMetadata(transactionId, documentId, jsonMetadata, fileName);
+        updateMetadata(transactionId, documentId, jsonMetadata, fileName, updateSource);
         return ResponseEntity.noContent().build();
     }
 
     public void updateMetadata(String transactionId, String documentId, Map<String, Object> jsonMetadata, String fileName) {
+        updateMetadata(transactionId, documentId, jsonMetadata, fileName, null);
+    }
+
+    public void updateMetadata(String transactionId, String documentId, Map<String, Object> jsonMetadata, String fileName, String updateSource) {
         String tenantId = tenantId();
         String businessKeyType = dmsDocumentRepository.findByIdAndTenantId(documentId, tenantId)
             .map(DmsDocument::getBusinessKeyType)
@@ -155,12 +168,16 @@ public class DmsService {
         if (optEntity.isPresent()) {
             log.info("DMS - TransactionId: {} - Documento {} encontrado será atualizado", transactionId, documentId);
             var entity = optEntity.get();
+            Map<String, Object> previousMetadata = entity.getMetadata() == null ? Map.of() : new LinkedHashMap<>(entity.getMetadata());
             var dmsDocumentVersion = dmsDocumentVersionRepository.findLastVersionByTenantIdAndDmsDocumentId(tenantId(), entity.getId()).orElseThrow();
             dmsDocumentVersion.setMetadata(jsonMetadata);
             dmsDocumentVersion.setModifiedAt(LocalDateTime.now());
             this.dmsDocumentVersionRepository.save(dmsDocumentVersion);
             entity.setMetadata(jsonMetadata);
+            appendMetadataUpdateHistory(entity, previousMetadata, jsonMetadata, updateSource);
             this.dmsDocumentRepository.save(entity);
+            publishAuditEvent("DOCUMENT_METADATA_UPDATED", entity, entity.getId(), entity.getFilename(), jsonMetadata,
+                    buildAttributes("source", resolveMetadataUpdateSource(updateSource), "changed_fields", String.valueOf(resolveChangedFieldNames(previousMetadata, jsonMetadata).size())));
         }
     }
     @Transactional
@@ -477,6 +494,81 @@ public class DmsService {
         );
 
         return new DocumentId(documentId, version.getVersionNumber().toPlainString());
+    }
+
+    private void appendMetadataUpdateHistory(DmsDocument document,
+                                             Map<String, Object> previousMetadata,
+                                             Map<String, Object> newMetadata,
+                                             String updateSource) {
+        if (document == null) {
+            return;
+        }
+
+        List<String> changedFields = resolveChangedFieldNames(previousMetadata, newMetadata);
+        if (changedFields.isEmpty()) {
+            return;
+        }
+
+        List<MetadataUpdateHistoryEntry> history = new ArrayList<>();
+        if (document.getMetadataUpdateHistory() != null) {
+            history.addAll(document.getMetadataUpdateHistory());
+        }
+
+        String actor = StringUtils.defaultIfBlank(auditActorResolver.resolveUserId(), "system");
+        String source = resolveMetadataUpdateSource(updateSource);
+        String updatedAt = Instant.now().toString();
+
+        for (String field : changedFields) {
+            history.add(MetadataUpdateHistoryEntry.builder()
+                    .field(field)
+                    .previousValue(toShortString(previousMetadata.get(field)))
+                    .newValue(toShortString(newMetadata.get(field)))
+                    .source(source)
+                    .updatedAt(updatedAt)
+                    .updatedBy(actor)
+                    .build());
+        }
+
+        int maxEntries = 25;
+        if (history.size() > maxEntries) {
+            history = new ArrayList<>(history.subList(history.size() - maxEntries, history.size()));
+        }
+
+        document.setMetadataUpdateHistory(history);
+    }
+
+    private List<String> resolveChangedFieldNames(Map<String, Object> previousMetadata, Map<String, Object> newMetadata) {
+        Map<String, Object> previous = previousMetadata == null ? Map.of() : previousMetadata;
+        Map<String, Object> current = newMetadata == null ? Map.of() : newMetadata;
+
+        List<String> keys = new ArrayList<>();
+        keys.addAll(previous.keySet());
+        current.keySet().forEach(key -> {
+            if (!keys.contains(key)) {
+                keys.add(key);
+            }
+        });
+
+        return keys.stream()
+                .filter(Objects::nonNull)
+                .filter(key -> !Objects.equals(previous.get(key), current.get(key)))
+                .toList();
+    }
+
+    private String toShortString(Object value) {
+        if (value == null) {
+            return null;
+        }
+        String serialized = String.valueOf(value).trim();
+        if (serialized.length() <= 180) {
+            return serialized;
+        }
+        return serialized.substring(0, 180) + "...";
+    }
+
+    private String resolveMetadataUpdateSource(String updateSource) {
+        String normalized = StringUtils.upperCase(StringUtils.trimToEmpty(updateSource));
+        return StringUtils.isBlank(normalized) ? "MANUAL" : normalized;
     }
 
     private void transitionWorkflow(DmsDocument document,

@@ -5,9 +5,11 @@ import br.com.dms.controller.response.DocumentRagContextResponse;
 import br.com.dms.controller.response.InsightSignalResponse;
 import br.com.dms.controller.response.MetadataActionHintResponse;
 import br.com.dms.controller.response.MetadataSuggestionResponse;
+import br.com.dms.controller.response.MetadataUpdateHistoryEntryResponse;
 import br.com.dms.controller.response.RagContextChunkResponse;
 import br.com.dms.domain.mongodb.Category;
 import br.com.dms.domain.mongodb.DmsDocument;
+import br.com.dms.domain.mongodb.MetadataUpdateHistoryEntry;
 import br.com.dms.exception.DmsDocumentNotFoundException;
 import br.com.dms.exception.TypeException;
 import br.com.dms.repository.mongo.CategoryRepository;
@@ -84,6 +86,7 @@ public class DocumentInsightService {
         List<String> missingRequiredMetadata = resolveMissingRequiredMetadata(document, expectedRequiredMetadata);
         int requiredMetadataCoveragePercent = resolveRequiredMetadataCoveragePercent(expectedRequiredMetadata, missingRequiredMetadata);
         List<MetadataActionHintResponse> metadataActionHints = resolveMetadataActionHints(document, missingRequiredMetadata);
+        List<MetadataUpdateHistoryEntryResponse> metadataUpdateHistory = resolveMetadataUpdateHistory(document);
         Map<String, Object> resolvedMetadata = new LinkedHashMap<>();
         if (suggestion.getSuggestedMetadata() != null) {
             resolvedMetadata.putAll(suggestion.getSuggestedMetadata());
@@ -120,6 +123,7 @@ public class DocumentInsightService {
                 .missingRequiredMetadata(missingRequiredMetadata)
                 .requiredMetadataCoveragePercent(requiredMetadataCoveragePercent)
                 .metadataActionHints(metadataActionHints)
+                .metadataUpdateHistory(metadataUpdateHistory)
                 .ocrStats(resolveOcrStats(document))
                 .build();
     }
@@ -318,6 +322,25 @@ public class DocumentInsightService {
         });
 
         return important;
+    }
+
+    private List<MetadataUpdateHistoryEntryResponse> resolveMetadataUpdateHistory(DmsDocument document) {
+        if (document == null || document.getMetadataUpdateHistory() == null || document.getMetadataUpdateHistory().isEmpty()) {
+            return List.of();
+        }
+
+        return document.getMetadataUpdateHistory().stream()
+                .sorted((left, right) -> StringUtils.defaultString(right.getUpdatedAt()).compareTo(StringUtils.defaultString(left.getUpdatedAt())))
+                .limit(5)
+                .map(entry -> MetadataUpdateHistoryEntryResponse.builder()
+                        .field(entry.getField())
+                        .previousValue(entry.getPreviousValue())
+                        .newValue(entry.getNewValue())
+                        .source(entry.getSource())
+                        .updatedAt(entry.getUpdatedAt())
+                        .updatedBy(entry.getUpdatedBy())
+                        .build())
+                .toList();
     }
 
     private Map<String, Object> resolveOcrStats(DmsDocument document) {
