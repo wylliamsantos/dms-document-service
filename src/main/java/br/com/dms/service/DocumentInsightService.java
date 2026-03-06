@@ -192,7 +192,9 @@ public class DocumentInsightService {
         return missingRequiredMetadata.stream()
                 .limit(5)
                 .map(field -> {
-                    String suggestedValue = hasPersistedOcrText ? extractFieldValueFromOcr(persistedOcrText, field) : null;
+                    OcrFieldSuggestion suggestion = hasPersistedOcrText
+                            ? extractFieldValueFromOcr(persistedOcrText, field)
+                            : OcrFieldSuggestion.empty();
                     return MetadataActionHintResponse.builder()
                             .field(field)
                             .action(hasPersistedOcrText ? "EXTRACT_FROM_OCR" : "REQUEST_OCR_PROCESSING")
@@ -200,18 +202,16 @@ public class DocumentInsightService {
                                     ? "OCR já persistido. Priorize extração/validação deste campo e salve no metadado do documento."
                                     : "Sem OCR persistido. Execute a extração OCR antes de preencher este campo obrigatório.")
                             .priority("HIGH")
-                            .suggestedValue(suggestedValue)
-                            .evidenceExcerpt(suggestedValue == null
-                                    ? null
-                                    : "Sugestão heurística baseada no OCR persistido; valide antes de salvar.")
+                            .suggestedValue(suggestion.value())
+                            .evidenceExcerpt(suggestion.evidenceExcerpt())
                             .build();
                 })
                 .toList();
     }
 
-    private String extractFieldValueFromOcr(String ocrText, String field) {
+    private OcrFieldSuggestion extractFieldValueFromOcr(String ocrText, String field) {
         if (StringUtils.isBlank(ocrText) || StringUtils.isBlank(field)) {
-            return null;
+            return OcrFieldSuggestion.empty();
         }
 
         String normalizedField = StringUtils.lowerCase(StringUtils.trimToEmpty(field));
@@ -236,10 +236,18 @@ public class DocumentInsightService {
             if (candidate.length() > 120) {
                 candidate = candidate.substring(0, 120);
             }
-            return candidate;
+
+            String excerpt = line.length() > 180 ? line.substring(0, 180) + "..." : line;
+            return new OcrFieldSuggestion(candidate, "Evidência OCR: " + excerpt);
         }
 
-        return null;
+        return OcrFieldSuggestion.empty();
+    }
+
+    private record OcrFieldSuggestion(String value, String evidenceExcerpt) {
+        private static OcrFieldSuggestion empty() {
+            return new OcrFieldSuggestion(null, null);
+        }
     }
 
     private String resolveConfidenceBand(double confidence) {
