@@ -91,6 +91,62 @@ class DocumentInsightServiceTest {
     }
 
     @Test
+    void shouldExposeOcrHintAdoptionSummary() {
+        AiMetadataSuggestionService aiService = mock(AiMetadataSuggestionService.class);
+        when(aiService.suggest(eq("doc-1"), eq(Optional.empty()))).thenReturn(
+                MetadataSuggestionResponse.builder().documentId("doc-1").confidence(0.7).source("ocr").build()
+        );
+
+        TenantContextService tenantContextService = mock(TenantContextService.class);
+        when(tenantContextService.requireTenantId()).thenReturn("tenant-1");
+
+        DmsDocument reference = DmsDocument.of()
+                .id("doc-1")
+                .tenantId("tenant-1")
+                .category("CONTRATO")
+                .metadataUpdateHistory(List.of(
+                        MetadataUpdateHistoryEntry.builder().field("valor").source("OCR_HINT").updatedAt("2026-03-06T10:00:00Z").build(),
+                        MetadataUpdateHistoryEntry.builder().field("numero").source("MANUAL").updatedAt("2026-03-06T09:00:00Z").build()
+                ))
+                .build();
+
+        DmsDocumentRepository repository = mock(DmsDocumentRepository.class);
+        when(repository.findByIdAndTenantId("doc-1", "tenant-1")).thenReturn(Optional.of(reference));
+        when(repository.findByTenantIdAndCategory("tenant-1", "CONTRATO")).thenReturn(List.of(
+                reference,
+                DmsDocument.of()
+                        .id("doc-2")
+                        .tenantId("tenant-1")
+                        .category("CONTRATO")
+                        .metadataUpdateHistory(List.of(
+                                MetadataUpdateHistoryEntry.builder().field("cpf").source("OCR_HINT").updatedAt("2026-03-05T10:00:00Z").build(),
+                                MetadataUpdateHistoryEntry.builder().field("cpf").source("MANUAL").updatedAt("2026-03-04T10:00:00Z").build()
+                        ))
+                        .build()
+        ));
+
+        DocumentInsightService service = new DocumentInsightService(
+                aiService,
+                tenantContextService,
+                repository,
+                mock(CategoryRepository.class),
+                new SimpleMeterRegistry(),
+                false,
+                "",
+                ""
+        );
+
+        var response = service.getInsight("doc-1", Optional.empty());
+
+        assertNotNull(response.getOcrHintAdoption());
+        assertEquals(2, response.getOcrHintAdoption().getDocumentTotalUpdates());
+        assertEquals(1, response.getOcrHintAdoption().getDocumentOcrHintUpdates());
+        assertEquals(4, response.getOcrHintAdoption().getCategoryTotalUpdates());
+        assertEquals(2, response.getOcrHintAdoption().getCategoryOcrHintUpdates());
+        assertEquals(3, response.getOcrHintAdoption().getTrend().size());
+    }
+
+    @Test
     void shouldFilterMetadataHistoryBySourceFieldAndPeriod() {
         AiMetadataSuggestionService aiService = mock(AiMetadataSuggestionService.class);
         TenantContextService tenantContextService = mock(TenantContextService.class);
