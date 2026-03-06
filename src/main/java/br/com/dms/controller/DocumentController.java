@@ -7,6 +7,7 @@ import br.com.dms.controller.response.DocumentRagContextResponse;
 import br.com.dms.controller.response.DocumentVersionDiffResponse;
 import br.com.dms.controller.response.MetadataSuggestionResponse;
 import br.com.dms.controller.response.MetadataUpdateHistoryPageResponse;
+import br.com.dms.controller.response.MetadataUpdateHistorySummaryResponse;
 import br.com.dms.controller.response.UrlPresignedResponse;
 import br.com.dms.domain.core.DocumentId;
 import br.com.dms.exception.DefaultError;
@@ -233,6 +234,27 @@ public class DocumentController {
                 version,
                 page,
                 size,
+                source,
+                field,
+                updatedFrom.flatMap(this::parseOptionalInstant),
+                updatedTo.flatMap(this::parseOptionalInstant)
+        ));
+    }
+
+    @GetMapping(path = {"/{documentId}/metadata/history/summary", "/{documentId}/{version}/metadata/history/summary"}, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<MetadataUpdateHistorySummaryResponse> getMetadataUpdateHistorySummary(@RequestHeader(name = "TransactionId") String transactionId,
+                                                                                                 @RequestHeader(name = "Authorization") String authorization,
+                                                                                                 @PathVariable(value = "documentId") String documentId,
+                                                                                                 @PathVariable(name = "version", required = false) Optional<String> version,
+                                                                                                 @RequestParam(name = "source", required = false) Optional<String> source,
+                                                                                                 @RequestParam(name = "field", required = false) Optional<String> field,
+                                                                                                 @RequestParam(name = "updatedFrom", required = false) Optional<String> updatedFrom,
+                                                                                                 @RequestParam(name = "updatedTo", required = false) Optional<String> updatedTo) {
+        log.info("DMS version {} - TransactionId: {} - metadata history summary - documentId: {}, version: {}, source: {}, field: {}, updatedFrom: {}, updatedTo: {}",
+                API_VERSION, transactionId, documentId, version, source, field, updatedFrom, updatedTo);
+        return ResponseEntity.ok(documentInsightService.getMetadataUpdateHistorySummary(
+                documentId,
+                version,
                 source,
                 field,
                 updatedFrom.flatMap(this::parseOptionalInstant),

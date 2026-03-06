@@ -5,8 +5,10 @@ import br.com.dms.controller.response.DocumentRagContextResponse;
 import br.com.dms.controller.response.InsightSignalResponse;
 import br.com.dms.controller.response.MetadataActionHintResponse;
 import br.com.dms.controller.response.MetadataSuggestionResponse;
+import br.com.dms.controller.response.MetadataUpdateHistoryBucketResponse;
 import br.com.dms.controller.response.MetadataUpdateHistoryEntryResponse;
 import br.com.dms.controller.response.MetadataUpdateHistoryPageResponse;
+import br.com.dms.controller.response.MetadataUpdateHistorySummaryResponse;
 import br.com.dms.controller.response.RagContextChunkResponse;
 import br.com.dms.domain.mongodb.Category;
 import br.com.dms.domain.mongodb.DmsDocument;
@@ -144,12 +146,7 @@ public class DocumentInsightService {
             throw new DmsDocumentNotFoundException("Document not found", TypeException.VALID);
         }
 
-        List<MetadataUpdateHistoryEntryResponse> ordered = toMetadataUpdateHistory(document).stream()
-                .filter(entry -> matchesSource(entry, source))
-                .filter(entry -> matchesField(entry, field))
-                .filter(entry -> matchesUpdatedFrom(entry, updatedFrom))
-                .filter(entry -> matchesUpdatedTo(entry, updatedTo))
-                .toList();
+        List<MetadataUpdateHistoryEntryResponse> ordered = filterMetadataUpdateHistory(document, source, field, updatedFrom, updatedTo);
         int safePage = Math.max(0, page);
         int safeSize = Math.max(1, Math.min(size, 100));
         int fromIndex = Math.min(safePage * safeSize, ordered.size());
@@ -161,6 +158,63 @@ public class DocumentInsightService {
                 .number(safePage)
                 .size(safeSize)
                 .build();
+    }
+
+    public MetadataUpdateHistorySummaryResponse getMetadataUpdateHistorySummary(String documentId,
+                                                                                Optional<String> version,
+                                                                                Optional<String> source,
+                                                                                Optional<String> field,
+                                                                                Optional<Instant> updatedFrom,
+                                                                                Optional<Instant> updatedTo) {
+        String tenantId = tenantContextService.requireTenantId();
+        DmsDocument document = resolveDocument(documentId, tenantId);
+
+        if (document == null) {
+            throw new DmsDocumentNotFoundException("Document not found", TypeException.VALID);
+        }
+
+        List<MetadataUpdateHistoryEntryResponse> allEntries = toMetadataUpdateHistory(document);
+        List<MetadataUpdateHistoryEntryResponse> filteredEntries = filterMetadataUpdateHistory(document, source, field, updatedFrom, updatedTo);
+
+        return MetadataUpdateHistorySummaryResponse.builder()
+                .totalEntries(allEntries.size())
+                .filteredEntries(filteredEntries.size())
+                .latestUpdatedAt(filteredEntries.stream().map(MetadataUpdateHistoryEntryResponse::getUpdatedAt).findFirst().orElse(null))
+                .bySource(buildHistoryBuckets(filteredEntries, MetadataUpdateHistoryEntryResponse::getSource))
+                .byField(buildHistoryBuckets(filteredEntries, MetadataUpdateHistoryEntryResponse::getField))
+                .build();
+    }
+
+    private List<MetadataUpdateHistoryEntryResponse> filterMetadataUpdateHistory(DmsDocument document,
+                                                                          Optional<String> source,
+                                                                          Optional<String> field,
+                                                                          Optional<Instant> updatedFrom,
+                                                                          Optional<Instant> updatedTo) {
+        return toMetadataUpdateHistory(document).stream()
+                .filter(entry -> matchesSource(entry, source))
+                .filter(entry -> matchesField(entry, field))
+                .filter(entry -> matchesUpdatedFrom(entry, updatedFrom))
+                .filter(entry -> matchesUpdatedTo(entry, updatedTo))
+                .toList();
+    }
+
+    private List<MetadataUpdateHistoryBucketResponse> buildHistoryBuckets(List<MetadataUpdateHistoryEntryResponse> entries,
+                                                                           java.util.function.Function<MetadataUpdateHistoryEntryResponse, String> keyResolver) {
+        return entries.stream()
+                .collect(Collectors.groupingBy(
+                        entry -> sanitizeMetricTag(keyResolver.apply(entry), "unknown"),
+                        LinkedHashMap::new,
+                        Collectors.counting()
+                ))
+                .entrySet()
+                .stream()
+                .sorted((left, right) -> Long.compare(right.getValue(), left.getValue()))
+                .limit(5)
+                .map(bucket -> MetadataUpdateHistoryBucketResponse.builder()
+                        .key(bucket.getKey())
+                        .count(bucket.getValue())
+                        .build())
+                .toList();
     }
 
     private boolean matchesSource(MetadataUpdateHistoryEntryResponse entry, Optional<String> source) {

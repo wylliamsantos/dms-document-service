@@ -150,6 +150,53 @@ class DocumentInsightServiceTest {
     }
 
     @Test
+    void shouldBuildMetadataHistorySummaryWithTopBuckets() {
+        AiMetadataSuggestionService aiService = mock(AiMetadataSuggestionService.class);
+        TenantContextService tenantContextService = mock(TenantContextService.class);
+        when(tenantContextService.requireTenantId()).thenReturn("tenant-1");
+
+        DmsDocumentRepository repository = mock(DmsDocumentRepository.class);
+        when(repository.findByIdAndTenantId("doc-history", "tenant-1")).thenReturn(Optional.of(
+                DmsDocument.of()
+                        .id("doc-history")
+                        .tenantId("tenant-1")
+                        .metadataUpdateHistory(List.of(
+                                MetadataUpdateHistoryEntry.builder().field("valor").source("OCR_HINT").updatedAt("2026-03-06T09:00:00Z").build(),
+                                MetadataUpdateHistoryEntry.builder().field("valor").source("OCR_HINT").updatedAt("2026-03-06T08:30:00Z").build(),
+                                MetadataUpdateHistoryEntry.builder().field("cpf").source("MANUAL").updatedAt("2026-03-06T08:00:00Z").build()
+                        ))
+                        .build()
+        ));
+
+        DocumentInsightService service = new DocumentInsightService(
+                aiService,
+                tenantContextService,
+                repository,
+                mock(CategoryRepository.class),
+                new SimpleMeterRegistry(),
+                false,
+                "",
+                ""
+        );
+
+        var summary = service.getMetadataUpdateHistorySummary(
+                "doc-history",
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty()
+        );
+
+        assertEquals(3, summary.getTotalEntries());
+        assertEquals(3, summary.getFilteredEntries());
+        assertEquals("2026-03-06T09:00:00Z", summary.getLatestUpdatedAt());
+        assertEquals("ocr_hint", summary.getBySource().get(0).getKey());
+        assertEquals(2L, summary.getBySource().get(0).getCount());
+        assertEquals("valor", summary.getByField().get(0).getKey());
+    }
+
+    @Test
     void shouldExposeMissingRequiredMetadataFromCategorySchema() {
         AiMetadataSuggestionService aiService = mock(AiMetadataSuggestionService.class);
         when(aiService.suggest(eq("doc-2"), eq(Optional.empty()))).thenReturn(
