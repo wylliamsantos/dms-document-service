@@ -2,7 +2,9 @@ package br.com.dms.service;
 
 import br.com.dms.controller.response.DocumentRagContextResponse;
 import br.com.dms.controller.response.MetadataSuggestionResponse;
+import br.com.dms.domain.mongodb.Category;
 import br.com.dms.domain.mongodb.DmsDocument;
+import br.com.dms.repository.mongo.CategoryRepository;
 import br.com.dms.repository.mongo.DmsDocumentRepository;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -48,6 +50,7 @@ class DocumentInsightServiceTest {
                 aiService,
                 tenantContextService,
                 repository,
+                mock(br.com.dms.repository.mongo.CategoryRepository.class),
                 new SimpleMeterRegistry(),
                 false,
                 "",
@@ -72,11 +75,61 @@ class DocumentInsightServiceTest {
     }
 
     @Test
+    void shouldExposeMissingRequiredMetadataFromCategorySchema() {
+        AiMetadataSuggestionService aiService = mock(AiMetadataSuggestionService.class);
+        when(aiService.suggest(eq("doc-2"), eq(Optional.empty()))).thenReturn(
+                MetadataSuggestionResponse.builder()
+                        .documentId("doc-2")
+                        .summary("Resumo")
+                        .confidence(0.9)
+                        .source("metadata")
+                        .build()
+        );
+
+        TenantContextService tenantContextService = mock(TenantContextService.class);
+        when(tenantContextService.requireTenantId()).thenReturn("tenant-1");
+
+        DmsDocumentRepository repository = mock(DmsDocumentRepository.class);
+        when(repository.findByIdAndTenantId("doc-2", "tenant-1")).thenReturn(Optional.of(
+                DmsDocument.of()
+                        .id("doc-2")
+                        .tenantId("tenant-1")
+                        .category("CONTRATO")
+                        .metadata(Map.of("cpf", "123"))
+                        .build()
+        ));
+
+        CategoryRepository categoryRepository = mock(CategoryRepository.class);
+        when(categoryRepository.findByTenantIdAndName("tenant-1", "CONTRATO")).thenReturn(Optional.of(
+                Category.builder()
+                        .name("CONTRATO")
+                        .schema(Map.of("required", List.of("cpf", "valor", "data_emissao")))
+                        .build()
+        ));
+
+        DocumentInsightService service = new DocumentInsightService(
+                aiService,
+                tenantContextService,
+                repository,
+                categoryRepository,
+                new SimpleMeterRegistry(),
+                false,
+                "",
+                ""
+        );
+
+        var response = service.getInsight("doc-2", Optional.empty());
+        assertEquals(List.of("cpf", "valor", "data_emissao"), response.getExpectedRequiredMetadata());
+        assertEquals(List.of("valor", "data_emissao"), response.getMissingRequiredMetadata());
+    }
+
+    @Test
     void shouldReturnDisabledRagSkeletonWhenFeatureFlagOff() {
         DocumentInsightService service = new DocumentInsightService(
                 mock(AiMetadataSuggestionService.class),
                 mock(TenantContextService.class),
                 mock(br.com.dms.repository.mongo.DmsDocumentRepository.class),
+                mock(br.com.dms.repository.mongo.CategoryRepository.class),
                 new SimpleMeterRegistry(),
                 false,
                 "",
@@ -103,6 +156,7 @@ class DocumentInsightServiceTest {
                 mock(AiMetadataSuggestionService.class),
                 tenantContextService,
                 mock(DmsDocumentRepository.class),
+                mock(br.com.dms.repository.mongo.CategoryRepository.class),
                 new SimpleMeterRegistry(),
                 true,
                 "tenant-1,tenant-2",
@@ -138,6 +192,7 @@ class DocumentInsightServiceTest {
                 mock(AiMetadataSuggestionService.class),
                 tenantContextService,
                 repository,
+                mock(br.com.dms.repository.mongo.CategoryRepository.class),
                 new SimpleMeterRegistry(),
                 true,
                 "tenant-1",
@@ -171,6 +226,7 @@ class DocumentInsightServiceTest {
                 mock(AiMetadataSuggestionService.class),
                 tenantContextService,
                 repository,
+                mock(br.com.dms.repository.mongo.CategoryRepository.class),
                 meterRegistry,
                 true,
                 "tenant-1",

@@ -5,9 +5,11 @@ import br.com.dms.controller.response.DocumentRagContextResponse;
 import br.com.dms.controller.response.InsightSignalResponse;
 import br.com.dms.controller.response.MetadataSuggestionResponse;
 import br.com.dms.controller.response.RagContextChunkResponse;
+import br.com.dms.domain.mongodb.Category;
 import br.com.dms.domain.mongodb.DmsDocument;
 import br.com.dms.exception.DmsDocumentNotFoundException;
 import br.com.dms.exception.TypeException;
+import br.com.dms.repository.mongo.CategoryRepository;
 import br.com.dms.repository.mongo.DmsDocumentRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -44,6 +46,7 @@ public class DocumentInsightService {
     private final AiMetadataSuggestionService aiMetadataSuggestionService;
     private final TenantContextService tenantContextService;
     private final DmsDocumentRepository dmsDocumentRepository;
+    private final CategoryRepository categoryRepository;
     private final MeterRegistry meterRegistry;
     private final boolean ragEnabled;
     private final Set<String> ragEnabledTenants;
@@ -52,6 +55,7 @@ public class DocumentInsightService {
     public DocumentInsightService(AiMetadataSuggestionService aiMetadataSuggestionService,
                                   TenantContextService tenantContextService,
                                   DmsDocumentRepository dmsDocumentRepository,
+                                  CategoryRepository categoryRepository,
                                   MeterRegistry meterRegistry,
                                   @Value("${dms.ai.rag.document.enabled:false}") boolean ragEnabled,
                                   @Value("${dms.ai.rag.document.enabled-tenants:}") String ragEnabledTenants,
@@ -59,6 +63,7 @@ public class DocumentInsightService {
         this.aiMetadataSuggestionService = aiMetadataSuggestionService;
         this.tenantContextService = tenantContextService;
         this.dmsDocumentRepository = dmsDocumentRepository;
+        this.categoryRepository = categoryRepository;
         this.meterRegistry = meterRegistry;
         this.ragEnabled = ragEnabled;
         this.ragEnabledTenants = parseEnabledTenants(ragEnabledTenants);
@@ -74,6 +79,8 @@ public class DocumentInsightService {
         Map<String, Object> importantPersistedMetadata = extractImportantPersistedMetadata(document);
         int persistedMetadataCount = countPersistedMetadata(document);
         boolean hasPersistedOcrText = StringUtils.isNotBlank(document == null ? null : document.getOcrText());
+        List<String> expectedRequiredMetadata = resolveExpectedRequiredMetadata(tenantId, document);
+        List<String> missingRequiredMetadata = resolveMissingRequiredMetadata(document, expectedRequiredMetadata);
         Map<String, Object> resolvedMetadata = new LinkedHashMap<>();
         if (suggestion.getSuggestedMetadata() != null) {
             resolvedMetadata.putAll(suggestion.getSuggestedMetadata());
@@ -106,8 +113,58 @@ public class DocumentInsightService {
                 .importantPersistedMetadata(importantPersistedMetadata)
                 .persistedMetadataCount(persistedMetadataCount)
                 .hasPersistedOcrText(hasPersistedOcrText)
+                .expectedRequiredMetadata(expectedRequiredMetadata)
+                .missingRequiredMetadata(missingRequiredMetadata)
                 .ocrStats(resolveOcrStats(document))
                 .build();
+    }
+
+    private List<String> resolveExpectedRequiredMetadata(String tenantId, DmsDocument document) {
+        String categoryName = document == null ? "" : StringUtils.trimToEmpty(document.getCategory());
+        if (StringUtils.isBlank(categoryName)) {
+            return List.of();
+        }
+
+        return categoryRepository.findByTenantIdAndName(tenantId, categoryName)
+                .map(this::extractRequiredFields)
+                .orElseGet(List::of);
+    }
+
+    private List<String> extractRequiredFields(Category category) {
+        if (category == null || category.getSchema() == null) {
+            return List.of();
+        }
+
+        Object required = category.getSchema().get("required");
+        if (!(required instanceof List<?> fields)) {
+            return List.of();
+        }
+
+        return fields.stream()
+                .map(String::valueOf)
+                .map(StringUtils::trimToEmpty)
+                .filter(StringUtils::isNotBlank)
+                .map(StringUtils::lowerCase)
+                .distinct()
+                .toList();
+    }
+
+    private List<String> resolveMissingRequiredMetadata(DmsDocument document, List<String> expectedRequiredMetadata) {
+        if (document == null || document.getMetadata() == null || document.getMetadata().isEmpty() || expectedRequiredMetadata.isEmpty()) {
+            return expectedRequiredMetadata;
+        }
+
+        Set<String> availableKeys = document.getMetadata().entrySet().stream()
+                .filter(entry -> entry.getValue() != null)
+                .map(Map.Entry::getKey)
+                .map(StringUtils::trimToEmpty)
+                .map(StringUtils::lowerCase)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toSet());
+
+        return expectedRequiredMetadata.stream()
+                .filter(field -> !availableKeys.contains(StringUtils.lowerCase(field)))
+                .toList();
     }
 
     private String resolveConfidenceBand(double confidence) {
