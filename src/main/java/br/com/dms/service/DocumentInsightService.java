@@ -3,6 +3,7 @@ package br.com.dms.service;
 import br.com.dms.controller.response.DocumentInsightResponse;
 import br.com.dms.controller.response.DocumentRagContextResponse;
 import br.com.dms.controller.response.InsightSignalResponse;
+import br.com.dms.controller.response.MetadataActionHintResponse;
 import br.com.dms.controller.response.MetadataSuggestionResponse;
 import br.com.dms.controller.response.RagContextChunkResponse;
 import br.com.dms.domain.mongodb.Category;
@@ -81,6 +82,7 @@ public class DocumentInsightService {
         boolean hasPersistedOcrText = StringUtils.isNotBlank(document == null ? null : document.getOcrText());
         List<String> expectedRequiredMetadata = resolveExpectedRequiredMetadata(tenantId, document);
         List<String> missingRequiredMetadata = resolveMissingRequiredMetadata(document, expectedRequiredMetadata);
+        List<MetadataActionHintResponse> metadataActionHints = resolveMetadataActionHints(document, missingRequiredMetadata);
         Map<String, Object> resolvedMetadata = new LinkedHashMap<>();
         if (suggestion.getSuggestedMetadata() != null) {
             resolvedMetadata.putAll(suggestion.getSuggestedMetadata());
@@ -115,6 +117,7 @@ public class DocumentInsightService {
                 .hasPersistedOcrText(hasPersistedOcrText)
                 .expectedRequiredMetadata(expectedRequiredMetadata)
                 .missingRequiredMetadata(missingRequiredMetadata)
+                .metadataActionHints(metadataActionHints)
                 .ocrStats(resolveOcrStats(document))
                 .build();
     }
@@ -164,6 +167,25 @@ public class DocumentInsightService {
 
         return expectedRequiredMetadata.stream()
                 .filter(field -> !availableKeys.contains(StringUtils.lowerCase(field)))
+                .toList();
+    }
+
+    private List<MetadataActionHintResponse> resolveMetadataActionHints(DmsDocument document, List<String> missingRequiredMetadata) {
+        if (missingRequiredMetadata == null || missingRequiredMetadata.isEmpty()) {
+            return List.of();
+        }
+
+        boolean hasPersistedOcrText = StringUtils.isNotBlank(document == null ? null : document.getOcrText());
+        return missingRequiredMetadata.stream()
+                .limit(5)
+                .map(field -> MetadataActionHintResponse.builder()
+                        .field(field)
+                        .action(hasPersistedOcrText ? "EXTRACT_FROM_OCR" : "REQUEST_OCR_PROCESSING")
+                        .reason(hasPersistedOcrText
+                                ? "OCR já persistido. Priorize extração/validação deste campo e salve no metadado do documento."
+                                : "Sem OCR persistido. Execute a extração OCR antes de preencher este campo obrigatório.")
+                        .priority("HIGH")
+                        .build())
                 .toList();
     }
 
