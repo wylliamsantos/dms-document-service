@@ -259,12 +259,12 @@ public class DocumentInsightService {
 
         if (!ragEnabled) {
             return buildRagResponse(documentId, version, tenantId, "", false, "DISABLED",
-                    "RAG de documento desabilitado por feature flag (dms.ai.rag.document.enabled=false).", List.of(), startedAt);
+                    "RAG de documento desabilitado por feature flag (dms.ai.rag.document.enabled=false).", List.of(), List.of(), startedAt);
         }
 
         if (!ragEnabledTenants.isEmpty() && !ragEnabledTenants.contains(tenantId)) {
             return buildRagResponse(documentId, version, tenantId, "", false, "TENANT_DISABLED",
-                    "RAG de documento desabilitado para o tenant atual (allowlist não inclui este tenant).", List.of(), startedAt);
+                    "RAG de documento desabilitado para o tenant atual (allowlist não inclui este tenant).", List.of(), List.of(), startedAt);
         }
 
         DmsDocument document = dmsDocumentRepository.findByIdAndTenantId(documentId, tenantId)
@@ -275,7 +275,7 @@ public class DocumentInsightService {
             boolean allowedCategory = ragEnabledCategories.contains(StringUtils.lowerCase(category));
             if (!allowedCategory) {
                 return buildRagResponse(documentId, version, tenantId, category, false, "CATEGORY_DISABLED",
-                        "RAG de documento desabilitado para a categoria atual (allowlist por categoria).", List.of(), startedAt);
+                        "RAG de documento desabilitado para a categoria atual (allowlist por categoria).", List.of(), List.of(), startedAt);
             }
         }
 
@@ -284,12 +284,13 @@ public class DocumentInsightService {
             String missingPreview = missingRequiredMetadata.stream().limit(3).collect(Collectors.joining(", "));
             String suffix = missingRequiredMetadata.size() > 3 ? "..." : "";
             return buildRagResponse(documentId, version, tenantId, category, false, "QUALITY_GATED",
-                    "RAG aguardando qualidade mínima: preencha metadados obrigatórios faltantes (" + missingPreview + suffix + ").", List.of(), startedAt);
+                    "RAG aguardando qualidade mínima: preencha metadados obrigatórios faltantes (" + missingPreview + suffix + ").", missingRequiredMetadata, List.of(), startedAt);
         }
 
         List<RagContextChunkResponse> chunks = buildChunks(document);
         return buildRagResponse(documentId, version, tenantId, category, true, "READY",
                 chunks.isEmpty() ? "Sem chunks de OCR disponíveis para este documento." : "Contexto RAG local carregado.",
+                List.of(),
                 chunks,
                 startedAt);
     }
@@ -330,6 +331,7 @@ public class DocumentInsightService {
                                                         boolean enabled,
                                                         String status,
                                                         String message,
+                                                        List<String> missingRequiredMetadata,
                                                         List<RagContextChunkResponse> chunks,
                                                         Instant startedAt) {
         int chunkCount = chunks.size();
@@ -359,6 +361,7 @@ public class DocumentInsightService {
                 .averageScore(averageScore)
                 .latencyMs(latencyMs)
                 .qualityBand(qualityBand)
+                .missingRequiredMetadata(missingRequiredMetadata)
                 .chunks(chunks)
                 .build();
     }

@@ -18,5 +18,6 @@ public class DocumentRagContextResponse {
     Double averageScore;
     Long latencyMs;
     String qualityBand;
+    List<String> missingRequiredMetadata;
     List<RagContextChunkResponse> chunks;
 }

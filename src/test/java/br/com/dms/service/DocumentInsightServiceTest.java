@@ -246,6 +246,7 @@ class DocumentInsightServiceTest {
         assertFalse(response.isEnabled());
         assertEquals("QUALITY_GATED", response.getStatus());
         assertEquals("BLOCKED", response.getQualityBand());
+        assertEquals(List.of("valor"), response.getMissingRequiredMetadata());
         assertTrue(response.getMessage().contains("metadados obrigatórios"));
         assertTrue(response.getChunks().isEmpty());
     }
