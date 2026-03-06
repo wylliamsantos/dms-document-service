@@ -187,18 +187,59 @@ public class DocumentInsightService {
             return List.of();
         }
 
-        boolean hasPersistedOcrText = StringUtils.isNotBlank(document == null ? null : document.getOcrText());
+        String persistedOcrText = StringUtils.trimToEmpty(document == null ? null : document.getOcrText());
+        boolean hasPersistedOcrText = StringUtils.isNotBlank(persistedOcrText);
         return missingRequiredMetadata.stream()
                 .limit(5)
-                .map(field -> MetadataActionHintResponse.builder()
-                        .field(field)
-                        .action(hasPersistedOcrText ? "EXTRACT_FROM_OCR" : "REQUEST_OCR_PROCESSING")
-                        .reason(hasPersistedOcrText
-                                ? "OCR já persistido. Priorize extração/validação deste campo e salve no metadado do documento."
-                                : "Sem OCR persistido. Execute a extração OCR antes de preencher este campo obrigatório.")
-                        .priority("HIGH")
-                        .build())
+                .map(field -> {
+                    String suggestedValue = hasPersistedOcrText ? extractFieldValueFromOcr(persistedOcrText, field) : null;
+                    return MetadataActionHintResponse.builder()
+                            .field(field)
+                            .action(hasPersistedOcrText ? "EXTRACT_FROM_OCR" : "REQUEST_OCR_PROCESSING")
+                            .reason(hasPersistedOcrText
+                                    ? "OCR já persistido. Priorize extração/validação deste campo e salve no metadado do documento."
+                                    : "Sem OCR persistido. Execute a extração OCR antes de preencher este campo obrigatório.")
+                            .priority("HIGH")
+                            .suggestedValue(suggestedValue)
+                            .evidenceExcerpt(suggestedValue == null
+                                    ? null
+                                    : "Sugestão heurística baseada no OCR persistido; valide antes de salvar.")
+                            .build();
+                })
                 .toList();
+    }
+
+    private String extractFieldValueFromOcr(String ocrText, String field) {
+        if (StringUtils.isBlank(ocrText) || StringUtils.isBlank(field)) {
+            return null;
+        }
+
+        String normalizedField = StringUtils.lowerCase(StringUtils.trimToEmpty(field));
+        String[] lines = ocrText.replace("\r", "\n").split("\n");
+        for (String rawLine : lines) {
+            String line = StringUtils.normalizeSpace(rawLine);
+            if (StringUtils.isBlank(line)) {
+                continue;
+            }
+
+            String normalizedLine = StringUtils.lowerCase(line);
+            if (!normalizedLine.contains(normalizedField)) {
+                continue;
+            }
+
+            String candidate = line.replaceFirst("(?i)^.*" + java.util.regex.Pattern.quote(field) + "\\s*[:\\-]?\\s*", "");
+            candidate = StringUtils.trimToEmpty(candidate);
+            if (StringUtils.isBlank(candidate)) {
+                continue;
+            }
+
+            if (candidate.length() > 120) {
+                candidate = candidate.substring(0, 120);
+            }
+            return candidate;
+        }
+
+        return null;
     }
 
     private String resolveConfidenceBand(double confidence) {

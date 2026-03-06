@@ -10,4 +10,6 @@ public class MetadataActionHintResponse {
     String action;
     String reason;
     String priority;
+    String suggestedValue;
+    String evidenceExcerpt;
 }

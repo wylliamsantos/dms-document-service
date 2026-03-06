@@ -225,7 +225,7 @@ class DocumentInsightServiceTest {
                         .tenantId("tenant-1")
                         .category("CONTRATO")
                         .metadata(Map.of("cpf", "123"))
-                        .ocrText("Parágrafo OCR válido")
+                        .ocrText("Parágrafo OCR válido\nvalor: 900,00")
                         .build()
         ));
 
@@ -265,6 +265,8 @@ class DocumentInsightServiceTest {
         assertEquals(List.of("valor"), response.getMissingRequiredMetadata());
         var insight = service.getInsight("doc-rag", Optional.empty());
         assertEquals("EXTRACT_FROM_OCR", insight.getMetadataActionHints().get(0).getAction());
+        assertEquals("900,00", insight.getMetadataActionHints().get(0).getSuggestedValue());
+        assertNotNull(insight.getMetadataActionHints().get(0).getEvidenceExcerpt());
         assertTrue(response.getMessage().contains("metadados obrigatórios"));
         assertTrue(response.getChunks().isEmpty());
     }
