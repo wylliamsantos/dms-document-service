@@ -10,9 +10,13 @@ import java.util.List;
 public class MetadataUpdateOcrHintAdoptionResponse {
     long documentTotalUpdates;
     long documentOcrHintUpdates;
+    long documentOcrHintCancelUpdates;
+    long documentOcrHintErrorUpdates;
     double documentOcrHintRate;
     long categoryTotalUpdates;
     long categoryOcrHintUpdates;
+    long categoryOcrHintCancelUpdates;
+    long categoryOcrHintErrorUpdates;
     double categoryOcrHintRate;
     int lookbackDaysApplied;
     List<MetadataUpdateAdoptionTrendPointResponse> trend;

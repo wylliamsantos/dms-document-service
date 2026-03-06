@@ -9,5 +9,7 @@ public class MetadataUpdateAdoptionTrendPointResponse {
     String label;
     long totalUpdates;
     long ocrHintUpdates;
+    long ocrHintCancelUpdates;
+    long ocrHintErrorUpdates;
     double ocrHintRate;
 }
