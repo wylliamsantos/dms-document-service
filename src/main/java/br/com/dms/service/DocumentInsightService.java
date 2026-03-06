@@ -6,6 +6,7 @@ import br.com.dms.controller.response.InsightSignalResponse;
 import br.com.dms.controller.response.MetadataActionHintResponse;
 import br.com.dms.controller.response.MetadataSuggestionResponse;
 import br.com.dms.controller.response.MetadataUpdateHistoryEntryResponse;
+import br.com.dms.controller.response.MetadataUpdateHistoryPageResponse;
 import br.com.dms.controller.response.RagContextChunkResponse;
 import br.com.dms.domain.mongodb.Category;
 import br.com.dms.domain.mongodb.DmsDocument;
@@ -125,6 +126,28 @@ public class DocumentInsightService {
                 .metadataActionHints(metadataActionHints)
                 .metadataUpdateHistory(metadataUpdateHistory)
                 .ocrStats(resolveOcrStats(document))
+                .build();
+    }
+
+    public MetadataUpdateHistoryPageResponse getMetadataUpdateHistory(String documentId, Optional<String> version, int page, int size) {
+        String tenantId = tenantContextService.requireTenantId();
+        DmsDocument document = resolveDocument(documentId, tenantId);
+
+        if (document == null) {
+            throw new DmsDocumentNotFoundException("Document not found", TypeException.VALID);
+        }
+
+        List<MetadataUpdateHistoryEntryResponse> ordered = toMetadataUpdateHistory(document);
+        int safePage = Math.max(0, page);
+        int safeSize = Math.max(1, Math.min(size, 100));
+        int fromIndex = Math.min(safePage * safeSize, ordered.size());
+        int toIndex = Math.min(fromIndex + safeSize, ordered.size());
+
+        return MetadataUpdateHistoryPageResponse.builder()
+                .content(ordered.subList(fromIndex, toIndex))
+                .totalElements(ordered.size())
+                .number(safePage)
+                .size(safeSize)
                 .build();
     }
 
@@ -324,14 +347,13 @@ public class DocumentInsightService {
         return important;
     }
 
-    private List<MetadataUpdateHistoryEntryResponse> resolveMetadataUpdateHistory(DmsDocument document) {
+    private List<MetadataUpdateHistoryEntryResponse> toMetadataUpdateHistory(DmsDocument document) {
         if (document == null || document.getMetadataUpdateHistory() == null || document.getMetadataUpdateHistory().isEmpty()) {
             return List.of();
         }
 
         return document.getMetadataUpdateHistory().stream()
                 .sorted((left, right) -> StringUtils.defaultString(right.getUpdatedAt()).compareTo(StringUtils.defaultString(left.getUpdatedAt())))
-                .limit(5)
                 .map(entry -> MetadataUpdateHistoryEntryResponse.builder()
                         .field(entry.getField())
                         .previousValue(entry.getPreviousValue())
@@ -340,6 +362,12 @@ public class DocumentInsightService {
                         .updatedAt(entry.getUpdatedAt())
                         .updatedBy(entry.getUpdatedBy())
                         .build())
+                .toList();
+    }
+
+    private List<MetadataUpdateHistoryEntryResponse> resolveMetadataUpdateHistory(DmsDocument document) {
+        return toMetadataUpdateHistory(document).stream()
+                .limit(5)
                 .toList();
     }
 

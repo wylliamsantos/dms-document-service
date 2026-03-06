@@ -6,6 +6,7 @@ import br.com.dms.controller.response.DocumentInsightResponse;
 import br.com.dms.controller.response.DocumentRagContextResponse;
 import br.com.dms.controller.response.DocumentVersionDiffResponse;
 import br.com.dms.controller.response.MetadataSuggestionResponse;
+import br.com.dms.controller.response.MetadataUpdateHistoryPageResponse;
 import br.com.dms.controller.response.UrlPresignedResponse;
 import br.com.dms.domain.core.DocumentId;
 import br.com.dms.exception.DefaultError;
@@ -211,6 +212,18 @@ public class DocumentController {
                                                                        @PathVariable(name = "version", required = false) Optional<String> version) {
         log.info("DMS version {} - TransactionId: {} - document insights - documentId: {}, version: {}", API_VERSION, transactionId, documentId, version);
         return ResponseEntity.ok(documentInsightService.getInsight(documentId, version));
+    }
+
+    @GetMapping(path = {"/{documentId}/metadata/history", "/{documentId}/{version}/metadata/history"}, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<MetadataUpdateHistoryPageResponse> getMetadataUpdateHistory(@RequestHeader(name = "TransactionId") String transactionId,
+                                                                                       @RequestHeader(name = "Authorization") String authorization,
+                                                                                       @PathVariable(value = "documentId") String documentId,
+                                                                                       @PathVariable(name = "version", required = false) Optional<String> version,
+                                                                                       @RequestParam(name = "page", defaultValue = "0") int page,
+                                                                                       @RequestParam(name = "size", defaultValue = "10") int size) {
+        log.info("DMS version {} - TransactionId: {} - metadata history - documentId: {}, version: {}, page: {}, size: {}",
+                API_VERSION, transactionId, documentId, version, page, size);
+        return ResponseEntity.ok(documentInsightService.getMetadataUpdateHistory(documentId, version, page, size));
     }
 
     @GetMapping(path = {"/{documentId}/rag/context", "/{documentId}/{version}/rag/context"}, produces = MediaType.APPLICATION_JSON_VALUE)
