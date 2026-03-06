@@ -296,6 +296,7 @@ class DocumentInsightServiceTest {
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
+                Optional.empty(),
                 Optional.empty()
         );
 
@@ -366,6 +367,7 @@ class DocumentInsightServiceTest {
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
+                Optional.empty(),
                 Optional.empty()
         );
 
@@ -374,6 +376,86 @@ class DocumentInsightServiceTest {
         assertEquals(2, summary.getTotalDocumentsWithUpdates());
         assertEquals(2, summary.getTotalEntries());
         assertEquals("2026-03-06T09:00:00Z", summary.getLatestUpdatedAt());
+    }
+
+    @Test
+    void shouldFilterCategorySummaryByOcrHintAction() {
+        AiMetadataSuggestionService aiService = mock(AiMetadataSuggestionService.class);
+        when(aiService.suggest(eq("doc-history"), eq(Optional.empty()))).thenReturn(
+                MetadataSuggestionResponse.builder().documentId("doc-history").summary("Resumo").build()
+        );
+
+        TenantContextService tenantContextService = mock(TenantContextService.class);
+        when(tenantContextService.requireTenantId()).thenReturn("tenant-1");
+
+        DmsDocumentRepository repository = mock(DmsDocumentRepository.class);
+        when(repository.findByIdAndTenantId("doc-history", "tenant-1")).thenReturn(Optional.of(
+                DmsDocument.of()
+                        .id("doc-history")
+                        .tenantId("tenant-1")
+                        .category("CONTRATO")
+                        .metadataUpdateHistory(List.of(
+                                MetadataUpdateHistoryEntry.builder().field("valor").source("OCR_HINT").updatedAt("2026-03-06T09:00:00Z").build()
+                        ))
+                        .build()
+        ));
+        when(repository.findByTenantIdAndCategory("tenant-1", "CONTRATO")).thenReturn(List.of(
+                DmsDocument.of()
+                        .id("doc-history")
+                        .tenantId("tenant-1")
+                        .category("CONTRATO")
+                        .metadataUpdateHistory(List.of(
+                                MetadataUpdateHistoryEntry.builder().field("valor").source("OCR_HINT").updatedAt("2026-03-06T09:00:00Z").build(),
+                                MetadataUpdateHistoryEntry.builder().field("valor").source("OCR_HINT_CANCEL").updatedAt("2026-03-06T08:40:00Z").build(),
+                                MetadataUpdateHistoryEntry.builder().field("valor").source("OCR_HINT_ERROR").updatedAt("2026-03-06T08:30:00Z").build()
+                        ))
+                        .build()
+        ));
+
+        DocumentInsightService service = new DocumentInsightService(
+                aiService,
+                tenantContextService,
+                repository,
+                mock(CategoryRepository.class),
+                new SimpleMeterRegistry(),
+                false,
+                "",
+                ""
+        );
+
+        var appliedSummary = service.getMetadataUpdateHistoryCategorySummary(
+                "doc-history",
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of("APPLIED")
+        );
+
+        var canceledSummary = service.getMetadataUpdateHistoryCategorySummary(
+                "doc-history",
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of("CANCELLED")
+        );
+
+        var errorSummary = service.getMetadataUpdateHistoryCategorySummary(
+                "doc-history",
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of("ERROR")
+        );
+
+        assertEquals(1, appliedSummary.getFilteredEntries());
+        assertEquals(1, canceledSummary.getFilteredEntries());
+        assertEquals(1, errorSummary.getFilteredEntries());
     }
 
     @Test
