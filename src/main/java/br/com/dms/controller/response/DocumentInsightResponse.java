@@ -28,5 +28,6 @@ public class DocumentInsightResponse {
     Integer requiredMetadataCoveragePercent;
     List<MetadataActionHintResponse> metadataActionHints;
     List<MetadataUpdateHistoryEntryResponse> metadataUpdateHistory;
+    List<MetadataRegressionAlertResponse> metadataRegressionAlerts;
     Map<String, Object> ocrStats;
 }

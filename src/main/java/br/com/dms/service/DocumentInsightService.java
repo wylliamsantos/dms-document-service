@@ -7,6 +7,7 @@ import br.com.dms.controller.response.MetadataActionHintResponse;
 import br.com.dms.controller.response.MetadataSuggestionResponse;
 import br.com.dms.controller.response.MetadataUpdateHistoryBucketResponse;
 import br.com.dms.controller.response.MetadataUpdateHistoryCategorySummaryResponse;
+import br.com.dms.controller.response.MetadataRegressionAlertResponse;
 import br.com.dms.controller.response.MetadataUpdateHistoryEntryResponse;
 import br.com.dms.controller.response.MetadataUpdateHistoryPageResponse;
 import br.com.dms.controller.response.MetadataUpdateHistorySummaryResponse;
@@ -91,6 +92,7 @@ public class DocumentInsightService {
         int requiredMetadataCoveragePercent = resolveRequiredMetadataCoveragePercent(expectedRequiredMetadata, missingRequiredMetadata);
         List<MetadataActionHintResponse> metadataActionHints = resolveMetadataActionHints(document, missingRequiredMetadata);
         List<MetadataUpdateHistoryEntryResponse> metadataUpdateHistory = resolveMetadataUpdateHistory(document);
+        List<MetadataRegressionAlertResponse> metadataRegressionAlerts = resolveMetadataRegressionAlerts(tenantId, document);
         Map<String, Object> resolvedMetadata = new LinkedHashMap<>();
         if (suggestion.getSuggestedMetadata() != null) {
             resolvedMetadata.putAll(suggestion.getSuggestedMetadata());
@@ -128,6 +130,7 @@ public class DocumentInsightService {
                 .requiredMetadataCoveragePercent(requiredMetadataCoveragePercent)
                 .metadataActionHints(metadataActionHints)
                 .metadataUpdateHistory(metadataUpdateHistory)
+                .metadataRegressionAlerts(metadataRegressionAlerts)
                 .ocrStats(resolveOcrStats(document))
                 .build();
     }
@@ -533,6 +536,95 @@ public class DocumentInsightService {
     private List<MetadataUpdateHistoryEntryResponse> resolveMetadataUpdateHistory(DmsDocument document) {
         return toMetadataUpdateHistory(document).stream()
                 .limit(5)
+                .toList();
+    }
+
+    private List<MetadataRegressionAlertResponse> resolveMetadataRegressionAlerts(String tenantId, DmsDocument document) {
+        if (document == null) {
+            return List.of();
+        }
+
+        List<MetadataUpdateHistoryEntryResponse> documentEntries = toMetadataUpdateHistory(document);
+        if (documentEntries.size() < 3) {
+            return List.of();
+        }
+
+        String category = StringUtils.trimToEmpty(document.getCategory());
+        List<DmsDocument> categoryDocuments = StringUtils.isBlank(category)
+                ? List.of(document)
+                : dmsDocumentRepository.findByTenantIdAndCategory(tenantId, category);
+
+        List<MetadataUpdateHistoryEntryResponse> categoryEntries = categoryDocuments.stream()
+                .flatMap(doc -> toMetadataUpdateHistory(doc).stream())
+                .toList();
+        if (categoryEntries.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, Long> documentBySource = buildCountMap(documentEntries, MetadataUpdateHistoryEntryResponse::getSource);
+        Map<String, Long> categoryBySource = buildCountMap(categoryEntries, MetadataUpdateHistoryEntryResponse::getSource);
+        Map<String, Long> documentByField = buildCountMap(documentEntries, MetadataUpdateHistoryEntryResponse::getField);
+        Map<String, Long> categoryByField = buildCountMap(categoryEntries, MetadataUpdateHistoryEntryResponse::getField);
+
+        List<MetadataRegressionAlertResponse> alerts = new ArrayList<>();
+        alerts.addAll(buildRegressionAlerts("SOURCE", documentEntries.size(), categoryEntries.size(), documentBySource, categoryBySource));
+        alerts.addAll(buildRegressionAlerts("FIELD", documentEntries.size(), categoryEntries.size(), documentByField, categoryByField));
+
+        return alerts.stream()
+                .sorted((left, right) -> Double.compare(right.getDeltaRatio(), left.getDeltaRatio()))
+                .limit(5)
+                .toList();
+    }
+
+    private Map<String, Long> buildCountMap(List<MetadataUpdateHistoryEntryResponse> entries,
+                                            java.util.function.Function<MetadataUpdateHistoryEntryResponse, String> keyResolver) {
+        return entries.stream()
+                .collect(Collectors.groupingBy(
+                        entry -> sanitizeMetricTag(keyResolver.apply(entry), "unknown"),
+                        Collectors.counting()
+                ));
+    }
+
+    private List<MetadataRegressionAlertResponse> buildRegressionAlerts(String dimension,
+                                                                        int documentTotal,
+                                                                        int categoryTotal,
+                                                                        Map<String, Long> documentCounts,
+                                                                        Map<String, Long> categoryCounts) {
+        if (documentTotal <= 0 || categoryTotal <= 0 || documentCounts.isEmpty()) {
+            return List.of();
+        }
+
+        return documentCounts.entrySet().stream()
+                .map(entry -> {
+                    String key = entry.getKey();
+                    long documentCount = entry.getValue();
+                    long categoryCount = categoryCounts.getOrDefault(key, 0L);
+                    double documentRatio = documentCount / (double) documentTotal;
+                    double categoryRatio = categoryCount / (double) categoryTotal;
+                    double deltaRatio = documentRatio - categoryRatio;
+                    if (documentCount < 2 || deltaRatio < 0.25d) {
+                        return null;
+                    }
+
+                    String severity = deltaRatio >= 0.45d ? "HIGH" : "MEDIUM";
+                    String message = "Volume de ajustes " + key + " acima do benchmark da categoria (" +
+                            Math.round(documentRatio * 100) + "% vs " + Math.round(categoryRatio * 100) + "%).";
+
+                    return MetadataRegressionAlertResponse.builder()
+                            .dimension(dimension)
+                            .key(key)
+                            .documentCount(documentCount)
+                            .categoryCount(categoryCount)
+                            .documentRatio(documentRatio)
+                            .categoryRatio(categoryRatio)
+                            .deltaRatio(deltaRatio)
+                            .severity(severity)
+                            .message(message)
+                            .build();
+                })
+                .filter(java.util.Objects::nonNull)
+                .sorted((left, right) -> Double.compare(right.getDeltaRatio(), left.getDeltaRatio()))
+                .limit(3)
                 .toList();
     }
 
