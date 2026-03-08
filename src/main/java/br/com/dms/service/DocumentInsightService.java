@@ -111,6 +111,8 @@ public class DocumentInsightService {
         if (resolvedMetadata.isEmpty()) {
             resolvedMetadata.putAll(persistedMetadataPreview);
         }
+        Map<String, Object> ocrStats = resolveOcrStats(document);
+        OcrQualityAssessment ocrQualityAssessment = resolveOcrQualityAssessment(ocrStats, requiredMetadataCoveragePercent, missingRequiredMetadata);
 
         String confidenceBand = resolveConfidenceBand(suggestion.getConfidence());
         Counter.builder("dms.ai.document.insight.requests")
@@ -145,7 +147,10 @@ public class DocumentInsightService {
                 .metadataUpdateHistory(metadataUpdateHistory)
                 .metadataRegressionAlerts(metadataRegressionAlerts)
                 .ocrHintAdoption(ocrHintAdoption)
-                .ocrStats(resolveOcrStats(document))
+                .ocrQualityScore(ocrQualityAssessment.score())
+                .ocrQualityBand(ocrQualityAssessment.band())
+                .ocrQualitySummary(ocrQualityAssessment.summary())
+                .ocrStats(ocrStats)
                 .build();
     }
 
@@ -952,6 +957,54 @@ public class DocumentInsightService {
         stats.put("words", words);
         stats.put("paragraphs", paragraphs);
         return stats;
+    }
+
+    private OcrQualityAssessment resolveOcrQualityAssessment(Map<String, Object> ocrStats,
+                                                             int requiredMetadataCoveragePercent,
+                                                             List<String> missingRequiredMetadata) {
+        if (ocrStats == null || ocrStats.isEmpty()) {
+            return new OcrQualityAssessment(0, "LOW", "Sem OCR persistido. Execute OCR para habilitar análise assistida com melhor qualidade.");
+        }
+
+        int words = asInt(ocrStats.get("words"));
+        int lines = asInt(ocrStats.get("lines"));
+        int paragraphs = asInt(ocrStats.get("paragraphs"));
+        int coverage = Math.max(0, Math.min(requiredMetadataCoveragePercent, 100));
+
+        double score = 0;
+        score += Math.min(words / 120.0d, 1.0d) * 40.0d;
+        score += Math.min(lines / 12.0d, 1.0d) * 20.0d;
+        score += Math.min(paragraphs / 3.0d, 1.0d) * 10.0d;
+        score += (coverage / 100.0d) * 30.0d;
+
+        int missingCount = missingRequiredMetadata == null ? 0 : missingRequiredMetadata.size();
+        if (missingCount >= 3) {
+            score -= 10.0d;
+        }
+
+        int roundedScore = (int) Math.max(0, Math.min(100, Math.round(score)));
+        String band = roundedScore >= 80 ? "HIGH" : roundedScore >= 50 ? "MEDIUM" : "LOW";
+
+        String summary;
+        if ("HIGH".equals(band)) {
+            summary = "Qualidade OCR alta para o MVP (densidade textual e cobertura de metadados em nível seguro).";
+        } else if ("MEDIUM".equals(band)) {
+            summary = "Qualidade OCR moderada. Recomendado revisar campos obrigatórios faltantes antes de expandir rollout de IA.";
+        } else {
+            summary = "Qualidade OCR baixa. Priorize enriquecimento OCR/metadados antes de habilitar fluxos avançados de IA.";
+        }
+
+        return new OcrQualityAssessment(roundedScore, band, summary);
+    }
+
+    private int asInt(Object value) {
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        return 0;
+    }
+
+    private record OcrQualityAssessment(int score, String band, String summary) {
     }
 
     public DocumentRagContextResponse getRagContextSkeleton(String documentId, Optional<String> version) {
