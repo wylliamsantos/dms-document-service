@@ -7,6 +7,7 @@ import br.com.dms.controller.response.DocumentRagContextResponse;
 import br.com.dms.controller.response.DocumentVersionDiffResponse;
 import br.com.dms.controller.response.MetadataSuggestionResponse;
 import br.com.dms.controller.response.MetadataUpdateHistoryCategorySummaryResponse;
+import br.com.dms.controller.response.MetadataUpdateHistoryTenantCategorySummaryResponse;
 import br.com.dms.controller.response.MetadataUpdateHistoryPageResponse;
 import br.com.dms.controller.response.MetadataUpdateHistorySummaryResponse;
 import br.com.dms.controller.response.UrlPresignedResponse;
@@ -287,6 +288,29 @@ public class DocumentController {
                 updatedFrom.flatMap(this::parseOptionalInstant),
                 updatedTo.flatMap(this::parseOptionalInstant),
                 ocrHintAction
+        ));
+    }
+
+    @GetMapping(path = "/metadata/history/summary/tenant/categories", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<MetadataUpdateHistoryTenantCategorySummaryResponse> getMetadataUpdateHistoryTenantCategorySummary(@RequestHeader(name = "TransactionId") String transactionId,
+                                                                                                                              @RequestHeader(name = "Authorization") String authorization,
+                                                                                                                              @RequestParam(name = "category", required = false) Optional<String> category,
+                                                                                                                              @RequestParam(name = "source", required = false) Optional<String> source,
+                                                                                                                              @RequestParam(name = "field", required = false) Optional<String> field,
+                                                                                                                              @RequestParam(name = "updatedFrom", required = false) Optional<String> updatedFrom,
+                                                                                                                              @RequestParam(name = "updatedTo", required = false) Optional<String> updatedTo,
+                                                                                                                              @RequestParam(name = "ocrHintAction", required = false) Optional<String> ocrHintAction,
+                                                                                                                              @RequestParam(name = "limit", required = false, defaultValue = "10") int limit) {
+        log.info("DMS version {} - TransactionId: {} - metadata history tenant category summary - category: {}, source: {}, field: {}, updatedFrom: {}, updatedTo: {}, ocrHintAction: {}, limit: {}",
+                API_VERSION, transactionId, category, source, field, updatedFrom, updatedTo, ocrHintAction, limit);
+        return ResponseEntity.ok(documentInsightService.getMetadataUpdateHistoryTenantCategorySummary(
+                category,
+                source,
+                field,
+                updatedFrom.flatMap(this::parseOptionalInstant),
+                updatedTo.flatMap(this::parseOptionalInstant),
+                ocrHintAction,
+                limit
         ));
     }
 
