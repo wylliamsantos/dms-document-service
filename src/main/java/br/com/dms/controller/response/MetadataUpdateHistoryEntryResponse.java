@@ -10,6 +10,7 @@ public class MetadataUpdateHistoryEntryResponse {
     String previousValue;
     String newValue;
     String source;
+    String context;
     String updatedAt;
     String updatedBy;
 }
