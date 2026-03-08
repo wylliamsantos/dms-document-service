@@ -89,6 +89,9 @@ class DocumentInsightServiceTest {
         assertTrue(response.getHasPersistedOcrText());
         assertEquals("linha 1 linha 2", response.getPersistedOcrExcerpt());
         assertEquals(100, response.getRequiredMetadataCoveragePercent());
+        assertNotNull(response.getOcrQualityScore());
+        assertEquals("LOW", response.getOcrQualityBand());
+        assertNotNull(response.getOcrQualitySummary());
         assertTrue(response.getMetadataActionHints().isEmpty());
         assertEquals(1, response.getMetadataUpdateHistory().size());
         assertEquals("OCR_HINT", response.getMetadataUpdateHistory().get(0).getSource());

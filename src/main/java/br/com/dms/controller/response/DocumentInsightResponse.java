@@ -32,5 +32,8 @@ public class DocumentInsightResponse {
     List<MetadataUpdateHistoryEntryResponse> metadataUpdateHistory;
     List<MetadataRegressionAlertResponse> metadataRegressionAlerts;
     MetadataUpdateOcrHintAdoptionResponse ocrHintAdoption;
+    Integer ocrQualityScore;
+    String ocrQualityBand;
+    String ocrQualitySummary;
     Map<String, Object> ocrStats;
 }
