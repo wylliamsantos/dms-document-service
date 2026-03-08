@@ -14,6 +14,7 @@ public class MetadataUpdateHistoryEntry {
     private String previousValue;
     private String newValue;
     private String source;
+    private String context;
     private String updatedAt;
     private String updatedBy;
 }

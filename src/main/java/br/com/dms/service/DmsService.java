@@ -137,24 +137,32 @@ public class DmsService {
     }
 
     public ResponseEntity<?> updateMetadata(String transactionId, String documentId, String metadata, String fileName) {
-        return updateMetadata(transactionId, documentId, metadata, fileName, null);
+        return updateMetadata(transactionId, documentId, metadata, fileName, null, null);
     }
 
     public ResponseEntity<?> updateMetadata(String transactionId, String documentId, String metadata, String fileName, String updateSource) {
+        return updateMetadata(transactionId, documentId, metadata, fileName, updateSource, null);
+    }
+
+    public ResponseEntity<?> updateMetadata(String transactionId, String documentId, String metadata, String fileName, String updateSource, String updateContext) {
         if (StringUtils.isBlank(metadata)) {
             throw new DmsBusinessException(environment.getProperty("dms.msg.metadataIsNull"), TypeException.VALID, transactionId);
         }
 
         Map<String, Object> jsonMetadata = dmsUtil.handleObject(transactionId, metadata);
-        updateMetadata(transactionId, documentId, jsonMetadata, fileName, updateSource);
+        updateMetadata(transactionId, documentId, jsonMetadata, fileName, updateSource, updateContext);
         return ResponseEntity.noContent().build();
     }
 
     public void updateMetadata(String transactionId, String documentId, Map<String, Object> jsonMetadata, String fileName) {
-        updateMetadata(transactionId, documentId, jsonMetadata, fileName, null);
+        updateMetadata(transactionId, documentId, jsonMetadata, fileName, null, null);
     }
 
     public void updateMetadata(String transactionId, String documentId, Map<String, Object> jsonMetadata, String fileName, String updateSource) {
+        updateMetadata(transactionId, documentId, jsonMetadata, fileName, updateSource, null);
+    }
+
+    public void updateMetadata(String transactionId, String documentId, Map<String, Object> jsonMetadata, String fileName, String updateSource, String updateContext) {
         String tenantId = tenantId();
         String businessKeyType = dmsDocumentRepository.findByIdAndTenantId(documentId, tenantId)
             .map(DmsDocument::getBusinessKeyType)
@@ -174,7 +182,7 @@ public class DmsService {
             dmsDocumentVersion.setModifiedAt(LocalDateTime.now());
             this.dmsDocumentVersionRepository.save(dmsDocumentVersion);
             entity.setMetadata(jsonMetadata);
-            appendMetadataUpdateHistory(entity, previousMetadata, jsonMetadata, updateSource);
+            appendMetadataUpdateHistory(entity, previousMetadata, jsonMetadata, updateSource, updateContext);
             this.dmsDocumentRepository.save(entity);
             publishAuditEvent("DOCUMENT_METADATA_UPDATED", entity, entity.getId(), entity.getFilename(), jsonMetadata,
                     buildAttributes("source", resolveMetadataUpdateSource(updateSource), "changed_fields", String.valueOf(resolveChangedFieldNames(previousMetadata, jsonMetadata).size())));
@@ -499,7 +507,8 @@ public class DmsService {
     private void appendMetadataUpdateHistory(DmsDocument document,
                                              Map<String, Object> previousMetadata,
                                              Map<String, Object> newMetadata,
-                                             String updateSource) {
+                                             String updateSource,
+                                             String updateContext) {
         if (document == null) {
             return;
         }
@@ -516,6 +525,7 @@ public class DmsService {
 
         String actor = StringUtils.defaultIfBlank(auditActorResolver.resolveUserId(), "system");
         String source = resolveMetadataUpdateSource(updateSource);
+        String context = resolveMetadataUpdateContext(updateContext);
         String updatedAt = Instant.now().toString();
 
         for (String field : changedFields) {
@@ -524,6 +534,7 @@ public class DmsService {
                     .previousValue(toShortString(previousMetadata.get(field)))
                     .newValue(toShortString(newMetadata.get(field)))
                     .source(source)
+                    .context(context)
                     .updatedAt(updatedAt)
                     .updatedBy(actor)
                     .build());
@@ -569,6 +580,11 @@ public class DmsService {
     private String resolveMetadataUpdateSource(String updateSource) {
         String normalized = StringUtils.upperCase(StringUtils.trimToEmpty(updateSource));
         return StringUtils.isBlank(normalized) ? "MANUAL" : normalized;
+    }
+
+    private String resolveMetadataUpdateContext(String updateContext) {
+        String normalized = StringUtils.upperCase(StringUtils.trimToEmpty(updateContext));
+        return StringUtils.isBlank(normalized) ? "UNSPECIFIED" : normalized;
     }
 
     private void transitionWorkflow(DmsDocument document,

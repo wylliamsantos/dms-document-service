@@ -676,6 +676,7 @@ public class DocumentInsightService {
                         .previousValue(entry.getPreviousValue())
                         .newValue(entry.getNewValue())
                         .source(entry.getSource())
+                        .context(entry.getContext())
                         .updatedAt(entry.getUpdatedAt())
                         .updatedBy(entry.getUpdatedBy())
                         .build())
