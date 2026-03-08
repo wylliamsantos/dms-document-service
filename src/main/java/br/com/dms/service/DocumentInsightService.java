@@ -33,6 +33,7 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,6 +54,16 @@ public class DocumentInsightService {
             entry("vencimento", "vencimento"),
             entry("data_emissao", "data_emissao"),
             entry("nome", "nome")
+    );
+
+    private static final Map<String, Integer> IMPORTANT_METADATA_IMPACT_WEIGHT = Map.ofEntries(
+            entry("valor", 70),
+            entry("vencimento", 60),
+            entry("data_emissao", 50),
+            entry("numero", 40),
+            entry("cpf", 30),
+            entry("cnpj", 30),
+            entry("nome", 20)
     );
 
     private final AiMetadataSuggestionService aiMetadataSuggestionService;
@@ -566,7 +577,10 @@ public class DocumentInsightService {
         String persistedOcrText = StringUtils.trimToEmpty(document == null ? null : document.getOcrText());
         boolean hasPersistedOcrText = StringUtils.isNotBlank(persistedOcrText);
         return missingRequiredMetadata.stream()
-                .limit(5)
+                .map(StringUtils::trimToEmpty)
+                .filter(StringUtils::isNotBlank)
+                .map(StringUtils::lowerCase)
+                .distinct()
                 .map(field -> {
                     OcrFieldSuggestion suggestion = hasPersistedOcrText
                             ? extractFieldValueFromOcr(persistedOcrText, field)
@@ -582,7 +596,25 @@ public class DocumentInsightService {
                             .evidenceExcerpt(suggestion.evidenceExcerpt())
                             .build();
                 })
+                .sorted(Comparator
+                        .comparingInt((MetadataActionHintResponse hint) -> resolveMetadataActionHintImpactScore(hint.getField(), hint.getSuggestedValue()))
+                        .reversed()
+                        .thenComparing(MetadataActionHintResponse::getField, String.CASE_INSENSITIVE_ORDER))
+                .limit(5)
                 .toList();
+    }
+
+    private int resolveMetadataActionHintImpactScore(String field, String suggestedValue) {
+        int score = 0;
+        String normalizedField = StringUtils.lowerCase(StringUtils.trimToEmpty(field));
+        if (IMPORTANT_METADATA_KEYS.containsKey(normalizedField)) {
+            score += 100;
+            score += IMPORTANT_METADATA_IMPACT_WEIGHT.getOrDefault(normalizedField, 0);
+        }
+        if (StringUtils.isNotBlank(suggestedValue)) {
+            score += 10;
+        }
+        return score;
     }
 
     private OcrFieldSuggestion extractFieldValueFromOcr(String ocrText, String field) {
