@@ -326,7 +326,9 @@ public class DocumentChatService {
         return builder
                 .ocrQualityScore(insight.getOcrQualityScore())
                 .ocrQualityBand(insight.getOcrQualityBand())
-                .ocrQualitySummary(insight.getOcrQualitySummary());
+                .ocrQualitySummary(insight.getOcrQualitySummary())
+                .missingRequiredMetadata(Optional.ofNullable(insight.getMissingRequiredMetadata()).orElse(List.of()))
+                .metadataActionHints(Optional.ofNullable(insight.getMetadataActionHints()).orElse(List.of()));
     }
 
     private DocumentInsightResponse resolveInsight(String documentId, Optional<String> version) {

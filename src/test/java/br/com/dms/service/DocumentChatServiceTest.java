@@ -4,6 +4,7 @@ import br.com.dms.controller.request.DocumentChatRequest;
 import br.com.dms.controller.response.DocumentChatResponse;
 import br.com.dms.controller.response.DocumentInsightResponse;
 import br.com.dms.controller.response.DocumentRagContextResponse;
+import br.com.dms.controller.response.MetadataActionHintResponse;
 import br.com.dms.domain.mongodb.DmsDocument;
 import br.com.dms.repository.mongo.DmsDocumentRepository;
 import br.com.dms.repository.mongo.DmsDocumentVersionRepository;
@@ -87,6 +88,15 @@ class DocumentChatServiceTest {
                         .ocrQualityScore(72)
                         .ocrQualityBand("MEDIUM")
                         .ocrQualitySummary("Qualidade OCR moderada")
+                        .missingRequiredMetadata(java.util.List.of("cpf"))
+                        .metadataActionHints(java.util.List.of(MetadataActionHintResponse.builder()
+                                .field("cpf")
+                                .action("EXTRACT_FROM_OCR")
+                                .reason("Campo obrigatório ausente")
+                                .priority("HIGH")
+                                .suggestedValue("12345678900")
+                                .evidenceExcerpt("CPF 123.456.789-00")
+                                .build()))
                         .build());
 
         DocumentChatService service = new DocumentChatService(
@@ -114,6 +124,8 @@ class DocumentChatServiceTest {
         assertFalse(response.getContextChunks().isEmpty());
         assertEquals(72, response.getOcrQualityScore());
         assertEquals("MEDIUM", response.getOcrQualityBand());
+        assertEquals(java.util.List.of("cpf"), response.getMissingRequiredMetadata());
+        assertEquals(1, response.getMetadataActionHints().size());
         assertNotNull(response.getLatencyMs());
     }
 }

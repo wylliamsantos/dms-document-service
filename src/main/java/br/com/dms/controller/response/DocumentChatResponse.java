@@ -17,6 +17,8 @@ public class DocumentChatResponse {
     Integer ocrQualityScore;
     String ocrQualityBand;
     String ocrQualitySummary;
+    List<String> missingRequiredMetadata;
+    List<MetadataActionHintResponse> metadataActionHints;
     String answer;
     String model;
     Long latencyMs;
