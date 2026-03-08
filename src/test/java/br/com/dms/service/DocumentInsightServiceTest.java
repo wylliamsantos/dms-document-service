@@ -372,6 +372,7 @@ class DocumentInsightServiceTest {
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
+                Optional.empty(),
                 Optional.empty()
         );
 
@@ -384,6 +385,62 @@ class DocumentInsightServiceTest {
         assertEquals(0L, summary.getOcrHintCancelledEntries());
         assertEquals(0L, summary.getOcrHintErrorEntries());
         assertEquals(0.5d, summary.getOcrHintAppliedRate(), 1e-9);
+    }
+
+    @Test
+    void shouldUseRequestedCategoryInCategorySummary() {
+        AiMetadataSuggestionService aiService = mock(AiMetadataSuggestionService.class);
+        TenantContextService tenantContextService = mock(TenantContextService.class);
+        when(tenantContextService.requireTenantId()).thenReturn("tenant-1");
+
+        DmsDocumentRepository repository = mock(DmsDocumentRepository.class);
+        when(repository.findByIdAndTenantId("doc-history", "tenant-1")).thenReturn(Optional.of(
+                DmsDocument.of()
+                        .id("doc-history")
+                        .tenantId("tenant-1")
+                        .category("CONTRATO")
+                        .metadataUpdateHistory(List.of(
+                                MetadataUpdateHistoryEntry.builder().field("valor").source("OCR_HINT").updatedAt("2026-03-06T09:00:00Z").build()
+                        ))
+                        .build()
+        ));
+        when(repository.findByTenantIdAndCategory("tenant-1", "NOTA_FISCAL")).thenReturn(List.of(
+                DmsDocument.of()
+                        .id("doc-nf")
+                        .tenantId("tenant-1")
+                        .category("NOTA_FISCAL")
+                        .metadataUpdateHistory(List.of(
+                                MetadataUpdateHistoryEntry.builder().field("numero").source("OCR_HINT_ERROR").updatedAt("2026-03-06T09:10:00Z").build()
+                        ))
+                        .build()
+        ));
+
+        DocumentInsightService service = new DocumentInsightService(
+                aiService,
+                tenantContextService,
+                repository,
+                mock(CategoryRepository.class),
+                new SimpleMeterRegistry(),
+                false,
+                "",
+                ""
+        );
+
+        var summary = service.getMetadataUpdateHistoryCategorySummary(
+                "doc-history",
+                Optional.empty(),
+                Optional.of("NOTA_FISCAL"),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty()
+        );
+
+        assertEquals("NOTA_FISCAL", summary.getCategory());
+        assertEquals(1, summary.getTotalDocumentsInCategory());
+        assertEquals(1, summary.getTotalEntries());
+        assertEquals(1L, summary.getOcrHintErrorEntries());
     }
 
     @Test
@@ -438,6 +495,7 @@ class DocumentInsightServiceTest {
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
+                Optional.empty(),
                 Optional.of("APPLIED")
         );
 
@@ -448,11 +506,13 @@ class DocumentInsightServiceTest {
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
+                Optional.empty(),
                 Optional.of("CANCELLED")
         );
 
         var errorSummary = service.getMetadataUpdateHistoryCategorySummary(
                 "doc-history",
+                Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
