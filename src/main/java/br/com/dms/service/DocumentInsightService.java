@@ -7,6 +7,8 @@ import br.com.dms.controller.response.MetadataActionHintResponse;
 import br.com.dms.controller.response.MetadataSuggestionResponse;
 import br.com.dms.controller.response.MetadataUpdateHistoryBucketResponse;
 import br.com.dms.controller.response.MetadataUpdateHistoryCategorySummaryResponse;
+import br.com.dms.controller.response.MetadataUpdateHistoryTenantCategoryBucketResponse;
+import br.com.dms.controller.response.MetadataUpdateHistoryTenantCategorySummaryResponse;
 import br.com.dms.controller.response.MetadataRegressionAlertResponse;
 import br.com.dms.controller.response.MetadataUpdateAdoptionTrendPointResponse;
 import br.com.dms.controller.response.MetadataUpdateOcrHintAdoptionResponse;
@@ -225,6 +227,74 @@ public class DocumentInsightService {
                 ? List.of(referenceDocument)
                 : dmsDocumentRepository.findByTenantIdAndCategory(tenantId, category);
 
+        MetadataUpdateHistoryTenantCategoryBucketResponse bucket = buildTenantCategoryBucket(category, categoryDocuments, source, field, updatedFrom, updatedTo, ocrHintAction);
+
+        return MetadataUpdateHistoryCategorySummaryResponse.builder()
+                .category(bucket.getCategory())
+                .totalDocumentsInCategory(bucket.getTotalDocumentsInCategory())
+                .totalDocumentsWithUpdates(bucket.getTotalDocumentsWithUpdates())
+                .totalEntries(bucket.getTotalEntries())
+                .filteredEntries(bucket.getFilteredEntries())
+                .latestUpdatedAt(bucket.getLatestUpdatedAt())
+                .bySource(bucket.getBySource())
+                .byField(bucket.getByField())
+                .ocrHintAppliedEntries(bucket.getOcrHintAppliedEntries())
+                .ocrHintCancelledEntries(bucket.getOcrHintCancelledEntries())
+                .ocrHintErrorEntries(bucket.getOcrHintErrorEntries())
+                .ocrHintAppliedRate(bucket.getOcrHintAppliedRate())
+                .build();
+    }
+
+    public MetadataUpdateHistoryTenantCategorySummaryResponse getMetadataUpdateHistoryTenantCategorySummary(Optional<String> category,
+                                                                                                             Optional<String> source,
+                                                                                                             Optional<String> field,
+                                                                                                             Optional<Instant> updatedFrom,
+                                                                                                             Optional<Instant> updatedTo,
+                                                                                                             Optional<String> ocrHintAction,
+                                                                                                             int limit) {
+        String tenantId = tenantContextService.requireTenantId();
+        int safeLimit = Math.max(1, Math.min(limit, 20));
+
+        List<DmsDocument> tenantDocuments = dmsDocumentRepository.findByTenantId(tenantId);
+        Map<String, List<DmsDocument>> docsByCategory = tenantDocuments.stream()
+                .collect(Collectors.groupingBy(doc -> StringUtils.defaultIfBlank(StringUtils.trimToEmpty(doc.getCategory()), "SEM_CATEGORIA")));
+
+        List<MetadataUpdateHistoryTenantCategoryBucketResponse> buckets = docsByCategory.entrySet().stream()
+                .filter(entry -> category == null || category.isEmpty() || StringUtils.isBlank(category.get())
+                        || StringUtils.equalsIgnoreCase(StringUtils.trimToEmpty(category.get()), entry.getKey()))
+                .map(entry -> buildTenantCategoryBucket(entry.getKey(), entry.getValue(), source, field, updatedFrom, updatedTo, ocrHintAction))
+                .filter(bucket -> bucket.getFilteredEntries() > 0)
+                .sorted((left, right) -> Integer.compare(right.getFilteredEntries(), left.getFilteredEntries()))
+                .limit(safeLimit)
+                .toList();
+
+        int totalEntries = buckets.stream().mapToInt(MetadataUpdateHistoryTenantCategoryBucketResponse::getTotalEntries).sum();
+        int filteredEntries = buckets.stream().mapToInt(MetadataUpdateHistoryTenantCategoryBucketResponse::getFilteredEntries).sum();
+
+        String latestUpdatedAt = buckets.stream()
+                .map(MetadataUpdateHistoryTenantCategoryBucketResponse::getLatestUpdatedAt)
+                .filter(StringUtils::isNotBlank)
+                .sorted((left, right) -> StringUtils.defaultString(right).compareTo(StringUtils.defaultString(left)))
+                .findFirst()
+                .orElse(null);
+
+        return MetadataUpdateHistoryTenantCategorySummaryResponse.builder()
+                .totalCategories(docsByCategory.size())
+                .totalDocuments(tenantDocuments.size())
+                .totalEntries(totalEntries)
+                .filteredEntries(filteredEntries)
+                .latestUpdatedAt(latestUpdatedAt)
+                .categories(buckets)
+                .build();
+    }
+
+    private MetadataUpdateHistoryTenantCategoryBucketResponse buildTenantCategoryBucket(String category,
+                                                                                           List<DmsDocument> categoryDocuments,
+                                                                                           Optional<String> source,
+                                                                                           Optional<String> field,
+                                                                                           Optional<Instant> updatedFrom,
+                                                                                           Optional<Instant> updatedTo,
+                                                                                           Optional<String> ocrHintAction) {
         List<MetadataUpdateHistoryEntryResponse> allEntries = categoryDocuments.stream()
                 .flatMap(doc -> toMetadataUpdateHistory(doc).stream())
                 .sorted((left, right) -> StringUtils.defaultString(right.getUpdatedAt()).compareTo(StringUtils.defaultString(left.getUpdatedAt())))
@@ -246,7 +316,7 @@ public class DocumentInsightService {
         long ocrHintCancelledEntries = countBySources(filteredEntries, List.of("OCR_HINT_CANCEL", "OCR_HINT_DISMISSED"));
         long ocrHintErrorEntries = countBySource(filteredEntries, "OCR_HINT_ERROR");
 
-        return MetadataUpdateHistoryCategorySummaryResponse.builder()
+        return MetadataUpdateHistoryTenantCategoryBucketResponse.builder()
                 .category(category)
                 .totalDocumentsInCategory(categoryDocuments.size())
                 .totalDocumentsWithUpdates(docsWithUpdates)
