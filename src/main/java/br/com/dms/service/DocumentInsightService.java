@@ -101,6 +101,9 @@ public class DocumentInsightService {
         List<String> expectedRequiredMetadata = resolveExpectedRequiredMetadata(tenantId, document);
         List<String> missingRequiredMetadata = resolveMissingRequiredMetadata(document, expectedRequiredMetadata);
         int requiredMetadataCoveragePercent = resolveRequiredMetadataCoveragePercent(expectedRequiredMetadata, missingRequiredMetadata);
+        int importantExpectedMetadataCount = resolveImportantExpectedMetadataCount(expectedRequiredMetadata);
+        int importantMissingMetadataCount = resolveImportantMissingMetadataCount(missingRequiredMetadata);
+        int importantMetadataCoveragePercent = resolveImportantMetadataCoveragePercent(importantExpectedMetadataCount, importantMissingMetadataCount);
         List<MetadataActionHintResponse> metadataActionHints = resolveMetadataActionHints(document, missingRequiredMetadata);
         List<MetadataUpdateHistoryEntryResponse> metadataUpdateHistory = resolveMetadataUpdateHistory(document);
         List<MetadataRegressionAlertResponse> metadataRegressionAlerts = resolveMetadataRegressionAlerts(tenantId, document);
@@ -139,6 +142,9 @@ public class DocumentInsightService {
                 .importantPersistedMetadata(importantPersistedMetadata)
                 .importantPersistedMetadataSummary(importantPersistedMetadataSummary)
                 .importantPersistedMetadataCount(importantPersistedMetadataCount)
+                .importantExpectedMetadataCount(importantExpectedMetadataCount)
+                .importantMissingMetadataCount(importantMissingMetadataCount)
+                .importantMetadataCoveragePercent(importantMetadataCoveragePercent)
                 .persistedMetadataCount(persistedMetadataCount)
                 .hasPersistedOcrText(hasPersistedOcrText)
                 .persistedOcrExcerpt(persistedOcrExcerpt)
@@ -515,6 +521,41 @@ public class DocumentInsightService {
         int missing = missingRequiredMetadata == null ? 0 : missingRequiredMetadata.size();
         int covered = Math.max(0, expectedRequiredMetadata.size() - missing);
         return (int) Math.round((covered * 100.0d) / expectedRequiredMetadata.size());
+    }
+
+    private int resolveImportantExpectedMetadataCount(List<String> expectedRequiredMetadata) {
+        if (expectedRequiredMetadata == null || expectedRequiredMetadata.isEmpty()) {
+            return 0;
+        }
+
+        return (int) expectedRequiredMetadata.stream()
+                .map(StringUtils::trimToEmpty)
+                .map(StringUtils::lowerCase)
+                .filter(IMPORTANT_METADATA_KEYS::containsKey)
+                .distinct()
+                .count();
+    }
+
+    private int resolveImportantMissingMetadataCount(List<String> missingRequiredMetadata) {
+        if (missingRequiredMetadata == null || missingRequiredMetadata.isEmpty()) {
+            return 0;
+        }
+
+        return (int) missingRequiredMetadata.stream()
+                .map(StringUtils::trimToEmpty)
+                .map(StringUtils::lowerCase)
+                .filter(IMPORTANT_METADATA_KEYS::containsKey)
+                .distinct()
+                .count();
+    }
+
+    private int resolveImportantMetadataCoveragePercent(int expectedCount, int missingCount) {
+        if (expectedCount <= 0) {
+            return 100;
+        }
+
+        int covered = Math.max(0, expectedCount - Math.max(0, missingCount));
+        return (int) Math.round((covered * 100.0d) / expectedCount);
     }
 
     private List<MetadataActionHintResponse> resolveMetadataActionHints(DmsDocument document, List<String> missingRequiredMetadata) {
