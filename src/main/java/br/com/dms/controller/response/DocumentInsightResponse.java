@@ -22,6 +22,7 @@ public class DocumentInsightResponse {
     Map<String, Object> persistedMetadataPreview;
     Map<String, Object> importantPersistedMetadata;
     String importantPersistedMetadataSummary;
+    Integer importantPersistedMetadataCount;
     Integer persistedMetadataCount;
     Boolean hasPersistedOcrText;
     String persistedOcrExcerpt;

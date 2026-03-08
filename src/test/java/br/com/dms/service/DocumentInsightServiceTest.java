@@ -85,6 +85,7 @@ class DocumentInsightServiceTest {
         assertEquals(42, response.getImportantPersistedMetadata().get("valor"));
         assertNotNull(response.getImportantPersistedMetadataSummary());
         assertTrue(response.getImportantPersistedMetadataSummary().contains("valor"));
+        assertEquals(2, response.getImportantPersistedMetadataCount());
         assertEquals(3, response.getPersistedMetadataCount());
         assertTrue(response.getHasPersistedOcrText());
         assertEquals("linha 1 linha 2", response.getPersistedOcrExcerpt());
