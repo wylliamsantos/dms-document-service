@@ -93,8 +93,10 @@ public class DocumentInsightService {
 
         Map<String, Object> persistedMetadataPreview = extractMetadataPreview(document);
         Map<String, Object> importantPersistedMetadata = extractImportantPersistedMetadata(document);
+        String importantPersistedMetadataSummary = summarizeImportantPersistedMetadata(importantPersistedMetadata);
         int persistedMetadataCount = countPersistedMetadata(document);
         boolean hasPersistedOcrText = StringUtils.isNotBlank(document == null ? null : document.getOcrText());
+        String persistedOcrExcerpt = resolvePersistedOcrExcerpt(document);
         List<String> expectedRequiredMetadata = resolveExpectedRequiredMetadata(tenantId, document);
         List<String> missingRequiredMetadata = resolveMissingRequiredMetadata(document, expectedRequiredMetadata);
         int requiredMetadataCoveragePercent = resolveRequiredMetadataCoveragePercent(expectedRequiredMetadata, missingRequiredMetadata);
@@ -132,8 +134,10 @@ public class DocumentInsightService {
                 .signals(resolveSignals(suggestion))
                 .persistedMetadataPreview(persistedMetadataPreview)
                 .importantPersistedMetadata(importantPersistedMetadata)
+                .importantPersistedMetadataSummary(importantPersistedMetadataSummary)
                 .persistedMetadataCount(persistedMetadataCount)
                 .hasPersistedOcrText(hasPersistedOcrText)
+                .persistedOcrExcerpt(persistedOcrExcerpt)
                 .expectedRequiredMetadata(expectedRequiredMetadata)
                 .missingRequiredMetadata(missingRequiredMetadata)
                 .requiredMetadataCoveragePercent(requiredMetadataCoveragePercent)
@@ -644,6 +648,17 @@ public class DocumentInsightService {
         return important;
     }
 
+    private String summarizeImportantPersistedMetadata(Map<String, Object> importantPersistedMetadata) {
+        if (importantPersistedMetadata == null || importantPersistedMetadata.isEmpty()) {
+            return null;
+        }
+
+        return importantPersistedMetadata.entrySet().stream()
+                .limit(4)
+                .map(entry -> entry.getKey() + ": " + String.valueOf(entry.getValue()))
+                .collect(Collectors.joining(" · "));
+    }
+
     private List<MetadataUpdateHistoryEntryResponse> toMetadataUpdateHistory(DmsDocument document) {
         if (document == null || document.getMetadataUpdateHistory() == null || document.getMetadataUpdateHistory().isEmpty()) {
             return List.of();
@@ -907,6 +922,17 @@ public class DocumentInsightService {
         return part / (double) total;
     }
 
+    private String resolvePersistedOcrExcerpt(DmsDocument document) {
+        String ocrText = document == null ? "" : StringUtils.normalizeSpace(document.getOcrText());
+        if (StringUtils.isBlank(ocrText)) {
+            return null;
+        }
+
+        return ocrText.length() <= 220
+                ? ocrText
+                : ocrText.substring(0, 220) + "...";
+    }
+
     private Map<String, Object> resolveOcrStats(DmsDocument document) {
         String ocrText = document == null ? "" : StringUtils.trimToEmpty(document.getOcrText());
         if (StringUtils.isBlank(ocrText)) {
@@ -929,12 +955,12 @@ public class DocumentInsightService {
 
         if (!ragEnabled) {
             return buildRagResponse(documentId, version, tenantId, "", false, "DISABLED",
-                    "RAG de documento desabilitado por feature flag (dms.ai.rag.document.enabled=false).", List.of(), List.of(), startedAt);
+                    "RAG de documento desabilitado por feature flag (dms.ai.rag.document.enabled=false).", "FEATURE_FLAG_DISABLED", List.of(), List.of(), startedAt);
         }
 
         if (!ragEnabledTenants.isEmpty() && !ragEnabledTenants.contains(tenantId)) {
             return buildRagResponse(documentId, version, tenantId, "", false, "TENANT_DISABLED",
-                    "RAG de documento desabilitado para o tenant atual (allowlist não inclui este tenant).", List.of(), List.of(), startedAt);
+                    "RAG de documento desabilitado para o tenant atual (allowlist não inclui este tenant).", "TENANT_NOT_ALLOWED", List.of(), List.of(), startedAt);
         }
 
         DmsDocument document = dmsDocumentRepository.findByIdAndTenantId(documentId, tenantId)
@@ -945,7 +971,7 @@ public class DocumentInsightService {
             boolean allowedCategory = ragEnabledCategories.contains(StringUtils.lowerCase(category));
             if (!allowedCategory) {
                 return buildRagResponse(documentId, version, tenantId, category, false, "CATEGORY_DISABLED",
-                        "RAG de documento desabilitado para a categoria atual (allowlist por categoria).", List.of(), List.of(), startedAt);
+                        "RAG de documento desabilitado para a categoria atual (allowlist por categoria).", "CATEGORY_NOT_ALLOWED", List.of(), List.of(), startedAt);
             }
         }
 
@@ -954,12 +980,13 @@ public class DocumentInsightService {
             String missingPreview = missingRequiredMetadata.stream().limit(3).collect(Collectors.joining(", "));
             String suffix = missingRequiredMetadata.size() > 3 ? "..." : "";
             return buildRagResponse(documentId, version, tenantId, category, false, "QUALITY_GATED",
-                    "RAG aguardando qualidade mínima: preencha metadados obrigatórios faltantes (" + missingPreview + suffix + ").", missingRequiredMetadata, List.of(), startedAt);
+                    "RAG aguardando qualidade mínima: preencha metadados obrigatórios faltantes (" + missingPreview + suffix + ").", "REQUIRED_METADATA_MISSING", missingRequiredMetadata, List.of(), startedAt);
         }
 
         List<RagContextChunkResponse> chunks = buildChunks(document);
         return buildRagResponse(documentId, version, tenantId, category, true, "READY",
                 chunks.isEmpty() ? "Sem chunks de OCR disponíveis para este documento." : "Contexto RAG local carregado.",
+                "NONE",
                 List.of(),
                 chunks,
                 startedAt);
@@ -1001,6 +1028,7 @@ public class DocumentInsightService {
                                                         boolean enabled,
                                                         String status,
                                                         String message,
+                                                        String rolloutGuard,
                                                         List<String> missingRequiredMetadata,
                                                         List<RagContextChunkResponse> chunks,
                                                         Instant startedAt) {
@@ -1031,6 +1059,10 @@ public class DocumentInsightService {
                 .averageScore(averageScore)
                 .latencyMs(latencyMs)
                 .qualityBand(qualityBand)
+                .rolloutGuard(rolloutGuard)
+                .featureFlagEnabled(ragEnabled)
+                .tenantAllowed(ragEnabledTenants.isEmpty() || ragEnabledTenants.contains(tenantId))
+                .categoryAllowed(ragEnabledCategories.isEmpty() || ragEnabledCategories.contains(StringUtils.lowerCase(StringUtils.defaultIfBlank(category, ""))))
                 .missingRequiredMetadata(missingRequiredMetadata)
                 .chunks(chunks)
                 .build();

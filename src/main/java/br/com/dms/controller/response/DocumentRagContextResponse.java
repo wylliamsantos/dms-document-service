@@ -18,6 +18,10 @@ public class DocumentRagContextResponse {
     Double averageScore;
     Long latencyMs;
     String qualityBand;
+    String rolloutGuard;
+    Boolean featureFlagEnabled;
+    Boolean tenantAllowed;
+    Boolean categoryAllowed;
     List<String> missingRequiredMetadata;
     List<RagContextChunkResponse> chunks;
 }

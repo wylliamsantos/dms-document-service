@@ -21,8 +21,10 @@ public class DocumentInsightResponse {
     List<InsightSignalResponse> signals;
     Map<String, Object> persistedMetadataPreview;
     Map<String, Object> importantPersistedMetadata;
+    String importantPersistedMetadataSummary;
     Integer persistedMetadataCount;
     Boolean hasPersistedOcrText;
+    String persistedOcrExcerpt;
     List<String> expectedRequiredMetadata;
     List<String> missingRequiredMetadata;
     Integer requiredMetadataCoveragePercent;
