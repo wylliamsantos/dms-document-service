@@ -94,6 +94,7 @@ public class DocumentInsightService {
         Map<String, Object> persistedMetadataPreview = extractMetadataPreview(document);
         Map<String, Object> importantPersistedMetadata = extractImportantPersistedMetadata(document);
         String importantPersistedMetadataSummary = summarizeImportantPersistedMetadata(importantPersistedMetadata);
+        int importantPersistedMetadataCount = importantPersistedMetadata == null ? 0 : importantPersistedMetadata.size();
         int persistedMetadataCount = countPersistedMetadata(document);
         boolean hasPersistedOcrText = StringUtils.isNotBlank(document == null ? null : document.getOcrText());
         String persistedOcrExcerpt = resolvePersistedOcrExcerpt(document);
@@ -137,6 +138,7 @@ public class DocumentInsightService {
                 .persistedMetadataPreview(persistedMetadataPreview)
                 .importantPersistedMetadata(importantPersistedMetadata)
                 .importantPersistedMetadataSummary(importantPersistedMetadataSummary)
+                .importantPersistedMetadataCount(importantPersistedMetadataCount)
                 .persistedMetadataCount(persistedMetadataCount)
                 .hasPersistedOcrText(hasPersistedOcrText)
                 .persistedOcrExcerpt(persistedOcrExcerpt)
