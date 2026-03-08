@@ -402,7 +402,7 @@ public class DocumentInsightService {
 
         return switch (normalizedAction) {
             case "APPLIED" -> "OCR_HINT".equals(normalizedSource);
-            case "CANCELLED", "CANCELED", "DISMISSED" -> List.of("OCR_HINT_CANCEL", "OCR_HINT_DISMISSED").contains(normalizedSource);
+            case "CANCEL", "CANCELLED", "CANCELED", "DISMISSED" -> List.of("OCR_HINT_CANCEL", "OCR_HINT_DISMISSED").contains(normalizedSource);
             case "ERROR" -> "OCR_HINT_ERROR".equals(normalizedSource);
             case "ALL" -> true;
             default -> StringUtils.equalsIgnoreCase(normalizedSource, normalizedAction);

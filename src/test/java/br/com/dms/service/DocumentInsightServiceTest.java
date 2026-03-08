@@ -521,6 +521,17 @@ class DocumentInsightServiceTest {
                 Optional.of("ERROR")
         );
 
+        var cancelAliasSummary = service.getMetadataUpdateHistoryCategorySummary(
+                "doc-history",
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of("CANCEL")
+        );
+
         assertEquals(1, appliedSummary.getFilteredEntries());
         assertEquals(1L, appliedSummary.getOcrHintAppliedEntries());
         assertEquals(0L, appliedSummary.getOcrHintCancelledEntries());
@@ -538,6 +549,12 @@ class DocumentInsightServiceTest {
         assertEquals(0L, errorSummary.getOcrHintCancelledEntries());
         assertEquals(1L, errorSummary.getOcrHintErrorEntries());
         assertEquals(0.0d, errorSummary.getOcrHintAppliedRate(), 1e-9);
+
+        assertEquals(1, cancelAliasSummary.getFilteredEntries());
+        assertEquals(0L, cancelAliasSummary.getOcrHintAppliedEntries());
+        assertEquals(1L, cancelAliasSummary.getOcrHintCancelledEntries());
+        assertEquals(0L, cancelAliasSummary.getOcrHintErrorEntries());
+        assertEquals(0.0d, cancelAliasSummary.getOcrHintAppliedRate(), 1e-9);
     }
 
     @Test
