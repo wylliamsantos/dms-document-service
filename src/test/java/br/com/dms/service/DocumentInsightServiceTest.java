@@ -80,6 +80,7 @@ class DocumentInsightServiceTest {
         assertTrue(response.getSignals().stream().anyMatch(signal -> "ocr".equals(signal.getSignal()) && signal.isActive()));
         assertTrue(response.getSignals().stream().anyMatch(signal -> "heuristics".equals(signal.getSignal()) && signal.isActive()));
         assertEquals(4, response.getOcrStats().get("words"));
+        assertEquals(2, response.getOcrStats().get("paragraphs"));
         assertEquals("123", response.getPersistedMetadataPreview().get("numero"));
         assertEquals(42, response.getImportantPersistedMetadata().get("valor"));
         assertNotNull(response.getImportantPersistedMetadataSummary());
@@ -934,6 +935,9 @@ class DocumentInsightServiceTest {
         assertTrue(response.getLatencyMs() >= 0L);
         assertNotNull(response.getQualityBand());
         assertEquals("NONE", response.getRolloutGuard());
+        assertTrue(response.getFeatureFlagEnabled());
+        assertTrue(response.getTenantAllowed());
+        assertTrue(response.getCategoryAllowed());
         assertEquals("ocr", response.getChunks().get(0).getSource());
         assertTrue(response.getChunks().get(0).getScore() > 0.0d);
         assertNotNull(response.getChunks().get(0).getExcerpt());
