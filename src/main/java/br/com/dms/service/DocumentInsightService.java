@@ -189,12 +189,20 @@ public class DocumentInsightService {
         List<MetadataUpdateHistoryEntryResponse> allEntries = toMetadataUpdateHistory(document);
         List<MetadataUpdateHistoryEntryResponse> filteredEntries = filterMetadataUpdateHistory(document, source, field, updatedFrom, updatedTo, ocrHintAction);
 
+        long ocrHintAppliedEntries = countBySource(filteredEntries, "OCR_HINT");
+        long ocrHintCancelledEntries = countBySources(filteredEntries, List.of("OCR_HINT_CANCEL", "OCR_HINT_DISMISSED"));
+        long ocrHintErrorEntries = countBySource(filteredEntries, "OCR_HINT_ERROR");
+
         return MetadataUpdateHistorySummaryResponse.builder()
                 .totalEntries(allEntries.size())
                 .filteredEntries(filteredEntries.size())
                 .latestUpdatedAt(filteredEntries.stream().map(MetadataUpdateHistoryEntryResponse::getUpdatedAt).findFirst().orElse(null))
                 .bySource(buildHistoryBuckets(filteredEntries, MetadataUpdateHistoryEntryResponse::getSource))
                 .byField(buildHistoryBuckets(filteredEntries, MetadataUpdateHistoryEntryResponse::getField))
+                .ocrHintAppliedEntries(ocrHintAppliedEntries)
+                .ocrHintCancelledEntries(ocrHintCancelledEntries)
+                .ocrHintErrorEntries(ocrHintErrorEntries)
+                .ocrHintAppliedRate(resolveRatio(ocrHintAppliedEntries, filteredEntries.size()))
                 .build();
     }
 
@@ -234,6 +242,10 @@ public class DocumentInsightService {
                 .filter(doc -> doc.getMetadataUpdateHistory() != null && !doc.getMetadataUpdateHistory().isEmpty())
                 .count();
 
+        long ocrHintAppliedEntries = countBySource(filteredEntries, "OCR_HINT");
+        long ocrHintCancelledEntries = countBySources(filteredEntries, List.of("OCR_HINT_CANCEL", "OCR_HINT_DISMISSED"));
+        long ocrHintErrorEntries = countBySource(filteredEntries, "OCR_HINT_ERROR");
+
         return MetadataUpdateHistoryCategorySummaryResponse.builder()
                 .category(category)
                 .totalDocumentsInCategory(categoryDocuments.size())
@@ -243,6 +255,10 @@ public class DocumentInsightService {
                 .latestUpdatedAt(filteredEntries.stream().map(MetadataUpdateHistoryEntryResponse::getUpdatedAt).findFirst().orElse(null))
                 .bySource(buildHistoryBuckets(filteredEntries, MetadataUpdateHistoryEntryResponse::getSource))
                 .byField(buildHistoryBuckets(filteredEntries, MetadataUpdateHistoryEntryResponse::getField))
+                .ocrHintAppliedEntries(ocrHintAppliedEntries)
+                .ocrHintCancelledEntries(ocrHintCancelledEntries)
+                .ocrHintErrorEntries(ocrHintErrorEntries)
+                .ocrHintAppliedRate(resolveRatio(ocrHintAppliedEntries, filteredEntries.size()))
                 .build();
     }
 

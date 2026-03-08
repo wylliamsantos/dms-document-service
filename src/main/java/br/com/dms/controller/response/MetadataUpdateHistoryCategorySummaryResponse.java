@@ -16,4 +16,8 @@ public class MetadataUpdateHistoryCategorySummaryResponse {
     private String latestUpdatedAt;
     private List<MetadataUpdateHistoryBucketResponse> bySource;
     private List<MetadataUpdateHistoryBucketResponse> byField;
+    private long ocrHintAppliedEntries;
+    private long ocrHintCancelledEntries;
+    private long ocrHintErrorEntries;
+    private double ocrHintAppliedRate;
 }

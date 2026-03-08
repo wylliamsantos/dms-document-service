@@ -306,6 +306,10 @@ class DocumentInsightServiceTest {
         assertEquals("ocr_hint", summary.getBySource().get(0).getKey());
         assertEquals(2L, summary.getBySource().get(0).getCount());
         assertEquals("valor", summary.getByField().get(0).getKey());
+        assertEquals(2L, summary.getOcrHintAppliedEntries());
+        assertEquals(0L, summary.getOcrHintCancelledEntries());
+        assertEquals(0L, summary.getOcrHintErrorEntries());
+        assertEquals(2d / 3d, summary.getOcrHintAppliedRate(), 1e-9);
     }
 
     @Test
@@ -376,6 +380,10 @@ class DocumentInsightServiceTest {
         assertEquals(2, summary.getTotalDocumentsWithUpdates());
         assertEquals(2, summary.getTotalEntries());
         assertEquals("2026-03-06T09:00:00Z", summary.getLatestUpdatedAt());
+        assertEquals(1L, summary.getOcrHintAppliedEntries());
+        assertEquals(0L, summary.getOcrHintCancelledEntries());
+        assertEquals(0L, summary.getOcrHintErrorEntries());
+        assertEquals(0.5d, summary.getOcrHintAppliedRate(), 1e-9);
     }
 
     @Test
@@ -454,8 +462,22 @@ class DocumentInsightServiceTest {
         );
 
         assertEquals(1, appliedSummary.getFilteredEntries());
+        assertEquals(1L, appliedSummary.getOcrHintAppliedEntries());
+        assertEquals(0L, appliedSummary.getOcrHintCancelledEntries());
+        assertEquals(0L, appliedSummary.getOcrHintErrorEntries());
+        assertEquals(1.0d, appliedSummary.getOcrHintAppliedRate(), 1e-9);
+
         assertEquals(1, canceledSummary.getFilteredEntries());
+        assertEquals(0L, canceledSummary.getOcrHintAppliedEntries());
+        assertEquals(1L, canceledSummary.getOcrHintCancelledEntries());
+        assertEquals(0L, canceledSummary.getOcrHintErrorEntries());
+        assertEquals(0.0d, canceledSummary.getOcrHintAppliedRate(), 1e-9);
+
         assertEquals(1, errorSummary.getFilteredEntries());
+        assertEquals(0L, errorSummary.getOcrHintAppliedEntries());
+        assertEquals(0L, errorSummary.getOcrHintCancelledEntries());
+        assertEquals(1L, errorSummary.getOcrHintErrorEntries());
+        assertEquals(0.0d, errorSummary.getOcrHintAppliedRate(), 1e-9);
     }
 
     @Test
