@@ -210,6 +210,7 @@ public class DocumentInsightService {
 
     public MetadataUpdateHistoryCategorySummaryResponse getMetadataUpdateHistoryCategorySummary(String documentId,
                                                                                                 Optional<String> version,
+                                                                                                Optional<String> category,
                                                                                                 Optional<String> source,
                                                                                                 Optional<String> field,
                                                                                                 Optional<Instant> updatedFrom,
@@ -222,12 +223,15 @@ public class DocumentInsightService {
             throw new DmsDocumentNotFoundException("Document not found", TypeException.VALID);
         }
 
-        String category = StringUtils.trimToEmpty(referenceDocument.getCategory());
-        List<DmsDocument> categoryDocuments = StringUtils.isBlank(category)
-                ? List.of(referenceDocument)
-                : dmsDocumentRepository.findByTenantIdAndCategory(tenantId, category);
+        String referenceCategory = StringUtils.trimToEmpty(referenceDocument.getCategory());
+        String requestedCategory = category.map(StringUtils::trimToEmpty).orElse("");
+        String effectiveCategory = StringUtils.defaultIfBlank(requestedCategory, referenceCategory);
 
-        MetadataUpdateHistoryTenantCategoryBucketResponse bucket = buildTenantCategoryBucket(category, categoryDocuments, source, field, updatedFrom, updatedTo, ocrHintAction);
+        List<DmsDocument> categoryDocuments = StringUtils.isBlank(effectiveCategory)
+                ? List.of(referenceDocument)
+                : dmsDocumentRepository.findByTenantIdAndCategory(tenantId, effectiveCategory);
+
+        MetadataUpdateHistoryTenantCategoryBucketResponse bucket = buildTenantCategoryBucket(effectiveCategory, categoryDocuments, source, field, updatedFrom, updatedTo, ocrHintAction);
 
         return MetadataUpdateHistoryCategorySummaryResponse.builder()
                 .category(bucket.getCategory())

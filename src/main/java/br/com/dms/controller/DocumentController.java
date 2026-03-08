@@ -273,16 +273,18 @@ public class DocumentController {
                                                                                                                  @RequestHeader(name = "Authorization") String authorization,
                                                                                                                  @PathVariable(value = "documentId") String documentId,
                                                                                                                  @PathVariable(name = "version", required = false) Optional<String> version,
+                                                                                                                 @RequestParam(name = "category", required = false) Optional<String> category,
                                                                                                                  @RequestParam(name = "source", required = false) Optional<String> source,
                                                                                                                  @RequestParam(name = "field", required = false) Optional<String> field,
                                                                                                                  @RequestParam(name = "updatedFrom", required = false) Optional<String> updatedFrom,
                                                                                                                  @RequestParam(name = "updatedTo", required = false) Optional<String> updatedTo,
                                                                                                                  @RequestParam(name = "ocrHintAction", required = false) Optional<String> ocrHintAction) {
-        log.info("DMS version {} - TransactionId: {} - metadata history category summary - documentId: {}, version: {}, source: {}, field: {}, updatedFrom: {}, updatedTo: {}, ocrHintAction: {}",
-                API_VERSION, transactionId, documentId, version, source, field, updatedFrom, updatedTo, ocrHintAction);
+        log.info("DMS version {} - TransactionId: {} - metadata history category summary - documentId: {}, version: {}, category: {}, source: {}, field: {}, updatedFrom: {}, updatedTo: {}, ocrHintAction: {}",
+                API_VERSION, transactionId, documentId, version, category, source, field, updatedFrom, updatedTo, ocrHintAction);
         return ResponseEntity.ok(documentInsightService.getMetadataUpdateHistoryCategorySummary(
                 documentId,
                 version,
+                category,
                 source,
                 field,
                 updatedFrom.flatMap(this::parseOptionalInstant),
