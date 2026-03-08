@@ -13,6 +13,10 @@ public class DocumentChatResponse {
     boolean enabled;
     String status;
     String message;
+    String rolloutGuard;
+    Integer ocrQualityScore;
+    String ocrQualityBand;
+    String ocrQualitySummary;
     String answer;
     String model;
     Long latencyMs;

@@ -2,6 +2,8 @@ package br.com.dms.service;
 
 import br.com.dms.controller.request.DocumentChatRequest;
 import br.com.dms.controller.response.DocumentChatResponse;
+import br.com.dms.controller.response.DocumentInsightResponse;
+import br.com.dms.controller.response.DocumentRagContextResponse;
 import br.com.dms.domain.mongodb.DmsDocument;
 import br.com.dms.domain.mongodb.DmsDocumentVersion;
 import br.com.dms.exception.DmsDocumentNotFoundException;
@@ -41,6 +43,7 @@ public class DocumentChatService {
     private final TenantContextService tenantContextService;
     private final DmsDocumentRepository dmsDocumentRepository;
     private final DmsDocumentVersionRepository dmsDocumentVersionRepository;
+    private final DocumentInsightService documentInsightService;
     private final MeterRegistry meterRegistry;
     private final RestTemplate restTemplate;
     private final boolean ragEnabled;
@@ -52,6 +55,7 @@ public class DocumentChatService {
     public DocumentChatService(TenantContextService tenantContextService,
                                DmsDocumentRepository dmsDocumentRepository,
                                DmsDocumentVersionRepository dmsDocumentVersionRepository,
+                               DocumentInsightService documentInsightService,
                                MeterRegistry meterRegistry,
                                @Value("${dms.ai.rag.document.enabled:false}") boolean ragEnabled,
                                @Value("${dms.ai.chat.document.enabled:false}") boolean chatEnabled,
@@ -63,6 +67,7 @@ public class DocumentChatService {
         this.tenantContextService = tenantContextService;
         this.dmsDocumentRepository = dmsDocumentRepository;
         this.dmsDocumentVersionRepository = dmsDocumentVersionRepository;
+        this.documentInsightService = documentInsightService;
         this.meterRegistry = meterRegistry;
         this.ragEnabled = ragEnabled;
         this.chatEnabled = chatEnabled;
@@ -91,6 +96,7 @@ public class DocumentChatService {
                             .enabled(false)
                             .status("DISABLED")
                             .message("Chat/RAG desabilitado por feature flags (dms.ai.rag.document.enabled e/ou dms.ai.chat.document.enabled).")
+                            .rolloutGuard("FEATURE_FLAG_DISABLED")
                             .contextChunks(List.of())
             );
         }
@@ -107,6 +113,30 @@ public class DocumentChatService {
                 .map(v -> v.getVersionNumber().stripTrailingZeros().toPlainString())
                 .orElse(request.getVersion());
 
+        Optional<String> resolvedVersionOptional = Optional.ofNullable(StringUtils.trimToNull(resolvedVersion));
+        DocumentInsightResponse insight = resolveInsight(documentId, resolvedVersionOptional);
+        DocumentRagContextResponse ragContext = documentInsightService.getRagContextSkeleton(documentId, resolvedVersionOptional);
+
+        if (!"READY".equalsIgnoreCase(ragContext.getStatus())) {
+            return buildResponseWithMetrics(
+                    tenantId,
+                    ragContext.getStatus(),
+                    null,
+                    startedAt,
+                    enrichWithInsight(
+                            DocumentChatResponse.builder()
+                                    .documentId(documentId)
+                                    .version(resolvedVersion)
+                                    .enabled(false)
+                                    .status(ragContext.getStatus())
+                                    .message(ragContext.getMessage())
+                                    .rolloutGuard(ragContext.getRolloutGuard())
+                                    .contextChunks(List.of()),
+                            insight
+                    )
+            );
+        }
+
         List<String> contextChunks = buildContextChunks(document);
         String prompt = buildPrompt(document, contextChunks, request.getMessage());
 
@@ -116,13 +146,17 @@ public class DocumentChatService {
                     "PROVIDER_DISABLED",
                     null,
                     startedAt,
-                    DocumentChatResponse.builder()
-                            .documentId(documentId)
-                            .version(resolvedVersion)
-                            .enabled(true)
-                            .status("PROVIDER_DISABLED")
-                            .message("Provedor local de IA desabilitado (dms.ai.provider.local.enabled=false).")
-                            .contextChunks(contextChunks)
+                    enrichWithInsight(
+                            DocumentChatResponse.builder()
+                                    .documentId(documentId)
+                                    .version(resolvedVersion)
+                                    .enabled(true)
+                                    .status("PROVIDER_DISABLED")
+                                    .message("Provedor local de IA desabilitado (dms.ai.provider.local.enabled=false).")
+                                    .rolloutGuard("NONE")
+                                    .contextChunks(contextChunks),
+                            insight
+                    )
             );
         }
 
@@ -133,15 +167,19 @@ public class DocumentChatService {
                     "OK",
                     result.model(),
                     startedAt,
-                    DocumentChatResponse.builder()
-                            .documentId(documentId)
-                            .version(resolvedVersion)
-                            .enabled(true)
-                            .status("OK")
-                            .message("Resposta gerada com contexto do documento.")
-                            .answer(result.answer())
-                            .model(result.model())
-                            .contextChunks(contextChunks)
+                    enrichWithInsight(
+                            DocumentChatResponse.builder()
+                                    .documentId(documentId)
+                                    .version(resolvedVersion)
+                                    .enabled(true)
+                                    .status("OK")
+                                    .message("Resposta gerada com contexto do documento.")
+                                    .rolloutGuard("NONE")
+                                    .answer(result.answer())
+                                    .model(result.model())
+                                    .contextChunks(contextChunks),
+                            insight
+                    )
             );
         } catch (Exception ex) {
             log.warn("Falha ao consultar provedor local de IA (baseUrl={}, model={}): {}", localProviderBaseUrl, localProviderModel, ex.getMessage());
@@ -150,13 +188,17 @@ public class DocumentChatService {
                     "PROVIDER_UNAVAILABLE",
                     localProviderModel,
                     startedAt,
-                    DocumentChatResponse.builder()
-                            .documentId(documentId)
-                            .version(resolvedVersion)
-                            .enabled(true)
-                            .status("PROVIDER_UNAVAILABLE")
-                            .message("Serviço local de IA indisponível. Clique em 'Tentar novamente'.")
-                            .contextChunks(contextChunks)
+                    enrichWithInsight(
+                            DocumentChatResponse.builder()
+                                    .documentId(documentId)
+                                    .version(resolvedVersion)
+                                    .enabled(true)
+                                    .status("PROVIDER_UNAVAILABLE")
+                                    .message("Serviço local de IA indisponível. Clique em 'Tentar novamente'.")
+                                    .rolloutGuard("NONE")
+                                    .contextChunks(contextChunks),
+                            insight
+                    )
             );
         }
     }
@@ -274,6 +316,26 @@ public class DocumentChatService {
         }
 
         return chunks;
+    }
+
+    private DocumentChatResponse.DocumentChatResponseBuilder enrichWithInsight(DocumentChatResponse.DocumentChatResponseBuilder builder,
+                                                                                DocumentInsightResponse insight) {
+        if (insight == null) {
+            return builder;
+        }
+        return builder
+                .ocrQualityScore(insight.getOcrQualityScore())
+                .ocrQualityBand(insight.getOcrQualityBand())
+                .ocrQualitySummary(insight.getOcrQualitySummary());
+    }
+
+    private DocumentInsightResponse resolveInsight(String documentId, Optional<String> version) {
+        try {
+            return documentInsightService.getInsight(documentId, version);
+        } catch (Exception ex) {
+            log.warn("Falha ao resolver insight para chat do documento {}: {}", documentId, ex.getMessage());
+            return null;
+        }
     }
 
     private DocumentChatResponse buildResponseWithMetrics(String tenantId,
