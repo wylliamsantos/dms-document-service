@@ -851,6 +851,59 @@ class DocumentInsightServiceTest {
     }
 
     @Test
+    void shouldPrioritizeMetadataActionHintsByOperationalImpact() {
+        TenantContextService tenantContextService = mock(TenantContextService.class);
+        when(tenantContextService.requireTenantId()).thenReturn("tenant-1");
+
+        DmsDocumentRepository repository = mock(DmsDocumentRepository.class);
+        when(repository.findByIdAndTenantId("doc-impact", "tenant-1")).thenReturn(Optional.of(
+                DmsDocument.of()
+                        .id("doc-impact")
+                        .tenantId("tenant-1")
+                        .category("CONTRATO")
+                        .metadata(Map.of("numero", "123"))
+                        .ocrText("numero: 123\nvalor: 900,00\ncpf: 12345678900")
+                        .build()
+        ));
+
+        CategoryRepository categoryRepository = mock(CategoryRepository.class);
+        when(categoryRepository.findByTenantIdAndName("tenant-1", "CONTRATO")).thenReturn(Optional.of(
+                Category.builder()
+                        .name("CONTRATO")
+                        .schema(Map.of("required", List.of("descricao", "valor", "cpf")))
+                        .build()
+        ));
+
+        AiMetadataSuggestionService aiService = mock(AiMetadataSuggestionService.class);
+        when(aiService.suggest(eq("doc-impact"), eq(Optional.empty()))).thenReturn(
+                MetadataSuggestionResponse.builder()
+                        .documentId("doc-impact")
+                        .confidence(0.7)
+                        .source("ocr")
+                        .build()
+        );
+
+        DocumentInsightService service = new DocumentInsightService(
+                aiService,
+                tenantContextService,
+                repository,
+                categoryRepository,
+                new SimpleMeterRegistry(),
+                true,
+                "tenant-1",
+                "contrato"
+        );
+
+        var insight = service.getInsight("doc-impact", Optional.empty());
+
+        assertEquals(List.of("valor", "cpf", "descricao"),
+                insight.getMetadataActionHints().stream().map(h -> h.getField()).toList());
+        assertEquals("900,00", insight.getMetadataActionHints().get(0).getSuggestedValue());
+        assertEquals("12345678900", insight.getMetadataActionHints().get(1).getSuggestedValue());
+        assertNull(insight.getMetadataActionHints().get(2).getSuggestedValue());
+    }
+
+    @Test
     void shouldReturnQualityGatedWhenRequiredMetadataIsMissing() {
         TenantContextService tenantContextService = mock(TenantContextService.class);
         when(tenantContextService.requireTenantId()).thenReturn("tenant-1");
