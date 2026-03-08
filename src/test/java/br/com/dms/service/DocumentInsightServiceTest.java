@@ -82,8 +82,11 @@ class DocumentInsightServiceTest {
         assertEquals(4, response.getOcrStats().get("words"));
         assertEquals("123", response.getPersistedMetadataPreview().get("numero"));
         assertEquals(42, response.getImportantPersistedMetadata().get("valor"));
+        assertNotNull(response.getImportantPersistedMetadataSummary());
+        assertTrue(response.getImportantPersistedMetadataSummary().contains("valor"));
         assertEquals(3, response.getPersistedMetadataCount());
         assertTrue(response.getHasPersistedOcrText());
+        assertEquals("linha 1 linha 2", response.getPersistedOcrExcerpt());
         assertEquals(100, response.getRequiredMetadataCoveragePercent());
         assertTrue(response.getMetadataActionHints().isEmpty());
         assertEquals(1, response.getMetadataUpdateHistory().size());
@@ -761,6 +764,10 @@ class DocumentInsightServiceTest {
         assertTrue(response.getAverageScore() >= 0.0d);
         assertTrue(response.getLatencyMs() >= 0L);
         assertEquals("BLOCKED", response.getQualityBand());
+        assertEquals("FEATURE_FLAG_DISABLED", response.getRolloutGuard());
+        assertFalse(response.getFeatureFlagEnabled());
+        assertTrue(response.getTenantAllowed());
+        assertTrue(response.getCategoryAllowed());
         assertTrue(response.getChunks().isEmpty());
     }
 
@@ -785,6 +792,10 @@ class DocumentInsightServiceTest {
         assertEquals("TENANT_DISABLED", response.getStatus());
         assertEquals("unknown", response.getCategory());
         assertEquals("BLOCKED", response.getQualityBand());
+        assertEquals("TENANT_NOT_ALLOWED", response.getRolloutGuard());
+        assertTrue(response.getFeatureFlagEnabled());
+        assertFalse(response.getTenantAllowed());
+        assertTrue(response.getCategoryAllowed());
         assertTrue(response.getChunks().isEmpty());
     }
 
@@ -821,6 +832,10 @@ class DocumentInsightServiceTest {
         assertEquals("CATEGORY_DISABLED", response.getStatus());
         assertEquals("CONTRATO", response.getCategory());
         assertEquals("BLOCKED", response.getQualityBand());
+        assertEquals("CATEGORY_NOT_ALLOWED", response.getRolloutGuard());
+        assertTrue(response.getFeatureFlagEnabled());
+        assertTrue(response.getTenantAllowed());
+        assertFalse(response.getCategoryAllowed());
         assertTrue(response.getChunks().isEmpty());
     }
 
@@ -873,6 +888,7 @@ class DocumentInsightServiceTest {
         assertFalse(response.isEnabled());
         assertEquals("QUALITY_GATED", response.getStatus());
         assertEquals("BLOCKED", response.getQualityBand());
+        assertEquals("REQUIRED_METADATA_MISSING", response.getRolloutGuard());
         assertEquals(List.of("valor"), response.getMissingRequiredMetadata());
         var insight = service.getInsight("doc-rag", Optional.empty());
         assertEquals("EXTRACT_FROM_OCR", insight.getMetadataActionHints().get(0).getAction());
@@ -917,6 +933,7 @@ class DocumentInsightServiceTest {
         assertTrue(response.getAverageScore() > 0.0d);
         assertTrue(response.getLatencyMs() >= 0L);
         assertNotNull(response.getQualityBand());
+        assertEquals("NONE", response.getRolloutGuard());
         assertEquals("ocr", response.getChunks().get(0).getSource());
         assertTrue(response.getChunks().get(0).getScore() > 0.0d);
         assertNotNull(response.getChunks().get(0).getExcerpt());
