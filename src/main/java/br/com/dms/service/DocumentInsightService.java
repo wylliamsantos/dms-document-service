@@ -941,11 +941,16 @@ public class DocumentInsightService {
 
         int lines = (int) ocrText.lines().map(StringUtils::trim).filter(StringUtils::isNotBlank).count();
         int words = ocrText.trim().split("\\s+").length;
+        int paragraphs = (int) java.util.Arrays.stream(ocrText.replace("\r", "\n").split("\\n\\s*\\n"))
+                .map(StringUtils::trim)
+                .filter(StringUtils::isNotBlank)
+                .count();
 
         LinkedHashMap<String, Object> stats = new LinkedHashMap<>();
         stats.put("chars", ocrText.length());
         stats.put("lines", lines);
         stats.put("words", words);
+        stats.put("paragraphs", paragraphs);
         return stats;
     }
 
