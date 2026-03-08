@@ -226,6 +226,15 @@ public class DocumentInsightService {
         String referenceCategory = StringUtils.trimToEmpty(referenceDocument.getCategory());
         String requestedCategory = category.map(StringUtils::trimToEmpty).orElse("");
         String effectiveCategory = StringUtils.defaultIfBlank(requestedCategory, referenceCategory);
+        boolean categoryOverride = StringUtils.isNotBlank(requestedCategory) && !StringUtils.equalsIgnoreCase(requestedCategory, referenceCategory);
+
+        Counter.builder("dms.ai.document.ocr_hint.benchmark.category.requests")
+                .description("Benchmark OCR_HINT category summary requests (default vs override)")
+                .tag("tenant", sanitizeTenantTag(tenantId))
+                .tag("mode", categoryOverride ? "drilldown_override" : "default")
+                .tag("ocr_hint_action", sanitizeMetricTag(ocrHintAction.orElse("ALL"), "all"))
+                .register(meterRegistry)
+                .increment();
 
         List<DmsDocument> categoryDocuments = StringUtils.isBlank(effectiveCategory)
                 ? List.of(referenceDocument)
