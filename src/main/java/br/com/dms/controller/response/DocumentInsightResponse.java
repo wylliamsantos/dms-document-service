@@ -39,5 +39,7 @@ public class DocumentInsightResponse {
     Integer ocrQualityScore;
     String ocrQualityBand;
     String ocrQualitySummary;
+    String aiExecutiveSummary;
+    List<String> aiExecutiveHighlights;
     Map<String, Object> ocrStats;
 }
