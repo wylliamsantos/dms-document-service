@@ -585,6 +585,7 @@ public class DocumentInsightService {
                     OcrFieldSuggestion suggestion = hasPersistedOcrText
                             ? extractFieldValueFromOcr(persistedOcrText, field)
                             : OcrFieldSuggestion.empty();
+                    int impactScore = resolveMetadataActionHintImpactScore(field, suggestion.value());
                     return MetadataActionHintResponse.builder()
                             .field(field)
                             .action(hasPersistedOcrText ? "EXTRACT_FROM_OCR" : "REQUEST_OCR_PROCESSING")
@@ -594,10 +595,11 @@ public class DocumentInsightService {
                             .priority("HIGH")
                             .suggestedValue(suggestion.value())
                             .evidenceExcerpt(suggestion.evidenceExcerpt())
+                            .impactScore(impactScore)
                             .build();
                 })
                 .sorted(Comparator
-                        .comparingInt((MetadataActionHintResponse hint) -> resolveMetadataActionHintImpactScore(hint.getField(), hint.getSuggestedValue()))
+                        .comparingInt((MetadataActionHintResponse hint) -> Optional.ofNullable(hint.getImpactScore()).orElse(0))
                         .reversed()
                         .thenComparing(MetadataActionHintResponse::getField, String.CASE_INSENSITIVE_ORDER))
                 .limit(5)

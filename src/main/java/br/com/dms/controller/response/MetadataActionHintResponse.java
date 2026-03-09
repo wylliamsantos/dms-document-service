@@ -12,4 +12,5 @@ public class MetadataActionHintResponse {
     String priority;
     String suggestedValue;
     String evidenceExcerpt;
+    Integer impactScore;
 }
