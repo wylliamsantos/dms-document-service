@@ -160,7 +160,8 @@ public class DocumentInsightService {
         }
         Map<String, Object> ocrStats = resolveOcrStats(document);
         OcrQualityAssessment ocrQualityAssessment = resolveOcrQualityAssessment(ocrStats, requiredMetadataCoveragePercent, missingRequiredMetadata);
-        boolean executiveSummaryAllowed = isExecutiveSummaryEnabledFor(tenantId, document == null ? null : document.getCategory());
+        String executiveSummaryRolloutGuard = resolveExecutiveSummaryRolloutGuard(tenantId, document == null ? null : document.getCategory());
+        boolean executiveSummaryAllowed = "NONE".equals(executiveSummaryRolloutGuard);
         String aiExecutiveSummary = executiveSummaryAllowed
                 ? resolveAiExecutiveSummary(suggestion.getSummary(), missingRequiredMetadata, ocrQualityAssessment.band())
                 : null;
@@ -210,6 +211,7 @@ public class DocumentInsightService {
                 .ocrQualitySummary(ocrQualityAssessment.summary())
                 .aiExecutiveSummary(aiExecutiveSummary)
                 .aiExecutiveHighlights(aiExecutiveHighlights)
+                .aiExecutiveRolloutGuard(executiveSummaryRolloutGuard)
                 .ocrStats(ocrStats)
                 .build();
     }
@@ -1201,20 +1203,21 @@ public class DocumentInsightService {
                 startedAt);
     }
 
-    private boolean isExecutiveSummaryEnabledFor(String tenantId, String category) {
+    private String resolveExecutiveSummaryRolloutGuard(String tenantId, String category) {
         if (!executiveSummaryEnabled) {
-            return false;
+            return "GLOBAL_DISABLED";
         }
 
         if (!executiveSummaryEnabledTenants.isEmpty() && !executiveSummaryEnabledTenants.contains(tenantId)) {
-            return false;
+            return "TENANT_NOT_ALLOWED";
         }
 
-        if (!executiveSummaryEnabledCategories.isEmpty()) {
-            return executiveSummaryEnabledCategories.contains(StringUtils.lowerCase(StringUtils.defaultIfBlank(category, "")));
+        if (!executiveSummaryEnabledCategories.isEmpty()
+                && !executiveSummaryEnabledCategories.contains(StringUtils.lowerCase(StringUtils.defaultIfBlank(category, "")))) {
+            return "CATEGORY_NOT_ALLOWED";
         }
 
-        return true;
+        return "NONE";
     }
 
     private List<RagContextChunkResponse> buildChunks(DmsDocument document) {
