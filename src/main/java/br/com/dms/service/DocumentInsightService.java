@@ -162,6 +162,7 @@ public class DocumentInsightService {
         OcrQualityAssessment ocrQualityAssessment = resolveOcrQualityAssessment(ocrStats, requiredMetadataCoveragePercent, missingRequiredMetadata);
         String executiveSummaryRolloutGuard = resolveExecutiveSummaryRolloutGuard(tenantId, document == null ? null : document.getCategory());
         String ragRolloutGuard = resolveInsightRagRolloutGuard(tenantId, document, missingRequiredMetadata);
+        String ragRolloutGuardMessage = resolveInsightRagRolloutGuardMessage(ragRolloutGuard);
         boolean executiveSummaryAllowed = "NONE".equals(executiveSummaryRolloutGuard);
         String aiExecutiveSummary = executiveSummaryAllowed
                 ? resolveAiExecutiveSummary(suggestion.getSummary(), missingRequiredMetadata, ocrQualityAssessment.band())
@@ -214,6 +215,7 @@ public class DocumentInsightService {
                 .aiExecutiveHighlights(aiExecutiveHighlights)
                 .aiExecutiveRolloutGuard(executiveSummaryRolloutGuard)
                 .ragRolloutGuard(ragRolloutGuard)
+                .ragRolloutGuardMessage(ragRolloutGuardMessage)
                 .ocrStats(ocrStats)
                 .build();
     }
@@ -1241,6 +1243,16 @@ public class DocumentInsightService {
         }
 
         return "NONE";
+    }
+
+    private String resolveInsightRagRolloutGuardMessage(String guard) {
+        return switch (StringUtils.defaultString(guard, "NONE")) {
+            case "FEATURE_FLAG_DISABLED" -> "RAG documental indisponível: feature flag global desativada.";
+            case "TENANT_NOT_ALLOWED" -> "RAG documental indisponível para este tenant no rollout atual.";
+            case "CATEGORY_NOT_ALLOWED" -> "RAG documental indisponível para esta categoria no rollout atual.";
+            case "REQUIRED_METADATA_MISSING" -> "RAG documental aguardando qualidade mínima: há metadados obrigatórios faltantes.";
+            default -> null;
+        };
     }
 
     private List<RagContextChunkResponse> buildChunks(DmsDocument document) {
