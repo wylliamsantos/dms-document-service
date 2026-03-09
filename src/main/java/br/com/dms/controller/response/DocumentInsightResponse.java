@@ -41,5 +41,6 @@ public class DocumentInsightResponse {
     String ocrQualitySummary;
     String aiExecutiveSummary;
     List<String> aiExecutiveHighlights;
+    String aiExecutiveRolloutGuard;
     Map<String, Object> ocrStats;
 }

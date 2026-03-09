@@ -98,6 +98,7 @@ class DocumentInsightServiceTest {
         assertNotNull(response.getOcrQualitySummary());
         assertNotNull(response.getAiExecutiveSummary());
         assertFalse(response.getAiExecutiveHighlights().isEmpty());
+        assertEquals("NONE", response.getAiExecutiveRolloutGuard());
         assertTrue(response.getMetadataActionHints().isEmpty());
         assertEquals(1, response.getMetadataUpdateHistory().size());
         assertEquals("OCR_HINT", response.getMetadataUpdateHistory().get(0).getSource());
@@ -146,6 +147,7 @@ class DocumentInsightServiceTest {
         var response = service.getInsight("doc-exec-off", Optional.empty());
         assertNull(response.getAiExecutiveSummary());
         assertTrue(response.getAiExecutiveHighlights().isEmpty());
+        assertEquals("GLOBAL_DISABLED", response.getAiExecutiveRolloutGuard());
     }
 
     @Test
