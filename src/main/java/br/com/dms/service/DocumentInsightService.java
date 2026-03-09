@@ -161,6 +161,7 @@ public class DocumentInsightService {
         Map<String, Object> ocrStats = resolveOcrStats(document);
         OcrQualityAssessment ocrQualityAssessment = resolveOcrQualityAssessment(ocrStats, requiredMetadataCoveragePercent, missingRequiredMetadata);
         String executiveSummaryRolloutGuard = resolveExecutiveSummaryRolloutGuard(tenantId, document == null ? null : document.getCategory());
+        String ragRolloutGuard = resolveInsightRagRolloutGuard(tenantId, document, missingRequiredMetadata);
         boolean executiveSummaryAllowed = "NONE".equals(executiveSummaryRolloutGuard);
         String aiExecutiveSummary = executiveSummaryAllowed
                 ? resolveAiExecutiveSummary(suggestion.getSummary(), missingRequiredMetadata, ocrQualityAssessment.band())
@@ -212,6 +213,7 @@ public class DocumentInsightService {
                 .aiExecutiveSummary(aiExecutiveSummary)
                 .aiExecutiveHighlights(aiExecutiveHighlights)
                 .aiExecutiveRolloutGuard(executiveSummaryRolloutGuard)
+                .ragRolloutGuard(ragRolloutGuard)
                 .ocrStats(ocrStats)
                 .build();
     }
@@ -1215,6 +1217,27 @@ public class DocumentInsightService {
         if (!executiveSummaryEnabledCategories.isEmpty()
                 && !executiveSummaryEnabledCategories.contains(StringUtils.lowerCase(StringUtils.defaultIfBlank(category, "")))) {
             return "CATEGORY_NOT_ALLOWED";
+        }
+
+        return "NONE";
+    }
+
+    private String resolveInsightRagRolloutGuard(String tenantId, DmsDocument document, List<String> missingRequiredMetadata) {
+        if (!ragEnabled) {
+            return "FEATURE_FLAG_DISABLED";
+        }
+
+        if (!ragEnabledTenants.isEmpty() && !ragEnabledTenants.contains(tenantId)) {
+            return "TENANT_NOT_ALLOWED";
+        }
+
+        String category = StringUtils.trimToEmpty(document == null ? null : document.getCategory());
+        if (!ragEnabledCategories.isEmpty() && !ragEnabledCategories.contains(StringUtils.lowerCase(category))) {
+            return "CATEGORY_NOT_ALLOWED";
+        }
+
+        if (missingRequiredMetadata != null && !missingRequiredMetadata.isEmpty()) {
+            return "REQUIRED_METADATA_MISSING";
         }
 
         return "NONE";
