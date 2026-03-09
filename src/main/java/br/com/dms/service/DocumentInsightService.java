@@ -128,6 +128,8 @@ public class DocumentInsightService {
         }
         Map<String, Object> ocrStats = resolveOcrStats(document);
         OcrQualityAssessment ocrQualityAssessment = resolveOcrQualityAssessment(ocrStats, requiredMetadataCoveragePercent, missingRequiredMetadata);
+        String aiExecutiveSummary = resolveAiExecutiveSummary(suggestion.getSummary(), missingRequiredMetadata, ocrQualityAssessment.band());
+        List<String> aiExecutiveHighlights = resolveAiExecutiveHighlights(requiredMetadataCoveragePercent, importantMetadataCoveragePercent, missingRequiredMetadata, metadataActionHints, ocrQualityAssessment.band());
 
         String confidenceBand = resolveConfidenceBand(suggestion.getConfidence());
         Counter.builder("dms.ai.document.insight.requests")
@@ -169,6 +171,8 @@ public class DocumentInsightService {
                 .ocrQualityScore(ocrQualityAssessment.score())
                 .ocrQualityBand(ocrQualityAssessment.band())
                 .ocrQualitySummary(ocrQualityAssessment.summary())
+                .aiExecutiveSummary(aiExecutiveSummary)
+                .aiExecutiveHighlights(aiExecutiveHighlights)
                 .ocrStats(ocrStats)
                 .build();
     }
@@ -678,6 +682,38 @@ public class DocumentInsightService {
                 InsightSignalResponse.builder().signal("heuristics").description("Regras heurísticas aplicadas").active(source.contains("heuristic")).build(),
                 InsightSignalResponse.builder().signal("filename").description("Nome do arquivo usado como sinal").active(source.contains("filename") || source.contains("name")).build()
         );
+    }
+
+    private String resolveAiExecutiveSummary(String baseSummary,
+                                             List<String> missingRequiredMetadata,
+                                             String ocrQualityBand) {
+        String summary = StringUtils.trimToEmpty(baseSummary);
+        String band = StringUtils.upperCase(StringUtils.defaultIfBlank(ocrQualityBand, "UNKNOWN"));
+        if (missingRequiredMetadata != null && !missingRequiredMetadata.isEmpty()) {
+            return "Status operacional: atenção. " + summary + " Campos obrigatórios faltando: "
+                    + String.join(", ", missingRequiredMetadata) + ". Qualidade OCR: " + band + ".";
+        }
+        return "Status operacional: estável. " + summary + " Qualidade OCR: " + band + ".";
+    }
+
+    private List<String> resolveAiExecutiveHighlights(int requiredMetadataCoveragePercent,
+                                                      int importantMetadataCoveragePercent,
+                                                      List<String> missingRequiredMetadata,
+                                                      List<MetadataActionHintResponse> metadataActionHints,
+                                                      String ocrQualityBand) {
+        List<String> highlights = new ArrayList<>();
+        highlights.add("Cobertura obrigatória: " + requiredMetadataCoveragePercent + "%.");
+        highlights.add("Cobertura de campos importantes: " + importantMetadataCoveragePercent + "%.");
+        if (missingRequiredMetadata != null && !missingRequiredMetadata.isEmpty()) {
+            highlights.add("Campos críticos pendentes: " + String.join(", ", missingRequiredMetadata.stream().limit(3).toList()) + ".");
+        }
+        if (metadataActionHints != null && !metadataActionHints.isEmpty()) {
+            String topField = StringUtils.defaultIfBlank(metadataActionHints.get(0).getField(), "n/d");
+            Integer impact = Optional.ofNullable(metadataActionHints.get(0).getImpactScore()).orElse(0);
+            highlights.add("Próxima melhor ação sugerida: preencher " + topField + " (impacto " + impact + ").");
+        }
+        highlights.add("Faixa de qualidade OCR: " + StringUtils.defaultIfBlank(ocrQualityBand, "UNKNOWN") + ".");
+        return highlights.stream().filter(StringUtils::isNotBlank).limit(5).toList();
     }
 
     private DmsDocument resolveDocument(String documentId, String tenantId) {
