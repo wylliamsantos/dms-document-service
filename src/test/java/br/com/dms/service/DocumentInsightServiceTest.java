@@ -96,6 +96,8 @@ class DocumentInsightServiceTest {
         assertNotNull(response.getOcrQualityScore());
         assertEquals("LOW", response.getOcrQualityBand());
         assertNotNull(response.getOcrQualitySummary());
+        assertNotNull(response.getAiExecutiveSummary());
+        assertFalse(response.getAiExecutiveHighlights().isEmpty());
         assertTrue(response.getMetadataActionHints().isEmpty());
         assertEquals(1, response.getMetadataUpdateHistory().size());
         assertEquals("OCR_HINT", response.getMetadataUpdateHistory().get(0).getSource());
