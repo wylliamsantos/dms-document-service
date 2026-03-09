@@ -99,6 +99,8 @@ class DocumentInsightServiceTest {
         assertNotNull(response.getAiExecutiveSummary());
         assertFalse(response.getAiExecutiveHighlights().isEmpty());
         assertEquals("NONE", response.getAiExecutiveRolloutGuard());
+        assertEquals("FEATURE_FLAG_DISABLED", response.getRagRolloutGuard());
+        assertEquals("RAG documental indisponível: feature flag global desativada.", response.getRagRolloutGuardMessage());
         assertTrue(response.getMetadataActionHints().isEmpty());
         assertEquals(1, response.getMetadataUpdateHistory().size());
         assertEquals("OCR_HINT", response.getMetadataUpdateHistory().get(0).getSource());
