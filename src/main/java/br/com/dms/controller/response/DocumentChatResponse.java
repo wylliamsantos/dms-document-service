@@ -14,6 +14,7 @@ public class DocumentChatResponse {
     String status;
     String message;
     String rolloutGuard;
+    String ragRolloutGuardMessage;
     Integer ocrQualityScore;
     String ocrQualityBand;
     String ocrQualitySummary;
