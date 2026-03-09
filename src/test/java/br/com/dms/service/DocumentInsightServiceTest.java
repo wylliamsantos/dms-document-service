@@ -901,6 +901,9 @@ class DocumentInsightServiceTest {
         assertEquals("900,00", insight.getMetadataActionHints().get(0).getSuggestedValue());
         assertEquals("12345678900", insight.getMetadataActionHints().get(1).getSuggestedValue());
         assertNull(insight.getMetadataActionHints().get(2).getSuggestedValue());
+        assertEquals(180, insight.getMetadataActionHints().get(0).getImpactScore());
+        assertEquals(140, insight.getMetadataActionHints().get(1).getImpactScore());
+        assertEquals(0, insight.getMetadataActionHints().get(2).getImpactScore());
     }
 
     @Test
