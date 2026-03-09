@@ -324,6 +324,7 @@ public class DocumentChatService {
             return builder;
         }
         return builder
+                .ragRolloutGuardMessage(insight.getRagRolloutGuardMessage())
                 .ocrQualityScore(insight.getOcrQualityScore())
                 .ocrQualityBand(insight.getOcrQualityBand())
                 .ocrQualitySummary(insight.getOcrQualitySummary())

@@ -85,6 +85,7 @@ class DocumentChatServiceTest {
         when(insightService.getInsight(org.mockito.ArgumentMatchers.eq("doc-1"), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(DocumentInsightResponse.builder()
                         .documentId("doc-1")
+                        .ragRolloutGuardMessage("RAG documental aguardando qualidade mínima: há metadados obrigatórios faltantes.")
                         .ocrQualityScore(72)
                         .ocrQualityBand("MEDIUM")
                         .ocrQualitySummary("Qualidade OCR moderada")
@@ -122,6 +123,7 @@ class DocumentChatServiceTest {
         assertTrue(response.isEnabled());
         assertEquals("PROVIDER_UNAVAILABLE", response.getStatus());
         assertFalse(response.getContextChunks().isEmpty());
+        assertEquals("RAG documental aguardando qualidade mínima: há metadados obrigatórios faltantes.", response.getRagRolloutGuardMessage());
         assertEquals(72, response.getOcrQualityScore());
         assertEquals("MEDIUM", response.getOcrQualityBand());
         assertEquals(java.util.List.of("cpf"), response.getMissingRequiredMetadata());
