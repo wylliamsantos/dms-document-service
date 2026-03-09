@@ -105,6 +105,50 @@ class DocumentInsightServiceTest {
     }
 
     @Test
+    void shouldHideExecutiveInsightWhenFeatureFlagIsDisabled() {
+        AiMetadataSuggestionService aiService = mock(AiMetadataSuggestionService.class);
+        when(aiService.suggest(eq("doc-exec-off"), eq(Optional.empty()))).thenReturn(
+                MetadataSuggestionResponse.builder()
+                        .documentId("doc-exec-off")
+                        .summary("Resumo")
+                        .confidence(0.9)
+                        .source("ocr")
+                        .build()
+        );
+
+        TenantContextService tenantContextService = mock(TenantContextService.class);
+        when(tenantContextService.requireTenantId()).thenReturn("tenant-1");
+
+        DmsDocumentRepository repository = mock(DmsDocumentRepository.class);
+        when(repository.findByIdAndTenantId("doc-exec-off", "tenant-1")).thenReturn(Optional.of(
+                DmsDocument.of()
+                        .id("doc-exec-off")
+                        .tenantId("tenant-1")
+                        .category("CONTRATO")
+                        .ocrText("texto OCR")
+                        .build()
+        ));
+
+        DocumentInsightService service = new DocumentInsightService(
+                aiService,
+                tenantContextService,
+                repository,
+                mock(CategoryRepository.class),
+                new SimpleMeterRegistry(),
+                true,
+                "tenant-1",
+                "contrato",
+                false,
+                "",
+                ""
+        );
+
+        var response = service.getInsight("doc-exec-off", Optional.empty());
+        assertNull(response.getAiExecutiveSummary());
+        assertTrue(response.getAiExecutiveHighlights().isEmpty());
+    }
+
+    @Test
     void shouldExposeOcrHintAdoptionSummary() {
         AiMetadataSuggestionService aiService = mock(AiMetadataSuggestionService.class);
         when(aiService.suggest(eq("doc-1"), eq(Optional.empty()))).thenReturn(
