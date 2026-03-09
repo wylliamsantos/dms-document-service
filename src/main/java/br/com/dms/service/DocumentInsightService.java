@@ -27,6 +27,7 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -74,7 +75,32 @@ public class DocumentInsightService {
     private final boolean ragEnabled;
     private final Set<String> ragEnabledTenants;
     private final Set<String> ragEnabledCategories;
+    private final boolean executiveSummaryEnabled;
+    private final Set<String> executiveSummaryEnabledTenants;
+    private final Set<String> executiveSummaryEnabledCategories;
 
+    public DocumentInsightService(AiMetadataSuggestionService aiMetadataSuggestionService,
+                                  TenantContextService tenantContextService,
+                                  DmsDocumentRepository dmsDocumentRepository,
+                                  CategoryRepository categoryRepository,
+                                  MeterRegistry meterRegistry,
+                                  boolean ragEnabled,
+                                  String ragEnabledTenants,
+                                  String ragEnabledCategories) {
+        this(aiMetadataSuggestionService,
+                tenantContextService,
+                dmsDocumentRepository,
+                categoryRepository,
+                meterRegistry,
+                ragEnabled,
+                ragEnabledTenants,
+                ragEnabledCategories,
+                true,
+                "",
+                "");
+    }
+
+    @Autowired
     public DocumentInsightService(AiMetadataSuggestionService aiMetadataSuggestionService,
                                   TenantContextService tenantContextService,
                                   DmsDocumentRepository dmsDocumentRepository,
@@ -82,7 +108,10 @@ public class DocumentInsightService {
                                   MeterRegistry meterRegistry,
                                   @Value("${dms.ai.rag.document.enabled:false}") boolean ragEnabled,
                                   @Value("${dms.ai.rag.document.enabled-tenants:}") String ragEnabledTenants,
-                                  @Value("${dms.ai.rag.document.enabled-categories:}") String ragEnabledCategories) {
+                                  @Value("${dms.ai.rag.document.enabled-categories:}") String ragEnabledCategories,
+                                  @Value("${dms.ai.insight.executive-summary.enabled:false}") boolean executiveSummaryEnabled,
+                                  @Value("${dms.ai.insight.executive-summary.enabled-tenants:}") String executiveSummaryEnabledTenants,
+                                  @Value("${dms.ai.insight.executive-summary.enabled-categories:}") String executiveSummaryEnabledCategories) {
         this.aiMetadataSuggestionService = aiMetadataSuggestionService;
         this.tenantContextService = tenantContextService;
         this.dmsDocumentRepository = dmsDocumentRepository;
@@ -91,6 +120,9 @@ public class DocumentInsightService {
         this.ragEnabled = ragEnabled;
         this.ragEnabledTenants = parseEnabledTenants(ragEnabledTenants);
         this.ragEnabledCategories = parseEnabledCategories(ragEnabledCategories);
+        this.executiveSummaryEnabled = executiveSummaryEnabled;
+        this.executiveSummaryEnabledTenants = parseEnabledTenants(executiveSummaryEnabledTenants);
+        this.executiveSummaryEnabledCategories = parseEnabledCategories(executiveSummaryEnabledCategories);
     }
 
     public DocumentInsightResponse getInsight(String documentId, Optional<String> version) {
@@ -128,8 +160,13 @@ public class DocumentInsightService {
         }
         Map<String, Object> ocrStats = resolveOcrStats(document);
         OcrQualityAssessment ocrQualityAssessment = resolveOcrQualityAssessment(ocrStats, requiredMetadataCoveragePercent, missingRequiredMetadata);
-        String aiExecutiveSummary = resolveAiExecutiveSummary(suggestion.getSummary(), missingRequiredMetadata, ocrQualityAssessment.band());
-        List<String> aiExecutiveHighlights = resolveAiExecutiveHighlights(requiredMetadataCoveragePercent, importantMetadataCoveragePercent, missingRequiredMetadata, metadataActionHints, ocrQualityAssessment.band());
+        boolean executiveSummaryAllowed = isExecutiveSummaryEnabledFor(tenantId, document == null ? null : document.getCategory());
+        String aiExecutiveSummary = executiveSummaryAllowed
+                ? resolveAiExecutiveSummary(suggestion.getSummary(), missingRequiredMetadata, ocrQualityAssessment.band())
+                : null;
+        List<String> aiExecutiveHighlights = executiveSummaryAllowed
+                ? resolveAiExecutiveHighlights(requiredMetadataCoveragePercent, importantMetadataCoveragePercent, missingRequiredMetadata, metadataActionHints, ocrQualityAssessment.band())
+                : List.of();
 
         String confidenceBand = resolveConfidenceBand(suggestion.getConfidence());
         Counter.builder("dms.ai.document.insight.requests")
@@ -1162,6 +1199,22 @@ public class DocumentInsightService {
                 List.of(),
                 chunks,
                 startedAt);
+    }
+
+    private boolean isExecutiveSummaryEnabledFor(String tenantId, String category) {
+        if (!executiveSummaryEnabled) {
+            return false;
+        }
+
+        if (!executiveSummaryEnabledTenants.isEmpty() && !executiveSummaryEnabledTenants.contains(tenantId)) {
+            return false;
+        }
+
+        if (!executiveSummaryEnabledCategories.isEmpty()) {
+            return executiveSummaryEnabledCategories.contains(StringUtils.lowerCase(StringUtils.defaultIfBlank(category, "")));
+        }
+
+        return true;
     }
 
     private List<RagContextChunkResponse> buildChunks(DmsDocument document) {
