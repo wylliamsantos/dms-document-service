@@ -19,6 +19,7 @@ public class DocumentRagContextResponse {
     Long latencyMs;
     String qualityBand;
     String rolloutGuard;
+    Boolean ragReadyForChat;
     Boolean featureFlagEnabled;
     Boolean tenantAllowed;
     Boolean categoryAllowed;

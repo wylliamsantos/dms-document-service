@@ -169,6 +169,7 @@ public class DocumentInsightService {
         String executiveSummaryRolloutGuard = resolveExecutiveSummaryRolloutGuard(tenantId, document == null ? null : document.getCategory());
         String ragRolloutGuard = resolveInsightRagRolloutGuard(tenantId, document, missingRequiredMetadata);
         String ragRolloutGuardMessage = resolveInsightRagRolloutGuardMessage(ragRolloutGuard);
+        boolean ragReadyForChat = RAG_GUARD_NONE.equals(ragRolloutGuard);
         boolean executiveSummaryAllowed = RAG_GUARD_NONE.equals(executiveSummaryRolloutGuard);
         String aiExecutiveSummary = executiveSummaryAllowed
                 ? resolveAiExecutiveSummary(suggestion.getSummary(), missingRequiredMetadata, ocrQualityAssessment.band())
@@ -222,6 +223,7 @@ public class DocumentInsightService {
                 .aiExecutiveRolloutGuard(executiveSummaryRolloutGuard)
                 .ragRolloutGuard(ragRolloutGuard)
                 .ragRolloutGuardMessage(ragRolloutGuardMessage)
+                .ragReadyForChat(ragReadyForChat)
                 .ocrStats(ocrStats)
                 .build();
     }
@@ -1329,6 +1331,7 @@ public class DocumentInsightService {
                 .latencyMs(latencyMs)
                 .qualityBand(qualityBand)
                 .rolloutGuard(rolloutGuard)
+                .ragReadyForChat(enabled && "READY".equalsIgnoreCase(status))
                 .featureFlagEnabled(ragEnabled)
                 .tenantAllowed(ragEnabledTenants.isEmpty() || ragEnabledTenants.contains(tenantId))
                 .categoryAllowed(ragEnabledCategories.isEmpty() || ragEnabledCategories.contains(StringUtils.lowerCase(StringUtils.defaultIfBlank(category, ""))))
