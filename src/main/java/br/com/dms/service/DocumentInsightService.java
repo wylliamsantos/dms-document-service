@@ -67,6 +67,12 @@ public class DocumentInsightService {
             entry("nome", 20)
     );
 
+    private static final String RAG_GUARD_NONE = "NONE";
+    private static final String RAG_GUARD_FEATURE_FLAG_DISABLED = "FEATURE_FLAG_DISABLED";
+    private static final String RAG_GUARD_TENANT_NOT_ALLOWED = "TENANT_NOT_ALLOWED";
+    private static final String RAG_GUARD_CATEGORY_NOT_ALLOWED = "CATEGORY_NOT_ALLOWED";
+    private static final String RAG_GUARD_REQUIRED_METADATA_MISSING = "REQUIRED_METADATA_MISSING";
+
     private final AiMetadataSuggestionService aiMetadataSuggestionService;
     private final TenantContextService tenantContextService;
     private final DmsDocumentRepository dmsDocumentRepository;
@@ -163,7 +169,7 @@ public class DocumentInsightService {
         String executiveSummaryRolloutGuard = resolveExecutiveSummaryRolloutGuard(tenantId, document == null ? null : document.getCategory());
         String ragRolloutGuard = resolveInsightRagRolloutGuard(tenantId, document, missingRequiredMetadata);
         String ragRolloutGuardMessage = resolveInsightRagRolloutGuardMessage(ragRolloutGuard);
-        boolean executiveSummaryAllowed = "NONE".equals(executiveSummaryRolloutGuard);
+        boolean executiveSummaryAllowed = RAG_GUARD_NONE.equals(executiveSummaryRolloutGuard);
         String aiExecutiveSummary = executiveSummaryAllowed
                 ? resolveAiExecutiveSummary(suggestion.getSummary(), missingRequiredMetadata, ocrQualityAssessment.band())
                 : null;
@@ -1170,12 +1176,12 @@ public class DocumentInsightService {
 
         if (!ragEnabled) {
             return buildRagResponse(documentId, version, tenantId, "", false, "DISABLED",
-                    "RAG de documento desabilitado por feature flag (dms.ai.rag.document.enabled=false).", "FEATURE_FLAG_DISABLED", List.of(), List.of(), startedAt);
+                    "RAG de documento desabilitado por feature flag (dms.ai.rag.document.enabled=false).", RAG_GUARD_FEATURE_FLAG_DISABLED, List.of(), List.of(), startedAt);
         }
 
         if (!ragEnabledTenants.isEmpty() && !ragEnabledTenants.contains(tenantId)) {
             return buildRagResponse(documentId, version, tenantId, "", false, "TENANT_DISABLED",
-                    "RAG de documento desabilitado para o tenant atual (allowlist não inclui este tenant).", "TENANT_NOT_ALLOWED", List.of(), List.of(), startedAt);
+                    "RAG de documento desabilitado para o tenant atual (allowlist não inclui este tenant).", RAG_GUARD_TENANT_NOT_ALLOWED, List.of(), List.of(), startedAt);
         }
 
         DmsDocument document = dmsDocumentRepository.findByIdAndTenantId(documentId, tenantId)
@@ -1186,7 +1192,7 @@ public class DocumentInsightService {
             boolean allowedCategory = ragEnabledCategories.contains(StringUtils.lowerCase(category));
             if (!allowedCategory) {
                 return buildRagResponse(documentId, version, tenantId, category, false, "CATEGORY_DISABLED",
-                        "RAG de documento desabilitado para a categoria atual (allowlist por categoria).", "CATEGORY_NOT_ALLOWED", List.of(), List.of(), startedAt);
+                        "RAG de documento desabilitado para a categoria atual (allowlist por categoria).", RAG_GUARD_CATEGORY_NOT_ALLOWED, List.of(), List.of(), startedAt);
             }
         }
 
@@ -1195,13 +1201,13 @@ public class DocumentInsightService {
             String missingPreview = missingRequiredMetadata.stream().limit(3).collect(Collectors.joining(", "));
             String suffix = missingRequiredMetadata.size() > 3 ? "..." : "";
             return buildRagResponse(documentId, version, tenantId, category, false, "QUALITY_GATED",
-                    "RAG aguardando qualidade mínima: preencha metadados obrigatórios faltantes (" + missingPreview + suffix + ").", "REQUIRED_METADATA_MISSING", missingRequiredMetadata, List.of(), startedAt);
+                    "RAG aguardando qualidade mínima: preencha metadados obrigatórios faltantes (" + missingPreview + suffix + ").", RAG_GUARD_REQUIRED_METADATA_MISSING, missingRequiredMetadata, List.of(), startedAt);
         }
 
         List<RagContextChunkResponse> chunks = buildChunks(document);
         return buildRagResponse(documentId, version, tenantId, category, true, "READY",
                 chunks.isEmpty() ? "Sem chunks de OCR disponíveis para este documento." : "Contexto RAG local carregado.",
-                "NONE",
+                RAG_GUARD_NONE,
                 List.of(),
                 chunks,
                 startedAt);
@@ -1213,44 +1219,44 @@ public class DocumentInsightService {
         }
 
         if (!executiveSummaryEnabledTenants.isEmpty() && !executiveSummaryEnabledTenants.contains(tenantId)) {
-            return "TENANT_NOT_ALLOWED";
+            return RAG_GUARD_TENANT_NOT_ALLOWED;
         }
 
         if (!executiveSummaryEnabledCategories.isEmpty()
                 && !executiveSummaryEnabledCategories.contains(StringUtils.lowerCase(StringUtils.defaultIfBlank(category, "")))) {
-            return "CATEGORY_NOT_ALLOWED";
+            return RAG_GUARD_CATEGORY_NOT_ALLOWED;
         }
 
-        return "NONE";
+        return RAG_GUARD_NONE;
     }
 
     private String resolveInsightRagRolloutGuard(String tenantId, DmsDocument document, List<String> missingRequiredMetadata) {
         if (!ragEnabled) {
-            return "FEATURE_FLAG_DISABLED";
+            return RAG_GUARD_FEATURE_FLAG_DISABLED;
         }
 
         if (!ragEnabledTenants.isEmpty() && !ragEnabledTenants.contains(tenantId)) {
-            return "TENANT_NOT_ALLOWED";
+            return RAG_GUARD_TENANT_NOT_ALLOWED;
         }
 
         String category = StringUtils.trimToEmpty(document == null ? null : document.getCategory());
         if (!ragEnabledCategories.isEmpty() && !ragEnabledCategories.contains(StringUtils.lowerCase(category))) {
-            return "CATEGORY_NOT_ALLOWED";
+            return RAG_GUARD_CATEGORY_NOT_ALLOWED;
         }
 
         if (missingRequiredMetadata != null && !missingRequiredMetadata.isEmpty()) {
-            return "REQUIRED_METADATA_MISSING";
+            return RAG_GUARD_REQUIRED_METADATA_MISSING;
         }
 
-        return "NONE";
+        return RAG_GUARD_NONE;
     }
 
     private String resolveInsightRagRolloutGuardMessage(String guard) {
-        return switch (StringUtils.defaultString(guard, "NONE")) {
-            case "FEATURE_FLAG_DISABLED" -> "RAG documental indisponível: feature flag global desativada.";
-            case "TENANT_NOT_ALLOWED" -> "RAG documental indisponível para este tenant no rollout atual.";
-            case "CATEGORY_NOT_ALLOWED" -> "RAG documental indisponível para esta categoria no rollout atual.";
-            case "REQUIRED_METADATA_MISSING" -> "RAG documental aguardando qualidade mínima: há metadados obrigatórios faltantes.";
+        return switch (StringUtils.defaultString(guard, RAG_GUARD_NONE)) {
+            case RAG_GUARD_FEATURE_FLAG_DISABLED -> "RAG documental indisponível: feature flag global desativada.";
+            case RAG_GUARD_TENANT_NOT_ALLOWED -> "RAG documental indisponível para este tenant no rollout atual.";
+            case RAG_GUARD_CATEGORY_NOT_ALLOWED -> "RAG documental indisponível para esta categoria no rollout atual.";
+            case RAG_GUARD_REQUIRED_METADATA_MISSING -> "RAG documental aguardando qualidade mínima: há metadados obrigatórios faltantes.";
             default -> null;
         };
     }
