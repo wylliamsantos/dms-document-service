@@ -101,6 +101,7 @@ class DocumentInsightServiceTest {
         assertEquals("NONE", response.getAiExecutiveRolloutGuard());
         assertEquals("FEATURE_FLAG_DISABLED", response.getRagRolloutGuard());
         assertEquals("RAG documental indisponível: feature flag global desativada.", response.getRagRolloutGuardMessage());
+        assertFalse(response.getRagReadyForChat());
         assertTrue(response.getMetadataActionHints().isEmpty());
         assertEquals(1, response.getMetadataUpdateHistory().size());
         assertEquals("OCR_HINT", response.getMetadataUpdateHistory().get(0).getSource());
@@ -826,6 +827,7 @@ class DocumentInsightServiceTest {
         assertTrue(response.getLatencyMs() >= 0L);
         assertEquals("BLOCKED", response.getQualityBand());
         assertEquals("FEATURE_FLAG_DISABLED", response.getRolloutGuard());
+        assertFalse(response.getRagReadyForChat());
         assertFalse(response.getFeatureFlagEnabled());
         assertTrue(response.getTenantAllowed());
         assertTrue(response.getCategoryAllowed());
@@ -1055,6 +1057,7 @@ class DocumentInsightServiceTest {
         assertTrue(response.getLatencyMs() >= 0L);
         assertNotNull(response.getQualityBand());
         assertEquals("NONE", response.getRolloutGuard());
+        assertTrue(response.getRagReadyForChat());
         assertTrue(response.getFeatureFlagEnabled());
         assertTrue(response.getTenantAllowed());
         assertTrue(response.getCategoryAllowed());

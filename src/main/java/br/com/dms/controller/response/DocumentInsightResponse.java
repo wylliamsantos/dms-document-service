@@ -44,5 +44,6 @@ public class DocumentInsightResponse {
     String aiExecutiveRolloutGuard;
     String ragRolloutGuard;
     String ragRolloutGuardMessage;
+    Boolean ragReadyForChat;
     Map<String, Object> ocrStats;
 }
