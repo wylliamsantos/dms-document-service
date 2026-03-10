@@ -829,6 +829,7 @@ class DocumentInsightServiceTest {
         assertFalse(response.getFeatureFlagEnabled());
         assertTrue(response.getTenantAllowed());
         assertTrue(response.getCategoryAllowed());
+        assertTrue(response.getQualityGatePassed());
         assertTrue(response.getChunks().isEmpty());
     }
 
@@ -857,6 +858,7 @@ class DocumentInsightServiceTest {
         assertTrue(response.getFeatureFlagEnabled());
         assertFalse(response.getTenantAllowed());
         assertTrue(response.getCategoryAllowed());
+        assertTrue(response.getQualityGatePassed());
         assertTrue(response.getChunks().isEmpty());
     }
 
@@ -897,6 +899,7 @@ class DocumentInsightServiceTest {
         assertTrue(response.getFeatureFlagEnabled());
         assertTrue(response.getTenantAllowed());
         assertFalse(response.getCategoryAllowed());
+        assertTrue(response.getQualityGatePassed());
         assertTrue(response.getChunks().isEmpty());
     }
 
@@ -1006,6 +1009,7 @@ class DocumentInsightServiceTest {
         assertEquals("QUALITY_GATED", response.getStatus());
         assertEquals("BLOCKED", response.getQualityBand());
         assertEquals("REQUIRED_METADATA_MISSING", response.getRolloutGuard());
+        assertFalse(response.getQualityGatePassed());
         assertEquals(List.of("valor"), response.getMissingRequiredMetadata());
         var insight = service.getInsight("doc-rag", Optional.empty());
         assertEquals("EXTRACT_FROM_OCR", insight.getMetadataActionHints().get(0).getAction());
@@ -1054,6 +1058,7 @@ class DocumentInsightServiceTest {
         assertTrue(response.getFeatureFlagEnabled());
         assertTrue(response.getTenantAllowed());
         assertTrue(response.getCategoryAllowed());
+        assertTrue(response.getQualityGatePassed());
         assertEquals("ocr", response.getChunks().get(0).getSource());
         assertTrue(response.getChunks().get(0).getScore() > 0.0d);
         assertNotNull(response.getChunks().get(0).getExcerpt());

@@ -22,6 +22,7 @@ public class DocumentRagContextResponse {
     Boolean featureFlagEnabled;
     Boolean tenantAllowed;
     Boolean categoryAllowed;
+    Boolean qualityGatePassed;
     List<String> missingRequiredMetadata;
     List<RagContextChunkResponse> chunks;
 }

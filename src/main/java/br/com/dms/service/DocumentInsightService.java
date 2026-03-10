@@ -1326,6 +1326,7 @@ public class DocumentInsightService {
                 .featureFlagEnabled(ragEnabled)
                 .tenantAllowed(ragEnabledTenants.isEmpty() || ragEnabledTenants.contains(tenantId))
                 .categoryAllowed(ragEnabledCategories.isEmpty() || ragEnabledCategories.contains(StringUtils.lowerCase(StringUtils.defaultIfBlank(category, ""))))
+                .qualityGatePassed(missingRequiredMetadata == null || missingRequiredMetadata.isEmpty())
                 .missingRequiredMetadata(missingRequiredMetadata)
                 .chunks(chunks)
                 .build();
